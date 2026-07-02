@@ -1,0 +1,16 @@
+@import "@fontsource/geist-sans";
+@import "@fontsource/inter-tight";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-bg text-text-primary font-sans antialiased;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading tracking-tight text-text-primary;
+  }
+}
