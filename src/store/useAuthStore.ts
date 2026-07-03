@@ -29,6 +29,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   loading: true,
   initialize: async () => {
     try {
+      const isCallback = window.location.hash.includes('access_token=') || 
+                         window.location.hash.includes('id_token=') ||
+                         window.location.search.includes('code=');
+
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         const { data: profile } = await supabase
@@ -39,7 +43,9 @@ export const useAuthStore = create<AuthState>((set) => ({
           
         set({ session, user: session.user, profile: profile as Profile || null, loading: false });
       } else {
-        set({ session: null, user: null, profile: null, loading: false });
+        if (!isCallback) {
+          set({ session: null, user: null, profile: null, loading: false });
+        }
       }
 
       // Set up auth state change listener
