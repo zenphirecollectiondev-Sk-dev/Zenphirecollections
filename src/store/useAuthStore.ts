@@ -28,15 +28,15 @@ export const useAuthStore = create<AuthState>((set) => ({
   profile: null,
   loading: true,
   initialize: async () => {
-    console.log("[Auth] Initializing store...");
+    console.warn("[Auth] Initializing store...");
     try {
       const isCallback = window.location.hash.includes('access_token=') || 
                          window.location.hash.includes('id_token=') ||
                          window.location.search.includes('code=');
 
-      console.log("[Auth] Is OAuth callback URL?", isCallback);
-      console.log("[Auth] URL Hash:", window.location.hash);
-      console.log("[Auth] URL Search:", window.location.search);
+      console.warn("[Auth] Is OAuth callback URL?", isCallback);
+      console.warn("[Auth] URL Hash:", window.location.hash);
+      console.warn("[Auth] URL Search:", window.location.search);
 
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       if (sessionError) {
@@ -44,7 +44,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       }
 
       if (session) {
-        console.log("[Auth] Session found for user:", session.user.email);
+        console.warn("[Auth] Session found for user:", session.user.email);
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('*')
@@ -54,20 +54,20 @@ export const useAuthStore = create<AuthState>((set) => ({
         if (profileError) {
           console.error("[Auth] Profile fetch error:", profileError);
         }
-        console.log("[Auth] Profile loaded:", profile);
+        console.warn("[Auth] Profile loaded:", profile);
         set({ session, user: session.user, profile: profile as Profile || null, loading: false });
       } else {
-        console.log("[Auth] No initial session found.");
+        console.warn("[Auth] No initial session found.");
         if (!isCallback) {
           set({ session: null, user: null, profile: null, loading: false });
         } else {
-          console.log("[Auth] Callback detected. Holding loader true for OAuth processing...");
+          console.warn("[Auth] Callback detected. Holding loader true for OAuth processing...");
         }
       }
 
       // Set up auth state change listener
       supabase.auth.onAuthStateChange(async (event, session) => {
-        console.log("[Auth] onAuthStateChange event:", event, "Session exists:", !!session);
+        console.warn("[Auth] onAuthStateChange event:", event, "Session exists:", !!session);
         if (session) {
           const { data: profile, error: profileError } = await supabase
             .from('profiles')
@@ -78,7 +78,7 @@ export const useAuthStore = create<AuthState>((set) => ({
           if (profileError) {
             console.error("[Auth] Profile select error on event:", profileError);
           }
-          console.log("[Auth] Profile updated on event:", profile);
+          console.warn("[Auth] Profile updated on event:", profile);
           set({ session, user: session.user, profile: profile as Profile || null, loading: false });
         } else {
           set({ session: null, user: null, profile: null, loading: false });
