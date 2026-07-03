@@ -14,6 +14,8 @@ export interface Database {
           id: string
           name: string | null
           phone: string | null
+          dob: string | null
+          gender: string | null
           role: 'customer' | 'admin'
           created_at: string
         }
@@ -21,6 +23,8 @@ export interface Database {
           id: string
           name?: string | null
           phone?: string | null
+          dob?: string | null
+          gender?: string | null
           role?: 'customer' | 'admin'
           created_at?: string
         }
@@ -28,6 +32,8 @@ export interface Database {
           id?: string
           name?: string | null
           phone?: string | null
+          dob?: string | null
+          gender?: string | null
           role?: 'customer' | 'admin'
           created_at?: string
         }

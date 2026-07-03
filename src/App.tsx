@@ -19,6 +19,7 @@ import Admin from './pages/Admin';
 import Login from './pages/auth/Login';
 import Signup from './pages/auth/Signup';
 import ForgotPassword from './pages/auth/ForgotPassword';
+import Onboarding from './pages/auth/Onboarding';
 
 export default function App() {
   const { session, profile, initialize, signOut } = useAuthStore();
@@ -135,6 +136,7 @@ export default function App() {
                 </ProtectedRoute>
               } 
             />
+            <Route path="/onboarding" element={<Onboarding />} />
             
             <Route path="/wishlist" element={<Wishlist />} />
             

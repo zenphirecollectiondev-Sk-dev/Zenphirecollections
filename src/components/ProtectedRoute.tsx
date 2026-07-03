@@ -25,6 +25,11 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  // Intercept if onboarding is incomplete
+  if (profile && (!profile.dob || !profile.gender) && location.pathname !== '/onboarding') {
+    return <Navigate to={`/onboarding?redirect=${encodeURIComponent(location.pathname + location.search)}`} replace />;
+  }
+
   if (allowedRoles && profile && !allowedRoles.includes(profile.role)) {
     // Role not authorized, redirect to homepage or show access denied
     return <Navigate to="/" replace />;

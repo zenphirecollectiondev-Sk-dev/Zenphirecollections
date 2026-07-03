@@ -1,20 +1,15 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/useAuthStore';
+import { AlertCircle } from 'lucide-react';
 
 export default function Signup() {
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
   
   const navigate = useNavigate();
+  const location = useLocation();
   const { session } = useAuthStore();
 
   // If already logged in, redirect away
@@ -24,179 +19,86 @@ export default function Signup() {
     }
   }, [session, navigate]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleGoogleSignup = async () => {
     setLoading(true);
     setError(null);
-    setSuccess(false);
-
-    if (password !== confirmPassword) {
-      setError("Passwords do not match");
-      setLoading(false);
-      return;
-    }
 
     try {
-      const { error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
+      const from = (location.state as any)?.from?.pathname || '/';
+      const redirectUrl = `${window.location.origin}/onboarding?redirect=${encodeURIComponent(from)}`;
+
+      const { error: authError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
         options: {
-          data: {
-            name,
-            phone,
-          },
-        },
+          redirectTo: redirectUrl
+        }
       });
 
-      if (signUpError) throw signUpError;
-
-      setSuccess(true);
-      // Reset form
-      setName('');
-      setPhone('');
-      setEmail('');
-      setPassword('');
-      setConfirmPassword('');
+      if (authError) throw authError;
     } catch (err: any) {
-      setError(err.message || 'Failed to register account. Please try again.');
-    } finally {
+      setError(err.message || 'Failed to initialize Google registration.');
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-[85vh] flex flex-col justify-center items-center px-4 py-12">
-      <div className="w-full max-w-md bg-white border border-border p-8 md:p-10">
-        <div className="text-center mb-8">
-          <h1 className="text-2xl md:text-3xl font-heading font-black tracking-wide uppercase">
+    <div className="min-h-[70vh] flex flex-col justify-center items-center px-4 py-12 bg-bg">
+      <div className="w-full max-w-md bg-white border border-border p-8 md:p-10 shadow-sm">
+        <div className="text-center mb-8 space-y-2">
+          <span className="text-[10px] uppercase tracking-widest bg-bg-subtle border border-border text-text-secondary font-black px-2.5 py-1">
+            Access Portal
+          </span>
+          <h1 className="text-2xl md:text-3xl font-heading font-black tracking-wide uppercase mt-2">
             Create Account
           </h1>
-          <p className="text-sm text-text-secondary mt-2">
-            Join Zenphire Collections today
+          <p className="text-xs text-text-secondary">
+            Join Zenphire Collections today.
           </p>
         </div>
 
         {error && (
-          <div className="mb-6 p-4 bg-sale/10 border border-sale text-sale text-sm rounded-none">
+          <div className="mb-6 p-4 bg-sale/10 border border-sale text-sale text-xs flex items-center gap-2">
+            <AlertCircle size={14} className="flex-shrink-0" />
             {error}
           </div>
         )}
 
-        {success ? (
-          <div className="text-center space-y-4">
-            <div className="p-4 bg-bg-subtle border border-border text-text-primary text-sm rounded-none">
-              Account created successfully! Please check your email inbox to verify your account before logging in.
-            </div>
-            <Link
-              to="/login"
-              className="inline-block bg-accent text-white px-6 py-3 font-medium uppercase text-sm tracking-wider hover:bg-accent-hover transition-colors"
-            >
-              Go to Sign In
-            </Link>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label htmlFor="name" className="block text-xs font-heading font-bold uppercase tracking-wider text-text-primary mb-2">
-                Full Name
-              </label>
-              <input
-                id="name"
-                type="text"
-                required
-                disabled={loading}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full px-4 py-3 border border-border bg-white text-text-primary text-sm rounded-none focus:outline-none focus:border-accent transition-colors"
-                placeholder="John Doe"
-              />
-            </div>
+        <div className="space-y-6">
+          <p className="text-xs text-text-secondary text-center leading-relaxed">
+            We use secure Google credentials to register your account instantly. Additional details will be collected on the next step.
+          </p>
 
-            <div>
-              <label htmlFor="phone" className="block text-xs font-heading font-bold uppercase tracking-wider text-text-primary mb-2">
-                Phone Number (Optional)
-              </label>
-              <input
-                id="phone"
-                type="tel"
-                disabled={loading}
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="w-full px-4 py-3 border border-border bg-white text-text-primary text-sm rounded-none focus:outline-none focus:border-accent transition-colors"
-                placeholder="+91 99999 99999"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="email" className="block text-xs font-heading font-bold uppercase tracking-wider text-text-primary mb-2">
-                Email Address
-              </label>
-              <input
-                id="email"
-                type="email"
-                required
-                disabled={loading}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 border border-border bg-white text-text-primary text-sm rounded-none focus:outline-none focus:border-accent transition-colors"
-                placeholder="name@example.com"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="password" className="block text-xs font-heading font-bold uppercase tracking-wider text-text-primary mb-2">
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                required
-                disabled={loading}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 border border-border bg-white text-text-primary text-sm rounded-none focus:outline-none focus:border-accent transition-colors"
-                placeholder="Minimum 6 characters"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="confirmPassword" className="block text-xs font-heading font-bold uppercase tracking-wider text-text-primary mb-2">
-                Confirm Password
-              </label>
-              <input
-                id="confirmPassword"
-                type="password"
-                required
-                disabled={loading}
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-4 py-3 border border-border bg-white text-text-primary text-sm rounded-none focus:outline-none focus:border-accent transition-colors"
-                placeholder="Confirm password"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-accent text-white py-3 font-medium uppercase text-sm tracking-wider hover:bg-accent-hover transition-colors disabled:bg-text-secondary disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-              ) : (
-                'Create Account'
-              )}
-            </button>
-          </form>
-        )}
-
-        <div className="mt-8 pt-6 border-t border-border text-center text-sm">
-          <span className="text-text-secondary">Already have an account? </span>
-          <Link
-            to="/login"
-            className="text-text-primary font-medium hover:underline underline-offset-4 transition-colors"
+          <button
+            onClick={handleGoogleSignup}
+            disabled={loading}
+            className="w-full border border-border bg-white text-text-primary py-4 font-bold uppercase text-xs tracking-widest hover:bg-bg-subtle transition-colors flex items-center justify-center gap-3 disabled:opacity-50"
           >
-            Sign In
-          </Link>
+            {loading ? (
+              <span className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin"></span>
+            ) : (
+              <>
+                <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24">
+                  <path
+                    fill="#4285F4"
+                    d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v3.92h6.69c-.29 1.5-.1.85-2.01 2.46l3.09 2.39c1.8-1.66 2.88-4.11 2.88-6.7z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 24c3.24 0 5.97-1.08 7.96-2.91l-3.09-2.39c-.9.6-2.06.96-3.27.96-3.13 0-5.78-2.11-6.73-4.96L3.69 17.6C5.66 21.4 9.62 24 12 24z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.27 14.7c-.25-.7-.39-1.46-.39-2.25s.14-1.55.39-2.25L1.51 7.23C.54 9.17 0 11.27 0 12.5s.54 3.33 1.51 5.27l3.76-3.07z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.22 0 12 0 9.62 0 5.66 2.6 3.69 6.4l3.76 2.92C8.4 6.86 11.05 4.75 12 4.75z"
+                  />
+                </svg>
+                Sign Up with Google
+              </>
+            )}
+          </button>
         </div>
       </div>
     </div>

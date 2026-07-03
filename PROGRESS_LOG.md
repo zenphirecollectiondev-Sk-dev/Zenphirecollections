@@ -7,6 +7,31 @@
 
 ---
 
+## [2026-07-03] — Session: Google OAuth & Onboarding
+**What was done:**
+- Integrated Supabase Google OAuth provider (`signInWithOAuth`) on `Login.tsx` and `Signup.tsx` pages.
+- Added `dob` (date) and `gender` (text) columns to the `profiles` table in `supabase_schema.sql`.
+- Updated the `handle_new_user()` trigger function in SQL schema to automatically capture the user's name from OAuth raw user metadata (`full_name` or `name`).
+- Updated TypeScript database schema definitions in `src/types/database.ts` and auth state interface in `src/store/useAuthStore.ts`.
+- Developed first-time user onboarding page (`src/pages/auth/Onboarding.tsx`) to collect Name, DOB, and Gender.
+- Updated `ProtectedRoute.tsx` to automatically redirect logged-in users who have not completed onboarding to the `/onboarding` setup screen.
+
+**Files touched:**
+- `supabase_schema.sql`
+- `src/types/database.ts`
+- `src/store/useAuthStore.ts`
+- `src/components/ProtectedRoute.tsx`
+- `src/App.tsx`
+- `src/pages/auth/Login.tsx`
+- `src/pages/auth/Signup.tsx`
+- `src/pages/auth/Onboarding.tsx`
+
+**Status:** ✅ Complete — Google sign-in and onboarding flow are fully integrated, build check compiles clean
+
+**Next session should start with:** Phase 4 — Customer Account: Session 1 (Profile & Address management UI dashboard setup at `/account`)
+
+---
+
 ## [2026-07-02] — Session: Refactored Categories to Gender Collections
 **What was done:**
 - Refactored storefront category architecture to display Gender Collections (Male, Female, Unisex) instead of generic clothing classifications.

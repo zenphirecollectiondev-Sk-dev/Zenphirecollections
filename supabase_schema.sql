@@ -17,6 +17,8 @@ create table public.profiles (
   id uuid references auth.users on delete cascade primary key,
   name text,
   phone text,
+  dob date,
+  gender text,
   role user_role not null default 'customer',
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
@@ -159,7 +161,7 @@ begin
   insert into public.profiles (id, name, phone, role)
   values (
     new.id,
-    coalesce(new.raw_user_meta_data->>'name', ''),
+    coalesce(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', ''),
     coalesce(new.raw_user_meta_data->>'phone', ''),
     'customer'
   );

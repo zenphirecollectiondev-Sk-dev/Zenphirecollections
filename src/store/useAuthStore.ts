@@ -6,6 +6,8 @@ export interface Profile {
   id: string;
   name: string | null;
   phone: string | null;
+  dob: string | null;
+  gender: string | null;
   role: 'customer' | 'admin';
   created_at: string;
 }
@@ -17,6 +19,7 @@ interface AuthState {
   loading: boolean;
   initialize: () => Promise<void>;
   signOut: () => Promise<void>;
+  updateProfile: (profileData: Partial<Profile>) => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -64,5 +67,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     } catch (error) {
       console.error('Error signing out:', error);
     }
-  }
+  },
+  updateProfile: (profileData) => set((state) => ({
+    profile: state.profile ? { ...state.profile, ...profileData } : null
+  }))
 }));

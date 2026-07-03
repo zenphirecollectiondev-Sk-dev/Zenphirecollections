@@ -15,7 +15,7 @@ This file serves as the handoff document for the next AI assistant session. It s
 - **Fonts**: Installed and imported `@fontsource/geist-sans` and `@fontsource/inter-tight` fonts.
 
 ### Phase 1: Database & Auth
-- **Supabase Schema**: Created [supabase_schema.sql](file:///c:/Users/saran/Desktop/Zenphire%20collection/supabase_schema.sql) with 12 core tables, performance indexes, and database triggers (profile generation, default address constraint).
+- **Supabase Schema**: Created [supabase_schema.sql](file:///c:/Users/saran/Desktop/Zenphire%20collection/supabase_schema.sql) with 12 core tables, performance indexes, and database triggers.
 - **RLS Policies**: Established secure, recursion-safe Row Level Security (RLS) policies on all tables.
 - **Zustand Auth Store**: Built reactive session management in [useAuthStore.ts](file:///c:/Users/saran/Desktop/Zenphire%20collection/src/store/useAuthStore.ts).
 - **Protected Routing**: Implemented [ProtectedRoute.tsx](file:///c:/Users/saran/Desktop/Zenphire%20collection/src/components/ProtectedRoute.tsx) supporting role-based redirects.
@@ -36,9 +36,15 @@ This file serves as the handoff document for the next AI assistant session. It s
 ### Phase 3: Cart & Checkout
 - **Cart Drawer overlay**: Designed the sliding cart drawer at [CartDrawer.tsx](file:///c:/Users/saran/Desktop/Zenphire%20collection/src/components/CartDrawer.tsx) which lists items and updates quantities in real-time.
 - **Shopping Cart Page**: Built the full checkout listing page at [Cart.tsx](file:///c:/Users/saran/Desktop/Zenphire%20collection/src/pages/Cart.tsx).
-- **Coupon Validation**: Coded discount verification rules in [coupons.ts](file:///c:/Users/saran/Desktop/Zenphire%20collection/src/lib/coupons.ts) (such as percentage calculations and minimum spending thresholds).
+- **Coupon Validation**: Coded discount verification rules in [coupons.ts](file:///c:/Users/saran/Desktop/Zenphire%20collection/src/lib/coupons.ts).
 - **Checkout View**: Implemented shipping address entry forms, order summary review panels, and simulated payment stubs in [Checkout.tsx](file:///c:/Users/saran/Desktop/Zenphire%20collection/src/pages/Checkout.tsx).
 - **Transaction Processing**: Wired transaction triggers writing successful payment logs into Supabase database tables with a robust client-side storage fallback. Designed the purchase receipt screen showing order numbers and totals.
+
+### Phase 4 Add-on: Google OAuth & Onboarding
+- **Google OAuth Integration**: Replaced standard sign-in forms with Google OAuth sign-in controls on Login and Signup pages.
+- **Profiles Schema Update**: Modified [supabase_schema.sql](file:///c:/Users/saran/Desktop/Zenphire%20collection/supabase_schema.sql) adding `dob` and `gender` columns to profiles table, and modified user registration trigger logic to collect name metadata.
+- **Onboarding Page**: Built [Onboarding.tsx](file:///c:/Users/saran/Desktop/Zenphire%20collection/src/pages/auth/Onboarding.tsx) collecting Name, Date of Birth, and Gender for new users.
+- **Onboarding Interceptor**: Configured [ProtectedRoute.tsx](file:///c:/Users/saran/Desktop/Zenphire%20collection/src/components/ProtectedRoute.tsx) to automatically redirect logged-in users who haven't completed profile onboarding details to `/onboarding`.
 
 ---
 
@@ -55,6 +61,6 @@ This file serves as the handoff document for the next AI assistant session. It s
 
 **Core Sessions**:
 1. **Session 1: Profile & Address Manager**
-   - Design the account dashboard (/account) allowing users to edit profile information (name, phone) and edit shipping address cards (add/edit/delete/toggle defaults).
+   - Design the account dashboard (/account) allowing users to edit profile information (name, phone, dob, gender) and edit shipping address cards (add/edit/delete/toggle defaults).
 2. **Session 2: Order History List & Status Timeline**
    - Implement order listing grids showing status (processing, shipped, etc.) and detail status cards with tracking timelines.
