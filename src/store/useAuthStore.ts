@@ -28,41 +28,64 @@ export const useAuthStore = create<AuthState>((set) => ({
   profile: null,
   loading: true,
   initialize: async () => {
+    console.log("[Auth] Initializing store...");
     try {
       const isCallback = window.location.hash.includes('access_token=') || 
                          window.location.hash.includes('id_token=') ||
                          window.location.search.includes('code=');
 
-      const { data: { session } } = await supabase.auth.getSession();
+      console.log("[Auth] Is OAuth callback URL?", isCallback);
+      console.log("[Auth] URL Hash:", window.location.hash);
+      console.log("[Auth] URL Search:", window.location.search);
+
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) {
+        console.error("[Auth] getSession error:", sessionError);
+      }
+
       if (session) {
-        const { data: profile } = await supabase
+        console.log("[Auth] Session found for user:", session.user.email);
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', session.user.id)
           .single();
           
+        if (profileError) {
+          console.error("[Auth] Profile fetch error:", profileError);
+        }
+        console.log("[Auth] Profile loaded:", profile);
         set({ session, user: session.user, profile: profile as Profile || null, loading: false });
       } else {
+        console.log("[Auth] No initial session found.");
         if (!isCallback) {
           set({ session: null, user: null, profile: null, loading: false });
+        } else {
+          console.log("[Auth] Callback detected. Holding loader true for OAuth processing...");
         }
       }
 
       // Set up auth state change listener
-      supabase.auth.onAuthStateChange(async (_event, session) => {
+      supabase.auth.onAuthStateChange(async (event, session) => {
+        console.log("[Auth] onAuthStateChange event:", event, "Session exists:", !!session);
         if (session) {
-          const { data: profile } = await supabase
+          const { data: profile, error: profileError } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', session.user.id)
             .single();
+            
+          if (profileError) {
+            console.error("[Auth] Profile select error on event:", profileError);
+          }
+          console.log("[Auth] Profile updated on event:", profile);
           set({ session, user: session.user, profile: profile as Profile || null, loading: false });
         } else {
           set({ session: null, user: null, profile: null, loading: false });
         }
       });
     } catch (error) {
-      console.error('Error initializing auth store:', error);
+      console.error('[Auth] Error in initialize:', error);
       set({ loading: false });
     }
   },
