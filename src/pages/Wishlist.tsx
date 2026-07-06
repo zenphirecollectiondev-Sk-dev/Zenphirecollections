@@ -1,15 +1,44 @@
-import { useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Heart, Trash2, ArrowRight } from 'lucide-react';
+import { Heart, Trash2, ArrowRight, Loader2 } from 'lucide-react';
 import { useWishlistStore } from '../store/useWishlistStore';
-import { mockProducts } from '../lib/mockData';
+import { getProductsByIds } from '../lib/supabase';
+import linenShirt from '../assets/product_linen_shirt.png';
 
 export default function Wishlist() {
   const { productIds, toggleWishlist } = useWishlistStore();
+  const [wishlistProducts, setWishlistProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const wishlistedItems = useMemo(() => {
-    return mockProducts.filter((p) => productIds.includes(p.id));
+  useEffect(() => {
+    async function loadWishlistItems() {
+      if (productIds.length === 0) {
+        setWishlistProducts([]);
+        return;
+      }
+      setLoading(true);
+      try {
+        const data = await getProductsByIds(productIds);
+        setWishlistProducts(data || []);
+      } catch (err) {
+        console.warn('Could not load wishlist product details from Supabase:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadWishlistItems();
   }, [productIds]);
+
+  if (loading) {
+    return (
+      <div className="min-h-[70vh] flex flex-col items-center justify-center">
+        <Loader2 size={32} className="animate-spin text-text-secondary mb-2" />
+        <p className="text-xs uppercase tracking-widest text-text-secondary font-bold">
+          Loading Wishlist...
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 min-h-[70vh]">
@@ -23,7 +52,7 @@ export default function Wishlist() {
         </h1>
       </div>
 
-      {wishlistedItems.length === 0 ? (
+      {wishlistProducts.length === 0 ? (
         <div className="text-center py-20 bg-bg-subtle border border-border">
           <Heart size={40} className="mx-auto text-text-secondary stroke-[1.2] mb-4" />
           <h2 className="text-lg font-heading font-bold uppercase mb-2">Your wishlist is empty</h2>
@@ -39,13 +68,13 @@ export default function Wishlist() {
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
-          {wishlistedItems.map((product) => (
+          {wishlistProducts.map((product) => (
             <div key={product.id} className="group relative">
               {/* Image box */}
               <div className="aspect-[3/4] bg-bg-subtle overflow-hidden border border-border relative mb-4">
                 <Link to={`/product/${product.slug}`}>
                   <img
-                    src={product.product_images[0]?.url}
+                    src={product.product_images && product.product_images[0]?.url || linenShirt}
                     alt={product.name}
                     className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
                   />
@@ -73,7 +102,7 @@ export default function Wishlist() {
                 </Link>
                 <div className="flex justify-between items-center">
                   <p className="text-sm font-semibold text-text-primary">
-                    ${product.base_price.toFixed(2)}
+                    ₹{Number(product.base_price || 0).toFixed(2)}
                   </p>
                   <Link
                     to={`/product/${product.slug}`}

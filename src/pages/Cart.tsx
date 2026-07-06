@@ -6,7 +6,7 @@ export default function Cart() {
   const { items, removeItem, updateQuantity } = useCartStore();
 
   const subtotal = items.reduce((acc, item) => acc + item.price * item.quantity, 0);
-  const shipping = subtotal > 100 ? 0 : 15;
+  const shipping = subtotal > 1000 ? 0 : 150;
   const total = subtotal + shipping;
 
   return (
@@ -76,7 +76,7 @@ export default function Cart() {
 
                   {/* Unit price */}
                   <div className="col-span-2 text-center hidden md:block">
-                    <span className="text-sm text-text-primary">${item.price.toFixed(2)}</span>
+                    <span className="text-sm text-text-primary">₹{item.price.toFixed(2)}</span>
                   </div>
 
                   {/* Quantity adjustments */}
@@ -104,7 +104,7 @@ export default function Cart() {
                   <div className="col-span-2 text-right w-full md:w-auto flex justify-between md:block">
                     <span className="text-xs text-text-secondary uppercase font-bold md:hidden">Total:</span>
                     <span className="text-sm font-bold text-text-primary">
-                      ${(item.price * item.quantity).toFixed(2)}
+                      ₹{(item.price * item.quantity).toFixed(2)}
                     </span>
                   </div>
                 </div>
@@ -122,25 +122,25 @@ export default function Cart() {
               <div className="space-y-4 text-sm">
                 <div className="flex justify-between text-text-secondary">
                   <span>Subtotal</span>
-                  <span className="font-semibold text-text-primary">${subtotal.toFixed(2)}</span>
+                  <span className="font-semibold text-text-primary">₹{subtotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-text-secondary">
                   <span>Shipping</span>
                   {shipping === 0 ? (
                     <span className="font-bold text-emerald-600 uppercase text-xs">Free</span>
                   ) : (
-                    <span className="font-semibold text-text-primary">${shipping.toFixed(2)}</span>
+                    <span className="font-semibold text-text-primary">₹{shipping.toFixed(2)}</span>
                   )}
                 </div>
                 {shipping > 0 && (
                   <p className="text-[10px] text-text-secondary leading-tight italic bg-white p-2 border border-border">
-                    Tip: Add ${(100 - subtotal).toFixed(2)} more to unlock free shipping.
+                    Tip: Add ₹{(1000 - subtotal).toFixed(2)} more to unlock free shipping.
                   </p>
                 )}
                 
                 <div className="flex justify-between items-baseline pt-4 border-t border-border">
                   <span className="font-heading font-bold uppercase text-xs tracking-wider">Total</span>
-                  <span className="text-xl font-bold text-text-primary">${total.toFixed(2)}</span>
+                  <span className="text-xl font-bold text-text-primary">₹{total.toFixed(2)}</span>
                 </div>
               </div>
 

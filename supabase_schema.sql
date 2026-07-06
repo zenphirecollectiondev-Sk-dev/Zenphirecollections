@@ -29,6 +29,7 @@ create table public.categories (
   name text not null,
   slug text unique not null,
   parent_category_id uuid references public.categories(id) on delete set null,
+  size_guide_html text,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
@@ -41,6 +42,8 @@ create table public.products (
   category_id uuid references public.categories(id) on delete set null,
   base_price numeric(10, 2) not null check (base_price >= 0),
   is_active boolean default true not null,
+  size_guide_type text not null default 'category',
+  custom_size_guide_html text,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
@@ -68,6 +71,9 @@ create table public.product_images (
 create table public.addresses (
   id uuid default gen_random_uuid() primary key,
   user_id uuid references public.profiles(id) on delete cascade not null,
+  recipient_name text not null,
+  phone_primary text not null,
+  phone_secondary text,
   line1 text not null,
   city text not null,
   state text not null,

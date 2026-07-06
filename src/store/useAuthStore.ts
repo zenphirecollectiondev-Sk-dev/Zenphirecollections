@@ -30,14 +30,6 @@ export const useAuthStore = create<AuthState>((set) => ({
   initialize: async () => {
     console.warn("[Auth] Initializing store...");
     try {
-      const isCallback = window.location.hash.includes('access_token=') || 
-                         window.location.hash.includes('id_token=') ||
-                         window.location.search.includes('code=');
-
-      console.warn("[Auth] Is OAuth callback URL?", isCallback);
-      console.warn("[Auth] URL Hash:", window.location.hash);
-      console.warn("[Auth] URL Search:", window.location.search);
-
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       if (sessionError) {
         console.error("[Auth] getSession error:", sessionError);
@@ -58,11 +50,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         set({ session, user: session.user, profile: profile as Profile || null, loading: false });
       } else {
         console.warn("[Auth] No initial session found.");
-        if (!isCallback) {
-          set({ session: null, user: null, profile: null, loading: false });
-        } else {
-          console.warn("[Auth] Callback detected. Holding loader true for OAuth processing...");
-        }
+        set({ session: null, user: null, profile: null, loading: false });
       }
 
       // Set up auth state change listener

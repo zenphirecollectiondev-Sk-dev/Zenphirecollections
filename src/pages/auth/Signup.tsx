@@ -25,7 +25,7 @@ export default function Signup() {
 
     try {
       const from = (location.state as any)?.from?.pathname || '/';
-      const redirectUrl = `${window.location.origin}/onboarding?redirect=${encodeURIComponent(from)}`;
+      const redirectUrl = `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(from)}`;
 
       const { error: authError } = await supabase.auth.signInWithOAuth({
         provider: 'google',

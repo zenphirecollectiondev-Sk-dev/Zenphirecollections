@@ -1,17 +1,45 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { SlidersHorizontal, X, ChevronDown, Heart } from 'lucide-react';
-import { mockProducts, mockCategories } from '../lib/mockData';
+import { SlidersHorizontal, X, ChevronDown, Heart, Loader2 } from 'lucide-react';
 import { useWishlistStore } from '../store/useWishlistStore';
+import { getActiveProducts, getCategories } from '../lib/supabase';
+import linenShirt from '../assets/product_linen_shirt.png';
 
 export default function Shop() {
   const { toggleWishlist, isWishlisted } = useWishlistStore();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeCategory = searchParams.get('category') || 'all';
+  const activeGender = searchParams.get('gender') || 'all';
+
+  // Live database states
+  const [dbProducts, setDbProducts] = useState<any[]>([]);
+  const [dbCategories, setDbCategories] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [prodData, catData] = await Promise.all([
+          getActiveProducts(),
+          getCategories()
+        ]);
+        setDbProducts(prodData || []);
+        setDbCategories(catData || []);
+      } catch (err) {
+        console.warn('Could not load shop page data from Supabase:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  const products = useMemo(() => dbProducts, [dbProducts]);
+  const categories = useMemo(() => dbCategories, [dbCategories]);
 
   // Filters State
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
-  const [maxPrice, setMaxPrice] = useState<number>(200);
+  const [maxPrice, setMaxPrice] = useState<number>(15000);
   const [sortBy, setSortBy] = useState<string>('newest');
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
 
@@ -19,6 +47,7 @@ export default function Shop() {
 
   // Handle category change
   const handleCategoryChange = (slug: string) => {
+    searchParams.delete('gender');
     if (slug === 'all') {
       searchParams.delete('category');
     } else {
@@ -37,21 +66,38 @@ export default function Shop() {
   // Reset all filters
   const resetFilters = () => {
     searchParams.delete('category');
+    searchParams.delete('gender');
     setSearchParams(searchParams);
     setSelectedSizes([]);
-    setMaxPrice(200);
+    setMaxPrice(15000);
   };
 
   // Filter and Sort Logic
   const filteredProducts = useMemo(() => {
-    let result = [...mockProducts];
+    let result = [...products];
 
     // Filter by Category
     if (activeCategory !== 'all') {
-      const categoryObj = mockCategories.find((c) => c.slug === activeCategory);
+      const categoryObj = categories.find((c) => c.slug === activeCategory);
       if (categoryObj) {
-        result = result.filter((p) => p.category_id === categoryObj.id);
+        result = result.filter((p) => {
+          if (p.category_id === categoryObj.id) return true;
+          const prodCat = categories.find((c) => c.id === p.category_id);
+          if (prodCat && prodCat.parent_category_id === categoryObj.id) return true;
+          return false;
+        });
       }
+    }
+
+    // Filter by Gender
+    if (activeGender !== 'all') {
+      result = result.filter((p) => {
+        const prodCat = categories.find((c) => c.id === p.category_id);
+        if (prodCat) {
+          return prodCat.name.toLowerCase() === activeGender.toLowerCase();
+        }
+        return false;
+      });
     }
 
     // Filter by Price
@@ -60,8 +106,8 @@ export default function Shop() {
     // Filter by Sizes
     if (selectedSizes.length > 0) {
       result = result.filter((p) =>
-        p.product_variants.some(
-          (v) => selectedSizes.includes(v.size) && v.stock_qty > 0
+        p.product_variants && p.product_variants.some(
+          (v: any) => selectedSizes.includes(v.size) && v.stock_qty > 0
         )
       );
     }
@@ -72,12 +118,22 @@ export default function Shop() {
     } else if (sortBy === 'price-desc') {
       result.sort((a, b) => b.base_price - a.base_price);
     } else if (sortBy === 'newest') {
-      // For mock data, larger product IDs or sequence represents newest
-      result.sort((a, b) => b.id.localeCompare(a.id));
+      result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     }
 
     return result;
-  }, [activeCategory, maxPrice, selectedSizes, sortBy]);
+  }, [products, categories, activeCategory, activeGender, maxPrice, selectedSizes, sortBy]);
+
+  if (loading) {
+    return (
+      <div className="min-h-[70vh] flex flex-col items-center justify-center">
+        <Loader2 size={32} className="animate-spin text-text-secondary mb-2" />
+        <p className="text-xs uppercase tracking-widest text-text-secondary font-bold">
+          Loading Catalog...
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 min-h-screen">
@@ -88,7 +144,11 @@ export default function Shop() {
             Zenphire Catalog
           </span>
           <h1 className="text-3xl font-heading font-black uppercase mt-1">
-            {activeCategory === 'all' ? 'Shop All' : `${activeCategory} Collection`}
+            {activeCategory !== 'all' 
+              ? `${activeCategory} Collection` 
+              : activeGender !== 'all' 
+                ? `${activeGender}'s Collection` 
+                : 'Shop All'}
           </h1>
         </div>
         <p className="text-sm text-text-secondary">
@@ -110,7 +170,7 @@ export default function Shop() {
           <span className="text-xs uppercase tracking-wider text-text-secondary">
             Filter status:
           </span>
-          {(selectedSizes.length > 0 || activeCategory !== 'all' || maxPrice < 200) ? (
+          {(selectedSizes.length > 0 || activeCategory !== 'all' || maxPrice < 15000) ? (
             <button
               onClick={resetFilters}
               className="text-xs uppercase tracking-wider text-sale font-bold flex items-center gap-1 hover:underline"
@@ -148,31 +208,33 @@ export default function Shop() {
         {/* DESKTOP SIDEBAR FILTER */}
         <aside className="w-64 flex-shrink-0 hidden md:block space-y-8">
           {/* Categories */}
-          <div>
-            <h3 className="text-xs font-heading font-bold uppercase tracking-wider text-text-primary mb-4 pb-2 border-b border-border">
-              Collections
-            </h3>
-            <ul className="space-y-2">
-              <li>
-                <button
-                  onClick={() => handleCategoryChange('all')}
-                  className={`text-sm tracking-wide ${activeCategory === 'all' ? 'font-bold text-text-primary underline underline-offset-4' : 'text-text-secondary hover:text-text-primary'}`}
-                >
-                  All Collections
-                </button>
-              </li>
-              {mockCategories.map((c) => (
-                <li key={c.id}>
+          {categories.length > 0 && (
+            <div>
+              <h3 className="text-xs font-heading font-bold uppercase tracking-wider text-text-primary mb-4 pb-2 border-b border-border">
+                Collections
+              </h3>
+              <ul className="space-y-2">
+                <li>
                   <button
-                    onClick={() => handleCategoryChange(c.slug)}
-                    className={`text-sm tracking-wide capitalize ${activeCategory === c.slug ? 'font-bold text-text-primary underline underline-offset-4' : 'text-text-secondary hover:text-text-primary'}`}
+                    onClick={() => handleCategoryChange('all')}
+                    className={`text-sm tracking-wide ${activeCategory === 'all' ? 'font-bold text-text-primary underline underline-offset-4' : 'text-text-secondary hover:text-text-primary'}`}
                   >
-                    {c.name}
+                    All Collections
                   </button>
                 </li>
-              ))}
-            </ul>
-          </div>
+                {categories.filter((c) => !c.parent_category_id).map((c) => (
+                  <li key={c.id}>
+                    <button
+                      onClick={() => handleCategoryChange(c.slug)}
+                      className={`text-sm tracking-wide capitalize ${activeCategory === c.slug ? 'font-bold text-text-primary underline underline-offset-4' : 'text-text-secondary hover:text-text-primary'}`}
+                    >
+                      {c.name}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* Sizes */}
           <div>
@@ -204,14 +266,14 @@ export default function Shop() {
             <div className="flex justify-between items-center mb-3">
               <h3 className="text-xs font-heading font-bold uppercase tracking-wider text-text-primary pb-2 border-b border-border w-full flex justify-between">
                 <span>Max Price</span>
-                <span className="text-text-secondary">${maxPrice}</span>
+                <span className="text-text-secondary">₹{maxPrice}</span>
               </h3>
             </div>
             <input
               type="range"
-              min="40"
-              max="200"
-              step="5"
+              min="100"
+              max="15000"
+              step="100"
               value={maxPrice}
               onChange={(e) => setMaxPrice(parseInt(e.target.value))}
               className="w-full accent-accent bg-bg-subtle h-1.5 cursor-pointer"
@@ -241,11 +303,11 @@ export default function Shop() {
                 >
                   <div className="aspect-[3/4] bg-bg-subtle overflow-hidden border border-border relative mb-4">
                     <img
-                      src={product.product_images[0]?.url}
+                      src={product.product_images && product.product_images[0]?.url || linenShirt}
                       alt={product.name}
                       className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
                     />
-                    {product.product_variants.every((v) => v.stock_qty === 0) && (
+                    {product.product_variants && product.product_variants.every((v: any) => v.stock_qty === 0) && (
                       <div className="absolute top-2 left-2 bg-sale text-white text-[10px] uppercase font-bold tracking-wider px-2 py-1">
                         Sold Out
                       </div>
@@ -273,7 +335,7 @@ export default function Shop() {
                       {product.name}
                     </h3>
                     <p className="text-sm font-semibold text-text-primary">
-                      ${product.base_price.toFixed(2)}
+                      ₹{Number(product.base_price || 0).toFixed(2)}
                     </p>
                   </div>
                 </Link>
@@ -307,36 +369,38 @@ export default function Shop() {
             </div>
 
             {/* Mobile Collections */}
-            <div>
-              <h3 className="text-xs font-heading font-bold uppercase tracking-wider text-text-primary mb-3">
-                Collections
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => handleCategoryChange('all')}
-                  className={`px-4 py-2 border text-xs font-semibold uppercase tracking-wider transition-colors ${
-                    activeCategory === 'all'
-                      ? 'bg-accent border-accent text-white'
-                      : 'border-border bg-white text-text-primary hover:border-accent'
-                  }`}
-                >
-                  All Collections
-                </button>
-                {mockCategories.map((c) => (
+            {categories.length > 0 && (
+              <div>
+                <h3 className="text-xs font-heading font-bold uppercase tracking-wider text-text-primary mb-3">
+                  Collections
+                </h3>
+                <div className="flex flex-wrap gap-2">
                   <button
-                    key={c.id}
-                    onClick={() => handleCategoryChange(c.slug)}
+                    onClick={() => handleCategoryChange('all')}
                     className={`px-4 py-2 border text-xs font-semibold uppercase tracking-wider transition-colors ${
-                      activeCategory === c.slug
+                      activeCategory === 'all'
                         ? 'bg-accent border-accent text-white'
                         : 'border-border bg-white text-text-primary hover:border-accent'
                     }`}
                   >
-                    {c.name}
+                    All Collections
                   </button>
-                ))}
+                  {categories.filter((c) => !c.parent_category_id).map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => handleCategoryChange(c.slug)}
+                      className={`px-4 py-2 border text-xs font-semibold uppercase tracking-wider transition-colors ${
+                        activeCategory === c.slug
+                          ? 'bg-accent border-accent text-white'
+                          : 'border-border bg-white text-text-primary hover:border-accent'
+                      }`}
+                    >
+                      {c.name}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Mobile Sizes */}
             <div>
@@ -369,13 +433,13 @@ export default function Shop() {
                 <h3 className="text-xs font-heading font-bold uppercase tracking-wider text-text-primary">
                   Max Price
                 </h3>
-                <span className="text-xs font-bold text-text-primary">${maxPrice}</span>
+                <span className="text-xs font-bold text-text-primary">₹{maxPrice}</span>
               </div>
               <input
                 type="range"
-                min="40"
-                max="200"
-                step="5"
+                min="100"
+                max="15000"
+                step="100"
                 value={maxPrice}
                 onChange={(e) => setMaxPrice(parseInt(e.target.value))}
                 className="w-full accent-accent bg-bg-subtle h-1.5 cursor-pointer"

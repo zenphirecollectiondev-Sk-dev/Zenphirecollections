@@ -11,6 +11,7 @@ import CartDrawer from './components/CartDrawer';
 import Home from './pages/Home';
 import Shop from './pages/Shop';
 import ProductDetail from './pages/ProductDetail';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
 import Account from './pages/Account';
@@ -20,6 +21,7 @@ import Login from './pages/auth/Login';
 import Signup from './pages/auth/Signup';
 import ForgotPassword from './pages/auth/ForgotPassword';
 import Onboarding from './pages/auth/Onboarding';
+import AuthCallback from './pages/auth/AuthCallback';
 
 export default function App() {
   const { session, profile, initialize, signOut } = useAuthStore();
@@ -116,7 +118,11 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/shop" element={<Shop />} />
-            <Route path="/product/:id" element={<ProductDetail />} />
+            <Route path="/product/:id" element={
+              <ErrorBoundary>
+                <ProductDetail />
+              </ErrorBoundary>
+            } />
             <Route path="/cart" element={<Cart />} />
             
             {/* Protected Checkout & Account */}
@@ -137,6 +143,7 @@ export default function App() {
               } 
             />
             <Route path="/onboarding" element={<Onboarding />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
             
             <Route path="/wishlist" element={<Wishlist />} />
             

@@ -76,7 +76,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                           {item.name}
                         </h3>
                         <p className="text-sm font-bold text-text-primary ml-2">
-                          ${(item.price * item.quantity).toFixed(2)}
+                          ₹{(item.price * item.quantity).toFixed(2)}
                         </p>
                       </div>
                       <p className="text-xs text-text-secondary mt-1">
@@ -123,7 +123,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
           <div className="p-6 border-t border-border bg-bg-subtle space-y-4">
             <div className="flex justify-between items-baseline">
               <span className="text-sm font-semibold uppercase tracking-wider text-text-secondary">Subtotal</span>
-              <span className="text-xl font-bold text-text-primary">${subtotal.toFixed(2)}</span>
+              <span className="text-xl font-bold text-text-primary">₹{subtotal.toFixed(2)}</span>
             </div>
             
             <p className="text-[11px] text-text-secondary text-center leading-relaxed">

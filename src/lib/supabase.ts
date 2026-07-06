@@ -189,7 +189,10 @@ export async function getUserOrders(userId: string) {
           color,
           products (
             name,
-            slug
+            slug,
+            product_images (
+              url
+            )
           )
         )
       )
@@ -203,4 +206,25 @@ export async function getUserOrders(userId: string) {
   }
 
   return data || [];
+}
+
+/**
+ * Fetch multiple products with variants and images by their IDs
+ */
+export async function getProductsByIds(ids: string[]): Promise<ProductWithDetails[]> {
+  if (!ids || ids.length === 0) return [];
+  const { data, error } = await supabase
+    .from('products')
+    .select(`
+      *,
+      product_images (*),
+      product_variants (*)
+    `)
+    .in('id', ids);
+
+  if (error) {
+    console.error('Error fetching products by ids:', error);
+    throw error;
+  }
+  return (data || []) as ProductWithDetails[];
 }

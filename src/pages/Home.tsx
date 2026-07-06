@@ -1,14 +1,91 @@
-import { ArrowRight, Heart } from 'lucide-react';
+import { useEffect, useState, useMemo } from 'react';
+import { ArrowRight, Heart, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { mockCategories, mockProducts } from '../lib/mockData';
 import heroBanner from '../assets/hero_banner.png';
 import { useWishlistStore } from '../store/useWishlistStore';
+import { getActiveProducts, getCategories } from '../lib/supabase';
+
+// Local fallbacks for visual presentation
+import linenShirt from '../assets/product_linen_shirt.png';
+import minimalJacket from '../assets/product_minimal_jacket.png';
+import categoryFemale from '../assets/category_female_fashion.png';
+
+
+
+const genderCollections = [
+  {
+    id: 'men',
+    name: 'Men',
+    slug: 'male',
+    image: linenShirt,
+    link: '/shop?gender=male'
+  },
+  {
+    id: 'women',
+    name: 'Women',
+    slug: 'female',
+    image: categoryFemale,
+    link: '/shop?gender=female'
+  },
+  {
+    id: 'unisex',
+    name: 'Unisex',
+    slug: 'unisex',
+    image: minimalJacket,
+    link: '/shop?gender=unisex'
+  }
+];
 
 export default function Home() {
   const { toggleWishlist, isWishlisted } = useWishlistStore();
-  // Use first 4 products for new arrivals, and next 4 (or same) for best sellers
-  const newArrivals = mockProducts.slice(0, 4);
-  const bestSellers = mockProducts.slice(2, 6);
+  const [products, setProducts] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadHomeData() {
+      try {
+        const [prodData, catData] = await Promise.all([
+          getActiveProducts(),
+          getCategories()
+        ]);
+        setProducts(prodData || []);
+        setCategories((catData || []).filter(c => !c.parent_category_id));
+      } catch (err) {
+        console.warn('Could not load home page data from Supabase:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadHomeData();
+  }, []);
+
+  // Compute New Arrivals sorted by newest created date
+  const newArrivals = useMemo(() => {
+    return [...products]
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 4);
+  }, [products]);
+
+  // Compute Best Sellers as first 4 items (or fallback index slice if available)
+  const bestSellers = useMemo(() => {
+    return products.slice(0, 4);
+  }, [products]);
+
+  const editorialImage = useMemo(() => {
+    return products[0]?.product_images[0]?.url || linenShirt;
+  }, [products]);
+
+  if (loading) {
+    return (
+      <div className="min-h-[70vh] flex flex-col items-center justify-center">
+        <Loader2 size={32} className="animate-spin text-text-secondary mb-2" />
+        <p className="text-xs uppercase tracking-widest text-text-secondary font-bold">
+          Loading Collections...
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-bg min-h-screen">
@@ -44,7 +121,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 2. Shop By Category (Horizontal Scroll) */}
+      {/* 2. Curated Wardrobe (Horizontal Scroll) */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="flex justify-between items-end mb-8">
           <div>
@@ -65,25 +142,25 @@ export default function Home() {
 
         {/* Scroll Container */}
         <div className="flex gap-4 md:gap-6 overflow-x-auto pb-4 scrollbar-none snap-x snap-mandatory">
-          {mockCategories.map((category) => (
+          {genderCollections.map((col) => (
             <Link
-              key={category.id}
-              to={`/shop?category=${category.slug}`}
+              key={col.id}
+              to={col.link}
               className="flex-shrink-0 w-72 md:w-96 snap-start group block"
             >
               <div className="relative aspect-[4/5] bg-bg-subtle overflow-hidden border border-border">
                 <img
-                  src={category.image}
-                  alt={category.name}
+                  src={col.image}
+                  alt={col.name}
                   className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"></div>
                 <div className="absolute bottom-6 left-6 text-white">
                   <h3 className="text-lg font-heading font-bold tracking-wider uppercase">
-                    {category.name}
+                    {col.name}
                   </h3>
                   <span className="text-xs tracking-wider opacity-80 uppercase inline-flex items-center gap-1 mt-1">
-                    Explore <ArrowRight size={10} />
+                    Explore {col.name}'s Collection <ArrowRight size={10} />
                   </span>
                 </div>
               </div>
@@ -91,6 +168,37 @@ export default function Home() {
           ))}
         </div>
       </section>
+
+      {/* 2.5 Shop by Category (Product Types) */}
+      {categories.length > 0 && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 border-t border-border">
+          <div className="mb-8">
+            <span className="text-xs uppercase tracking-[0.2em] text-text-secondary font-bold">
+              Browse Catalog
+            </span>
+            <h2 className="text-2xl font-heading font-black uppercase mt-1">
+              Shop by Category
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {categories.map((category) => (
+              <Link
+                key={category.id}
+                to={`/shop?category=${category.slug}`}
+                className="group border border-border p-6 text-center hover:border-accent hover:bg-bg-subtle transition-all duration-300 flex flex-col justify-center items-center h-32"
+              >
+                <span className="text-xs font-bold uppercase tracking-widest text-text-primary group-hover:text-accent transition-colors">
+                  {category.name}
+                </span>
+                <span className="text-[10px] text-text-secondary uppercase tracking-wider mt-2 group-hover:underline">
+                  View Collection →
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* 3. New Arrivals Grid */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 border-t border-border">
@@ -103,53 +211,61 @@ export default function Home() {
           </h2>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
-          {newArrivals.map((product) => (
-            <Link
-              key={product.id}
-              to={`/product/${product.slug}`}
-              className="group"
-            >
-              <div className="aspect-[3/4] bg-bg-subtle overflow-hidden border border-border relative mb-4">
-                <img
-                  src={product.product_images[0]?.url}
-                  alt={product.name}
-                  className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
-                />
-                {product.product_variants.every(v => v.stock_qty === 0) && (
-                  <div className="absolute top-2 left-2 bg-sale text-white text-[10px] uppercase font-bold tracking-wider px-2 py-1">
-                    Sold Out
-                  </div>
-                )}
-                <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    toggleWishlist(product.id);
-                  }}
-                  aria-label="Toggle Wishlist"
-                  className="absolute top-3 right-3 p-1.5 bg-white/85 hover:bg-white text-text-primary border border-border shadow-sm rounded-full transition-colors z-10"
-                >
-                  <Heart
-                    size={14}
-                    className={isWishlisted(product.id) ? 'fill-sale stroke-sale' : 'stroke-text-primary'}
+        {newArrivals.length === 0 ? (
+          <div className="text-center py-16 bg-bg-subtle border border-border">
+            <p className="text-xs uppercase tracking-widest text-text-secondary font-bold">
+              No products found in database.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
+            {newArrivals.map((product) => (
+              <Link
+                key={product.id}
+                to={`/product/${product.slug}`}
+                className="group"
+              >
+                <div className="aspect-[3/4] bg-bg-subtle overflow-hidden border border-border relative mb-4">
+                  <img
+                    src={product.product_images[0]?.url || linenShirt}
+                    alt={product.name}
+                    className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
                   />
-                </button>
-              </div>
-              <div className="space-y-1">
-                <p className="text-[10px] uppercase tracking-widest text-text-secondary font-bold">
-                  Zenphire
-                </p>
-                <h3 className="text-sm font-medium text-text-primary group-hover:underline truncate">
-                  {product.name}
-                </h3>
-                <p className="text-sm font-semibold text-text-primary">
-                  ${product.base_price.toFixed(2)}
-                </p>
-              </div>
-            </Link>
-          ))}
-        </div>
+                  {product.product_variants.every((v: any) => v.stock_qty === 0) && (
+                    <div className="absolute top-2 left-2 bg-sale text-white text-[10px] uppercase font-bold tracking-wider px-2 py-1">
+                      Sold Out
+                    </div>
+                  )}
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      toggleWishlist(product.id);
+                    }}
+                    aria-label="Toggle Wishlist"
+                    className="absolute top-3 right-3 p-1.5 bg-white/85 hover:bg-white text-text-primary border border-border shadow-sm rounded-full transition-colors z-10"
+                  >
+                    <Heart
+                      size={14}
+                      className={isWishlisted(product.id) ? 'fill-sale stroke-sale' : 'stroke-text-primary'}
+                    />
+                  </button>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] uppercase tracking-widest text-text-secondary font-bold">
+                    Zenphire
+                  </p>
+                  <h3 className="text-sm font-medium text-text-primary group-hover:underline truncate">
+                    {product.name}
+                  </h3>
+                  <p className="text-sm font-semibold text-text-primary">
+                    ₹{Number(product.base_price || 0).toFixed(2)}
+                  </p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* 4. Editorial Banner */}
@@ -176,7 +292,7 @@ export default function Home() {
           </div>
           <div className="aspect-[4/3] bg-white border border-border overflow-hidden">
             <img
-              src={mockProducts[0].product_images[0].url}
+              src={editorialImage}
               alt="Artisan Craft detail"
               className="w-full h-full object-cover object-center"
             />
@@ -185,59 +301,61 @@ export default function Home() {
       </section>
 
       {/* 5. Best Sellers Grid */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 mb-16">
-        <div className="text-center mb-12">
-          <span className="text-xs uppercase tracking-[0.2em] text-text-secondary font-bold">
-            Customer Favorites
-          </span>
-          <h2 className="text-2xl md:text-3xl font-heading font-black uppercase mt-1">
-            Best Sellers
-          </h2>
-        </div>
+      {bestSellers.length > 0 && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 mb-16">
+          <div className="text-center mb-12">
+            <span className="text-xs uppercase tracking-[0.2em] text-text-secondary font-bold">
+              Customer Favorites
+            </span>
+            <h2 className="text-2xl md:text-3xl font-heading font-black uppercase mt-1">
+              Best Sellers
+            </h2>
+          </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
-          {bestSellers.map((product) => (
-            <Link
-              key={product.id}
-              to={`/product/${product.slug}`}
-              className="group"
-            >
-              <div className="aspect-[3/4] bg-bg-subtle overflow-hidden border border-border relative mb-4">
-                <img
-                  src={product.product_images[0]?.url}
-                  alt={product.name}
-                  className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
-                />
-                <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    toggleWishlist(product.id);
-                  }}
-                  aria-label="Toggle Wishlist"
-                  className="absolute top-3 right-3 p-1.5 bg-white/85 hover:bg-white text-text-primary border border-border shadow-sm rounded-full transition-colors z-10"
-                >
-                  <Heart
-                    size={14}
-                    className={isWishlisted(product.id) ? 'fill-sale stroke-sale' : 'stroke-text-primary'}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
+            {bestSellers.map((product) => (
+              <Link
+                key={product.id}
+                to={`/product/${product.slug}`}
+                className="group"
+              >
+                <div className="aspect-[3/4] bg-bg-subtle overflow-hidden border border-border relative mb-4">
+                  <img
+                    src={product.product_images[0]?.url || linenShirt}
+                    alt={product.name}
+                    className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
                   />
-                </button>
-              </div>
-              <div className="space-y-1">
-                <p className="text-[10px] uppercase tracking-widest text-text-secondary font-bold">
-                  Zenphire
-                </p>
-                <h3 className="text-sm font-medium text-text-primary group-hover:underline truncate">
-                  {product.name}
-                </h3>
-                <p className="text-sm font-semibold text-text-primary">
-                  ${product.base_price.toFixed(2)}
-                </p>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </section>
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      toggleWishlist(product.id);
+                    }}
+                    aria-label="Toggle Wishlist"
+                    className="absolute top-3 right-3 p-1.5 bg-white/85 hover:bg-white text-text-primary border border-border shadow-sm rounded-full transition-colors z-10"
+                  >
+                    <Heart
+                      size={14}
+                      className={isWishlisted(product.id) ? 'fill-sale stroke-sale' : 'stroke-text-primary'}
+                    />
+                  </button>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] uppercase tracking-widest text-text-secondary font-bold">
+                    Zenphire
+                  </p>
+                  <h3 className="text-sm font-medium text-text-primary group-hover:underline truncate">
+                    {product.name}
+                  </h3>
+                  <p className="text-sm font-semibold text-text-primary">
+                    ₹{Number(product.base_price || 0).toFixed(2)}
+                  </p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

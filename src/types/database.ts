@@ -53,6 +53,7 @@ export interface Database {
           name: string
           slug: string
           parent_category_id: string | null
+          size_guide_html: string | null
           created_at: string
         }
         Insert: {
@@ -60,6 +61,7 @@ export interface Database {
           name: string
           slug: string
           parent_category_id?: string | null
+          size_guide_html?: string | null
           created_at?: string
         }
         Update: {
@@ -67,6 +69,7 @@ export interface Database {
           name?: string
           slug?: string
           parent_category_id?: string | null
+          size_guide_html?: string | null
           created_at?: string
         }
         Relationships: [
@@ -88,6 +91,8 @@ export interface Database {
           category_id: string | null
           base_price: number
           is_active: boolean
+          size_guide_type: string
+          custom_size_guide_html: string | null
           created_at: string
         }
         Insert: {
@@ -98,6 +103,8 @@ export interface Database {
           category_id?: string | null
           base_price: number
           is_active?: boolean
+          size_guide_type?: string
+          custom_size_guide_html?: string | null
           created_at?: string
         }
         Update: {
@@ -108,6 +115,8 @@ export interface Database {
           category_id?: string | null
           base_price?: number
           is_active?: boolean
+          size_guide_type?: string
+          custom_size_guide_html?: string | null
           created_at?: string
         }
         Relationships: [
@@ -194,6 +203,9 @@ export interface Database {
         Row: {
           id: string
           user_id: string
+          recipient_name: string
+          phone_primary: string
+          phone_secondary: string | null
           line1: string
           city: string
           state: string
@@ -204,6 +216,9 @@ export interface Database {
         Insert: {
           id?: string
           user_id: string
+          recipient_name: string
+          phone_primary: string
+          phone_secondary?: string | null
           line1: string
           city: string
           state: string
@@ -214,6 +229,9 @@ export interface Database {
         Update: {
           id?: string
           user_id?: string
+          recipient_name?: string
+          phone_primary?: string
+          phone_secondary?: string | null
           line1?: string
           city?: string
           state?: string

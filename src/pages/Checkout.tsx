@@ -9,6 +9,9 @@ import { supabase } from '../lib/supabase';
 type CheckoutStep = 'SHIPPING' | 'REVIEW' | 'SUCCESS';
 
 interface AddressForm {
+  recipient_name: string;
+  phone_primary: string;
+  phone_secondary: string;
   line1: string;
   city: string;
   state: string;
@@ -27,6 +30,9 @@ export default function Checkout() {
 
   // Address State
   const [addressForm, setAddressForm] = useState<AddressForm>({
+    recipient_name: '',
+    phone_primary: '',
+    phone_secondary: '',
     line1: '',
     city: '',
     state: '',
@@ -81,7 +87,7 @@ export default function Checkout() {
   const shipping = useMemo(() => {
     const remaining = subtotal - discount;
     if (remaining <= 0) return 0;
-    return remaining > 100 ? 0 : 15;
+    return remaining > 1000 ? 0 : 150;
   }, [subtotal, discount]);
 
   const total = useMemo(() => {
@@ -108,11 +114,24 @@ export default function Checkout() {
   // Validate address form
   const validateAddress = () => {
     if (selectedAddressId !== 'new') return true;
-    const { line1, city, state, pincode } = addressForm;
-    if (!line1.trim() || !city.trim() || !state.trim() || !pincode.trim()) {
+    const { recipient_name, phone_primary, phone_secondary, line1, city, state, pincode } = addressForm;
+    if (!recipient_name.trim() || !phone_primary.trim() || !line1.trim() || !city.trim() || !state.trim() || !pincode.trim()) {
       setError('Please fill in all shipping address fields.');
       return false;
     }
+    
+    // Indian phone number validation
+    const phoneRegex = /^[6-9]\d{9}$/;
+    if (!phoneRegex.test(phone_primary.trim())) {
+      setError('Please enter a valid 10-digit Indian mobile number for the primary contact.');
+      return false;
+    }
+    
+    if (phone_secondary.trim() && !phoneRegex.test(phone_secondary.trim())) {
+      setError('Please enter a valid 10-digit Indian mobile number for the alternate contact.');
+      return false;
+    }
+    
     return true;
   };
 
@@ -195,6 +214,9 @@ export default function Checkout() {
             .from('addresses')
             .insert({
               user_id: user.id,
+              recipient_name: addressForm.recipient_name,
+              phone_primary: addressForm.phone_primary,
+              phone_secondary: addressForm.phone_secondary || null,
               line1: addressForm.line1,
               city: addressForm.city,
               state: addressForm.state,
@@ -348,6 +370,53 @@ export default function Checkout() {
             {/* Form for new address */}
             {selectedAddressId === 'new' && (
               <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label htmlFor="recipient_name" className="block text-xs font-heading font-bold uppercase tracking-wider text-text-primary mb-2">
+                      Recipient Name
+                    </label>
+                    <input
+                      id="recipient_name"
+                      name="recipient_name"
+                      type="text"
+                      required
+                      value={addressForm.recipient_name}
+                      onChange={handleAddressInputChange}
+                      className="w-full px-4 py-3 border border-border bg-white text-text-primary text-sm rounded-none focus:outline-none focus:border-accent"
+                      placeholder="e.g. John Doe"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="phone_primary" className="block text-xs font-heading font-bold uppercase tracking-wider text-text-primary mb-2">
+                      Mobile Number
+                    </label>
+                    <input
+                      id="phone_primary"
+                      name="phone_primary"
+                      type="tel"
+                      required
+                      value={addressForm.phone_primary}
+                      onChange={handleAddressInputChange}
+                      className="w-full px-4 py-3 border border-border bg-white text-text-primary text-sm rounded-none focus:outline-none focus:border-accent"
+                      placeholder="10-digit mobile"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="phone_secondary" className="block text-xs font-heading font-bold uppercase tracking-wider text-text-primary mb-2">
+                      Alt Mobile (Optional)
+                    </label>
+                    <input
+                      id="phone_secondary"
+                      name="phone_secondary"
+                      type="tel"
+                      value={addressForm.phone_secondary}
+                      onChange={handleAddressInputChange}
+                      className="w-full px-4 py-3 border border-border bg-white text-text-primary text-sm rounded-none focus:outline-none focus:border-accent"
+                      placeholder="10-digit mobile"
+                    />
+                  </div>
+                </div>
+
                 <div>
                   <label htmlFor="line1" className="block text-xs font-heading font-bold uppercase tracking-wider text-text-primary mb-2">
                     Street Address
@@ -454,14 +523,14 @@ export default function Checkout() {
                       <h4 className="text-xs font-semibold text-text-primary truncate">{item.name}</h4>
                       <p className="text-[10px] text-text-secondary mt-0.5">Size: {item.size} | Qty: {item.quantity}</p>
                     </div>
-                    <span className="text-xs font-bold text-text-primary">${(item.price * item.quantity).toFixed(2)}</span>
+                    <span className="text-xs font-bold text-text-primary">₹{(item.price * item.quantity).toFixed(2)}</span>
                   </div>
                 ))}
               </div>
-
+ 
               <div className="border-t border-border pt-4 text-sm flex justify-between items-baseline">
                 <span className="font-heading font-bold uppercase text-xs tracking-wider">Subtotal</span>
-                <span className="font-bold text-text-primary">${subtotal.toFixed(2)}</span>
+                <span className="font-bold text-text-primary">₹{subtotal.toFixed(2)}</span>
               </div>
             </div>
           </div>
@@ -518,7 +587,7 @@ export default function Checkout() {
 
               {appliedCoupon ? (
                 <div className="p-3 bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs flex justify-between items-center">
-                  <span className="font-semibold">Applied: {appliedCoupon.code} (-${couponDiscount.toFixed(2)})</span>
+                  <span className="font-semibold">Applied: {appliedCoupon.code} (-₹{couponDiscount.toFixed(2)})</span>
                   <button
                     onClick={handleRemoveCoupon}
                     className="text-[10px] uppercase font-bold text-sale hover:underline"
@@ -579,33 +648,32 @@ export default function Checkout() {
               <h2 className="text-xs font-heading font-bold uppercase tracking-wider text-text-primary pb-3 border-b border-border">
                 Review Total
               </h2>
-
               <div className="space-y-4 text-sm border-b border-border pb-4">
                 <div className="flex justify-between text-text-secondary">
                   <span>Subtotal</span>
-                  <span className="font-semibold text-text-primary">${subtotal.toFixed(2)}</span>
+                  <span className="font-semibold text-text-primary">₹{subtotal.toFixed(2)}</span>
                 </div>
-
+ 
                 {appliedCoupon && (
                   <div className="flex justify-between text-emerald-600 font-medium">
                     <span>Coupon ({appliedCoupon.code})</span>
-                    <span>-${discount.toFixed(2)}</span>
+                    <span>-₹{discount.toFixed(2)}</span>
                   </div>
                 )}
-
+ 
                 <div className="flex justify-between text-text-secondary">
                   <span>Shipping</span>
                   {shipping === 0 ? (
                     <span className="font-bold text-emerald-600 uppercase text-xs">Free</span>
                   ) : (
-                    <span className="font-semibold text-text-primary">${shipping.toFixed(2)}</span>
+                    <span className="font-semibold text-text-primary">₹{shipping.toFixed(2)}</span>
                   )}
                 </div>
               </div>
-
+ 
               <div className="flex justify-between items-baseline pb-2">
                 <span className="font-heading font-bold uppercase text-xs tracking-wider">Grand Total</span>
-                <span className="text-2xl font-bold text-text-primary">${total.toFixed(2)}</span>
+                <span className="text-2xl font-bold text-text-primary">₹{total.toFixed(2)}</span>
               </div>
 
               <button
@@ -661,7 +729,7 @@ export default function Checkout() {
               </div>
               <div className="flex justify-between">
                 <span className="text-text-secondary">Total Paid:</span>
-                <span className="font-bold text-text-primary">${paymentSuccessData.total.toFixed(2)}</span>
+                <span className="font-bold text-text-primary">₹{paymentSuccessData.total.toFixed(2)}</span>
               </div>
               <div className="border-t border-border pt-3 mt-1">
                 <span className="block text-xs uppercase tracking-wider font-bold text-text-secondary mb-1">
@@ -719,7 +787,7 @@ export default function Checkout() {
               <h3 className="text-lg font-bold">Zenphire Collections</h3>
               <div className="flex justify-between items-baseline pt-2 border-t border-[#22222a]">
                 <span className="text-xs text-gray-400">Amount Payable:</span>
-                <span className="text-xl font-bold text-blue-400">${total.toFixed(2)}</span>
+                <span className="text-xl font-bold text-blue-400">₹{total.toFixed(2)}</span>
               </div>
             </div>
 

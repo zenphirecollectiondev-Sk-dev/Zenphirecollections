@@ -1,21 +1,152 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Heart, ShoppingBag, ChevronRight, Check, AlertCircle } from 'lucide-react';
-import { mockProducts } from '../lib/mockData';
+import { Heart, ShoppingBag, ChevronRight, Check, AlertCircle, X, Loader2 } from 'lucide-react';
 import { useCartStore } from '../store/useCartStore';
 import { useWishlistStore } from '../store/useWishlistStore';
+import { getProductDetails, supabase } from '../lib/supabase';
+import { motion, AnimatePresence } from 'framer-motion';
+import linenShirt from '../assets/product_linen_shirt.png';
 
 export default function ProductDetail() {
   const { toggleWishlist, isWishlisted } = useWishlistStore();
   const { id } = useParams(); // id is the slug
-  const product = useMemo(() => mockProducts.find((p) => p.slug === id), [id]);
+  
+  const [dbProduct, setDbProduct] = useState<any>(null);
+  const [categorySizeGuide, setCategorySizeGuide] = useState<string | null>(null);
+  const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
+  const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const recommendations = useMemo(() => {
-    if (!product) return [];
-    return mockProducts
-      .filter((p) => p.category_id === product.category_id && p.id !== product.id)
-      .slice(0, 4);
-  }, [product]);
+  useEffect(() => {
+    async function loadProduct() {
+      if (!id) return;
+      setLoading(true);
+      try {
+        const data = await getProductDetails(id, true);
+        if (data) {
+          setDbProduct(data);
+          
+          // Fetch category default size guide if product belongs to category
+          if (data.category_id) {
+            const { data: catData } = await supabase
+              .from('categories')
+              .select('size_guide_html')
+              .eq('id', data.category_id)
+              .maybeSingle();
+            if (catData) {
+              setCategorySizeGuide(catData.size_guide_html);
+            }
+          }
+        } else {
+          setDbProduct(null);
+        }
+      } catch (err) {
+        console.warn('Could not fetch product from Supabase DB:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadProduct();
+  }, [id]);
+
+  const product = useMemo<any>(() => {
+    if (!dbProduct) return null;
+    return {
+      ...dbProduct,
+      product_images: dbProduct.product_images || [],
+      product_variants: dbProduct.product_variants || []
+    };
+  }, [dbProduct]);
+
+  const sizeGuideHtml = useMemo(() => {
+    // 1. Product custom size guide override
+    if (product?.size_guide_type === 'custom' && product.custom_size_guide_html) {
+      return product.custom_size_guide_html;
+    }
+    // 2. Category level default
+    if (categorySizeGuide) {
+      return categorySizeGuide;
+    }
+    // 3. Fallback based on category / name
+    const isPants = product?.name?.toLowerCase()?.includes('pant') || 
+                    product?.name?.toLowerCase()?.includes('trouser') || 
+                    (product?.name?.toLowerCase()?.includes('linen shirt') === false && 
+                     (product?.name?.toLowerCase()?.includes('pants') || 
+                      product?.name?.toLowerCase()?.includes('trousers')));
+    if (isPants) {
+      return `
+        <table class="w-full text-left text-xs border-collapse">
+          <thead>
+            <tr class="border-b border-border font-bold text-text-primary">
+              <th class="py-2.5">Size</th>
+              <th class="py-2.5">Waist (in)</th>
+              <th class="py-2.5">Hip (in)</th>
+              <th class="py-2.5">Inseam (in)</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-border text-text-secondary">
+            <tr><td class="py-2.5 font-bold text-text-primary">S</td><td class="py-2.5">30</td><td class="py-2.5">38</td><td class="py-2.5">30</td></tr>
+            <tr><td class="py-2.5 font-bold text-text-primary">M</td><td class="py-2.5">32</td><td class="py-2.5">40</td><td class="py-2.5">31</td></tr>
+            <tr><td class="py-2.5 font-bold text-text-primary">L</td><td class="py-2.5">34</td><td class="py-2.5">42</td><td class="py-2.5">32</td></tr>
+            <tr><td class="py-2.5 font-bold text-text-primary">XL</td><td class="py-2.5">36</td><td class="py-2.5">44</td><td class="py-2.5">32</td></tr>
+          </tbody>
+        </table>
+      `;
+    }
+
+    // Default: Tops (shirts, jackets)
+    return `
+      <table class="w-full text-left text-xs border-collapse">
+        <thead>
+          <tr class="border-b border-border font-bold text-text-primary">
+            <th class="py-2.5">Size</th>
+            <th class="py-2.5">Chest (in)</th>
+            <th class="py-2.5">Front Length (in)</th>
+            <th class="py-2.5">Across Shoulder (in)</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-border text-text-secondary">
+          <tr><td class="py-2.5 font-bold text-text-primary">S</td><td class="py-2.5">38</td><td class="py-2.5">27.5</td><td class="py-2.5">17.5</td></tr>
+          <tr><td class="py-2.5 font-bold text-text-primary">M</td><td class="py-2.5">40</td><td class="py-2.5">28.5</td><td class="py-2.5">18.5</td></tr>
+          <tr><td class="py-2.5 font-bold text-text-primary">L</td><td class="py-2.5">42</td><td class="py-2.5">29.5</td><td class="py-2.5">19.5</td></tr>
+          <tr><td class="py-2.5 font-bold text-text-primary">XL</td><td class="py-2.5">44</td><td class="py-2.5">30.5</td><td class="py-2.5">20.5</td></tr>
+        </tbody>
+      </table>
+    `;
+  }, [product, categorySizeGuide]);
+
+  // Load recommendations dynamically from Supabase
+  useEffect(() => {
+    async function loadRecommendations() {
+      if (!dbProduct) {
+        setRecommendations([]);
+        return;
+      }
+      try {
+        let query = supabase
+          .from('products')
+          .select(`
+            *,
+            product_images (*),
+            product_variants (*)
+          `)
+          .eq('is_active', true)
+          .neq('id', dbProduct.id)
+          .limit(4);
+
+        if (dbProduct.category_id) {
+          query = query.eq('category_id', dbProduct.category_id);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+        setRecommendations(data || []);
+      } catch (err) {
+        console.warn('Could not load recommendations from Supabase:', err);
+      }
+    }
+    loadRecommendations();
+  }, [dbProduct]);
 
   const [selectedSize, setSelectedSize] = useState<string>('');
   const [selectedColor, setSelectedColor] = useState<string>('');
@@ -24,12 +155,23 @@ export default function ProductDetail() {
 
   const addItem = useCartStore((state) => state.addItem);
 
-  // Set default color if product exists
-  useState(() => {
+  // Set default color when product loaded
+  useEffect(() => {
     if (product && product.product_variants.length > 0) {
       setSelectedColor(product.product_variants[0].color);
     }
-  });
+  }, [product]);
+
+  if (loading) {
+    return (
+      <div className="min-h-[70vh] flex flex-col items-center justify-center">
+        <Loader2 size={32} className="animate-spin text-text-secondary mb-2" />
+        <p className="text-xs uppercase tracking-widest text-text-secondary font-bold">
+          Loading Details...
+        </p>
+      </div>
+    );
+  }
 
   if (!product) {
     return (
@@ -44,21 +186,22 @@ export default function ProductDetail() {
   }
 
   // Get unique sizes and colors for this product
-  const availableVariantsForColor = product.product_variants.filter(v => v.color === selectedColor);
-  const availableColors = Array.from(new Set(product.product_variants.map(v => v.color)));
+  const availableVariantsForColor: any[] = product.product_variants.filter((v: any) => v.color === selectedColor);
+  const availableColors: string[] = Array.from(new Set(product.product_variants.map((v: any) => v.color))) as string[];
 
   // Selected variant details
   const selectedVariant = product.product_variants.find(
-    (v) => v.color === selectedColor && v.size === selectedSize
+    (v: any) => v.color === selectedColor && v.size === selectedSize
   );
 
   const isOutOfStock = selectedSize 
     ? (selectedVariant?.stock_qty === 0)
-    : availableVariantsForColor.every((v) => v.stock_qty === 0);
+    : availableVariantsForColor.every((v: any) => v.stock_qty === 0);
+
+
 
   const handleAddToCart = () => {
     if (!selectedSize) {
-      // Highlight size selection or alert
       alert('Please select a size first.');
       return;
     }
@@ -72,7 +215,7 @@ export default function ProductDetail() {
         size: selectedVariant.size,
         color: selectedVariant.color,
         price: product.base_price,
-        image: product.product_images[0]?.url || ''
+        image: product.product_images[0]?.url || linenShirt
       });
 
       setIsAdded(true);
@@ -100,7 +243,7 @@ export default function ProductDetail() {
         <div className="space-y-4">
           <div className="aspect-[3/4] bg-bg-subtle border border-border overflow-hidden relative">
             <img
-              src={product.product_images[activeImageIdx]?.url}
+              src={product.product_images[activeImageIdx]?.url || linenShirt}
               alt={`${product.name} active`}
               className="w-full h-full object-cover object-center"
             />
@@ -109,7 +252,7 @@ export default function ProductDetail() {
           {/* Thumbnails Row */}
           {product.product_images.length > 1 && (
             <div className="flex gap-3 overflow-x-auto pb-1">
-              {product.product_images.map((img, idx) => (
+              {product.product_images.map((img: any, idx: number) => (
                 <button
                   key={img.id}
                   onClick={() => setActiveImageIdx(idx)}
@@ -132,7 +275,7 @@ export default function ProductDetail() {
               {product.name}
             </h1>
             <p className="text-xl font-bold text-text-primary">
-              ${product.base_price.toFixed(2)}
+              ₹{Number(product.base_price || 0).toFixed(2)}
             </p>
           </div>
 
@@ -177,13 +320,16 @@ export default function ProductDetail() {
                 <h3 className="text-xs font-heading font-bold uppercase tracking-wider text-text-primary">
                   Select Size
                 </h3>
-                <button className="text-xs text-text-secondary hover:text-text-primary underline underline-offset-4">
+                <button 
+                  onClick={() => setIsSizeGuideOpen(true)}
+                  className="text-xs text-text-secondary hover:text-text-primary underline underline-offset-4"
+                >
                   Size Guide
                 </button>
               </div>
               <div className="flex gap-2.5">
                 {['S', 'M', 'L', 'XL'].map((size) => {
-                  const variant = availableVariantsForColor.find((v) => v.size === size);
+                  const variant = availableVariantsForColor.find((v: any) => v.size === size);
                   const isAvailable = variant ? variant.stock_qty > 0 : false;
                   
                   return (
@@ -261,7 +407,7 @@ export default function ProductDetail() {
             You May Also Like
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
-            {recommendations.map((rec) => (
+            {recommendations.map((rec: any) => (
               <Link
                 key={rec.id}
                 to={`/product/${rec.slug}`}
@@ -273,7 +419,7 @@ export default function ProductDetail() {
               >
                 <div className="aspect-[3/4] bg-bg-subtle overflow-hidden border border-border relative mb-4">
                   <img
-                    src={rec.product_images[0]?.url}
+                    src={rec.product_images && rec.product_images[0]?.url || linenShirt}
                     alt={rec.name}
                     className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
                   />
@@ -300,7 +446,7 @@ export default function ProductDetail() {
                     {rec.name}
                   </h3>
                   <p className="text-sm font-semibold text-text-primary">
-                    ${rec.base_price.toFixed(2)}
+                    ₹{Number(rec.base_price || 0).toFixed(2)}
                   </p>
                 </div>
               </Link>
@@ -313,7 +459,7 @@ export default function ProductDetail() {
       <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-border p-4 flex items-center justify-between gap-4 md:hidden shadow-lg">
         <div className="flex flex-col">
           <span className="text-[10px] uppercase tracking-wider text-text-secondary">Price</span>
-          <span className="text-base font-bold text-text-primary">${product.base_price.toFixed(2)}</span>
+          <span className="text-base font-bold text-text-primary">₹{Number(product.base_price || 0).toFixed(2)}</span>
         </div>
         <button
           disabled={isOutOfStock}
@@ -324,6 +470,68 @@ export default function ProductDetail() {
           {isAdded ? 'Added' : isOutOfStock ? 'Sold Out' : selectedSize ? 'Add to Cart' : 'Select Size'}
         </button>
       </div>
+
+      {/* SIZE GUIDE OVERLAY DIALOG MODAL */}
+      <AnimatePresence>
+        {isSizeGuideOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsSizeGuideOpen(false)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+            />
+
+            {/* Modal Container */}
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              transition={{ type: 'spring', duration: 0.4 }}
+              className="relative w-full max-w-lg bg-white border border-border p-6 shadow-2xl z-10 flex flex-col max-h-[90vh]"
+            >
+              <div className="flex justify-between items-center border-b border-border pb-4 mb-4">
+                <div>
+                  <span className="text-[9px] uppercase tracking-widest text-text-secondary font-black bg-bg-subtle px-2 py-0.5 border border-border">
+                    Reference Guide
+                  </span>
+                  <h3 className="text-base font-heading font-black uppercase mt-1 text-text-primary">
+                    Size Measurements
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setIsSizeGuideOpen(false)}
+                  className="p-1 text-text-secondary hover:text-text-primary hover:bg-bg-subtle transition-colors rounded-full"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Sizing Table Body */}
+              <div className="overflow-y-auto py-2 leading-relaxed">
+                <p className="text-[11px] text-text-secondary mb-4">
+                  Find your correct size configuration from our benchmark sizing table below. All dimensions are stated in inches.
+                </p>
+                <div 
+                  className="prose prose-sm max-w-none text-text-primary"
+                  dangerouslySetInnerHTML={{ __html: sizeGuideHtml }}
+                />
+              </div>
+
+              <div className="border-t border-border pt-4 mt-4 flex justify-end">
+                <button
+                  onClick={() => setIsSizeGuideOpen(false)}
+                  className="bg-accent text-white px-5 py-2.5 text-xs font-bold uppercase tracking-widest hover:bg-accent-hover transition-colors shadow-sm"
+                >
+                  Close Guide
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

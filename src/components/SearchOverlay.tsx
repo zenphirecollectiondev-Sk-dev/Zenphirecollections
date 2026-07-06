@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Search } from 'lucide-react';
-import { mockProducts } from '../lib/mockData';
-import type { MockProduct } from '../lib/mockData';
+import { getActiveProducts } from '../lib/supabase';
+import linenShirt from '../assets/product_linen_shirt.png';
 
 interface SearchOverlayProps {
   isOpen: boolean;
@@ -11,9 +11,26 @@ interface SearchOverlayProps {
 
 export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<MockProduct[]>([]);
+  const [results, setResults] = useState<any[]>([]);
+  const [dbProducts, setDbProducts] = useState<any[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+
+  // Load live active products
+  useEffect(() => {
+    async function loadSearchProducts() {
+      try {
+        const data = await getActiveProducts();
+        setDbProducts(data || []);
+      } catch (err) {
+        console.warn('Could not load products for search overlay:', err);
+      }
+    }
+    loadSearchProducts();
+  }, []);
+
+  // Use database products only
+  const products = useMemo(() => dbProducts, [dbProducts]);
 
   // Focus input when overlay opens
   useEffect(() => {
@@ -31,16 +48,16 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
 
     const timer = setTimeout(() => {
       const lowerQuery = query.toLowerCase();
-      const filtered = mockProducts.filter(
+      const filtered = products.filter(
         (product) =>
           product.name.toLowerCase().includes(lowerQuery) ||
-          product.description.toLowerCase().includes(lowerQuery)
+          (product.description || '').toLowerCase().includes(lowerQuery)
       );
       setResults(filtered);
     }, 150); // Fast debounce for instant feedback
 
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [query, products]);
 
   if (!isOpen) return null;
 
@@ -97,13 +114,13 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                     className="w-full py-4 flex items-center gap-4 hover:bg-bg-subtle text-left px-2 transition-colors"
                   >
                     <img
-                      src={product.product_images[0]?.url}
+                      src={product.product_images && product.product_images[0]?.url || linenShirt}
                       alt={product.name}
                       className="w-12 aspect-[3/4] object-cover object-center bg-bg-subtle border border-border"
                     />
                     <div>
                       <h4 className="text-sm font-semibold text-text-primary">{product.name}</h4>
-                      <p className="text-xs text-text-secondary mt-0.5">${product.base_price.toFixed(2)}</p>
+                      <p className="text-xs text-text-secondary mt-0.5">₹{Number(product.base_price || 0).toFixed(2)}</p>
                     </div>
                   </button>
                 ))}

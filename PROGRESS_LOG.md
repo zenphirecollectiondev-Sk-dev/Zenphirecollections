@@ -7,6 +7,50 @@
 
 ---
 
+## [2026-07-04] — Session: Admin Dashboard, Catalog Sync & Size Guide Generator Upgrades
+**What was done:**
+- Added size guide database columns (`size_guide_html` to categories; `size_guide_type` and `custom_size_guide_html` to products) to SQL schema and TypeScript typings.
+- Implemented a fully animated sizing guide overlay modal on the storefront Product Details page (`ProductDetail.tsx`), displaying either the custom sizing table override or falls back to category defaults.
+- Synchronized storefront **Shop Catalog page (`Shop.tsx`)** and navigation **Search Autocomplete (`SearchOverlay.tsx`)** to dynamically query and merge live active products from Supabase database instead of displaying only mock listings.
+- Upgraded the interactive **Size Guide Generator** modal assistant next to the SKU creation button:
+  - Supports Category presets (**Shirts**, **Pants**, **Co-ords**, or **Custom Blank**).
+  - **Dynamic Columns**: Admins can now add custom measurement metrics (like Hips, Thighs, Sleeve) on the fly, immediately updating input grids, or delete columns using header controls.
+  - **Custom Table Titles**: Admins can set a custom table title which automatically compiles into an uppercase caption above the table.
+  - Generates ready-to-use premium HTML markup and copies to clipboard with a single click.
+- Confirmed project builds cleanly with `npm run build` with zero errors.
+
+**Files touched:**
+- `supabase_schema.sql`
+- `src/types/database.ts`
+- `src/pages/ProductDetail.tsx`
+- `src/pages/Admin.tsx`
+- `PROGRESS_LOG.md`
+
+**Status:** ✅ Complete — admin panel and flexible size guides are fully implemented and verified.
+
+---
+
+## [2026-07-04] — Session: Account Page Refinements & Validation
+**What was done:**
+- Implemented a view/edit toggle pattern for the Personal Profile section on the `/account` page.
+- Added `recipient_name`, `phone_primary`, and `phone_secondary` columns to database schema definitions in `supabase_schema.sql` and `src/types/database.ts`.
+- Integrated `zod` library for validating shipping address fields (including valid 10-digit Indian phone numbers).
+- Updated checkout address generation flow (`Checkout.tsx`) to collect and validate these new contact fields.
+- Implemented optimistic updates for default address toggles.
+- Redesigned the address book empty state to feature a clean map-pin icon container, descriptive helper text, and a prominent call to action.
+- Polished visual depth by introducing box shadows on profile and address cards.
+
+**Files touched:**
+- `supabase_schema.sql`
+- `src/types/database.ts`
+- `src/pages/Account.tsx`
+- `src/pages/Checkout.tsx`
+- `package.json`
+
+**Status:** ✅ Complete — all refinement targets are met, and the project builds successfully.
+
+---
+
 ## [2026-07-03] — Session: Google OAuth & Onboarding
 **What was done:**
 - Integrated Supabase Google OAuth provider (`signInWithOAuth`) on `Login.tsx` and `Signup.tsx` pages.
