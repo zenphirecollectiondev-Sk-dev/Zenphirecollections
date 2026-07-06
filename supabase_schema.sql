@@ -420,3 +420,36 @@ create policy "Allow users to update own reviews"
 create policy "Allow users to delete own reviews"
   on public.reviews for delete
   using (auth.uid() = user_id or public.is_admin());
+
+-- -------------------------------------------------------------
+-- MIGRATION UPGRADES (COUPONS EXTENSIONS & COURIER PARTNERS)
+-- -------------------------------------------------------------
+
+-- Alter orders table to store coupon discounts & carrier tracking details
+ALTER TABLE public.orders
+ADD COLUMN IF NOT EXISTS subtotal numeric(10, 2),
+ADD COLUMN IF NOT EXISTS shipping_cost numeric(10, 2) DEFAULT 0.00,
+ADD COLUMN IF NOT EXISTS coupon_code text,
+ADD COLUMN IF NOT EXISTS discount_amount numeric(10, 2) DEFAULT 0.00,
+ADD COLUMN IF NOT EXISTS courier_name text,
+ADD COLUMN IF NOT EXISTS courier_tracking_url text;
+
+-- Create table for admin-managed courier partners
+CREATE TABLE IF NOT EXISTS public.courier_partners (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  name text NOT NULL UNIQUE,
+  tracking_url_template text NOT NULL,
+  created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS for courier partners
+ALTER TABLE public.courier_partners ENABLE ROW LEVEL SECURITY;
+
+-- Courier partners policies (Everyone read; Admins write/manage)
+CREATE POLICY "Allow public read access to courier partners"
+  ON public.courier_partners FOR SELECT
+  USING (true);
+
+CREATE POLICY "Allow admin full access to courier partners"
+  ON public.courier_partners FOR ALL
+  USING (public.is_admin());

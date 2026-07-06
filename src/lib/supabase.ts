@@ -178,6 +178,12 @@ export async function getUserOrders(userId: string) {
       id,
       status,
       total,
+      subtotal,
+      discount_amount,
+      coupon_code,
+      shipping_cost,
+      courier_name,
+      courier_tracking_url,
       tracking_id,
       created_at,
       order_items (

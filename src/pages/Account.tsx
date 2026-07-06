@@ -17,7 +17,9 @@ import {
   Loader2, 
   Check, 
   Package, 
-  AlertCircle
+  AlertCircle,
+  Copy,
+  ExternalLink
 } from 'lucide-react';
 
 interface OrderItem {
@@ -39,6 +41,12 @@ interface OrderWithItems {
   id: string;
   status: string;
   total: number;
+  subtotal: number | null;
+  discount_amount: number | null;
+  coupon_code: string | null;
+  shipping_cost: number | null;
+  courier_name: string | null;
+  courier_tracking_url: string | null;
   tracking_id: string | null;
   created_at: string;
   order_items: OrderItem[];
@@ -1055,6 +1063,64 @@ export default function Account() {
                             );
                           })}
                         </div>
+
+                        {/* If a coupon was applied to this order */}
+                        {order.coupon_code && (
+                          <div className="mt-4 pt-4 border-t border-border flex justify-between items-center text-xs text-text-secondary">
+                            <span>Coupon Used: <strong className="text-emerald-700 font-bold uppercase">{order.coupon_code}</strong></span>
+                            <span>Discount: <strong className="text-emerald-600 font-bold">-₹{Number(order.discount_amount || 0).toFixed(2)}</strong></span>
+                          </div>
+                        )}
+
+                        {/* Courier Partner & tracking info */}
+                        {(order.courier_name || order.tracking_id) && (
+                          <div className="mt-4 p-4 border border-border bg-bg-subtle space-y-3">
+                            <p className="text-[10px] uppercase tracking-wider text-text-secondary font-bold pb-2 border-b border-border">
+                              Shipment Tracking
+                            </p>
+
+                            {/* Tracking website link */}
+                            {order.courier_tracking_url && (
+                              <div>
+                                <p className="text-[10px] text-text-secondary font-semibold uppercase tracking-wider mb-1.5">Courier Partner</p>
+                                <a
+                                  href={order.courier_tracking_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-2 px-3 py-2 border border-accent text-accent text-xs font-bold uppercase tracking-wider hover:bg-accent hover:text-white transition-all group"
+                                >
+                                  <ExternalLink size={11} className="group-hover:translate-x-0.5 transition-transform" />
+                                  {order.courier_name || 'Open Tracking Website'}
+                                </a>
+                              </div>
+                            )}
+
+                            {/* Tracking ID + copy */}
+                            {order.tracking_id && (
+                              <div>
+                                <p className="text-[10px] text-text-secondary font-semibold uppercase tracking-wider mb-1.5">Your Tracking ID</p>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-mono font-bold text-text-primary bg-white border border-border px-2.5 py-1.5 select-all flex-1 break-all">
+                                    {order.tracking_id}
+                                  </span>
+                                  <button
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(order.tracking_id || '');
+                                      alert('Tracking ID copied! Paste it on the courier website to track your package.');
+                                    }}
+                                    className="p-2 border border-border bg-white hover:bg-bg-subtle text-text-secondary hover:text-text-primary transition-all flex-shrink-0"
+                                    title="Copy Tracking ID"
+                                  >
+                                    <Copy size={12} />
+                                  </button>
+                                </div>
+                                <p className="text-[10px] text-text-secondary mt-1.5 leading-relaxed">
+                                  → Open the courier website above, paste this ID to track your order.
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       {/* Right: Graphical Delivery Tracking Timeline */}

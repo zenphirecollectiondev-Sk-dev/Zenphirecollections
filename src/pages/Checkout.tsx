@@ -237,11 +237,15 @@ export default function Checkout() {
       if (user) {
         try {
           const { data: orderData, error: orderErr } = await supabase
-            .from('orders')
+            .from('orders' as any)
             .insert({
               user_id: user.id,
               status: 'processing',
               total: total,
+              subtotal: subtotal,
+              shipping_cost: shipping,
+              coupon_code: appliedCoupon ? appliedCoupon.code : null,
+              discount_amount: discount,
               address_id: dbAddressId,
               tracking_id: trackingId
             })
@@ -253,7 +257,7 @@ export default function Checkout() {
           if (orderData && items.length > 0) {
             // Write order items
             const orderItemsInsert = items.map((item) => ({
-              order_id: orderData.id,
+              order_id: (orderData as any).id,
               variant_id: item.variantId,
               quantity: item.quantity,
               price_at_purchase: item.price

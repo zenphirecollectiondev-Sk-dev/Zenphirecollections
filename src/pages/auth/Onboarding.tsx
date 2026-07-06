@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../../store/useAuthStore';
 import { supabase } from '../../lib/supabase';
-import { ArrowRight, User, Calendar, Smile, AlertCircle } from 'lucide-react';
+import { ArrowRight, User, Calendar, Smile, AlertCircle, Phone } from 'lucide-react';
 
 export default function Onboarding() {
   const navigate = useNavigate();
@@ -10,6 +10,7 @@ export default function Onboarding() {
   const { user, profile, updateProfile, loading: authLoading } = useAuthStore();
 
   const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
   const [dob, setDob] = useState('');
   const [gender, setGender] = useState('');
   const [loading, setLoading] = useState(false);
@@ -33,11 +34,14 @@ export default function Onboarding() {
     } else if (user?.user_metadata?.name) {
       setName(user.user_metadata.name);
     }
+    if (profile?.phone) {
+      setPhone(profile.phone);
+    }
   }, [user, profile]);
 
   // If already onboarded, send them on their way
   useEffect(() => {
-    if (!authLoading && profile?.dob && profile?.gender) {
+    if (!authLoading && profile?.dob && profile?.gender && profile?.phone) {
       navigate(redirectPath, { replace: true });
     }
   }, [authLoading, profile, navigate, redirectPath]);
@@ -53,8 +57,15 @@ export default function Onboarding() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !dob || !gender) {
+    if (!name.trim() || !phone.trim() || !dob || !gender) {
       setError('Please fill in all profile fields.');
+      return;
+    }
+
+    // Indian phone number validation
+    const phoneRegex = /^[6-9]\d{9}$/;
+    if (!phoneRegex.test(phone.trim())) {
+      setError('Please enter a valid 10-digit Indian mobile number.');
       return;
     }
 
@@ -69,6 +80,7 @@ export default function Onboarding() {
         .from('profiles')
         .update({
           name: name.trim(),
+          phone: phone.trim(),
           dob,
           gender
         })
@@ -79,6 +91,7 @@ export default function Onboarding() {
       // Update locally in Zustand store
       updateProfile({
         name: name.trim(),
+        phone: phone.trim(),
         dob,
         gender
       });
@@ -128,6 +141,22 @@ export default function Onboarding() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. John Doe"
+              className="w-full px-4 py-3 border border-border bg-white text-text-primary text-sm rounded-none focus:outline-none focus:border-accent"
+            />
+          </div>
+
+          {/* Mobile Number */}
+          <div>
+            <label htmlFor="phone" className="block text-xs font-heading font-bold uppercase tracking-wider text-text-primary mb-2 flex items-center gap-1.5">
+              <Phone size={13} className="text-text-secondary" /> Mobile Number
+            </label>
+            <input
+              id="phone"
+              type="tel"
+              required
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="10-digit mobile number"
               className="w-full px-4 py-3 border border-border bg-white text-text-primary text-sm rounded-none focus:outline-none focus:border-accent"
             />
           </div>

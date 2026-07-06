@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
-import { ShoppingBag, Heart, User, Search, Shield, LogOut } from 'lucide-react';
+import { ShoppingBag, Heart, User, Search, Shield, LogOut, Menu, X } from 'lucide-react';
 import { useAuthStore } from './store/useAuthStore';
 import { useCartStore } from './store/useCartStore';
 import { useWishlistStore } from './store/useWishlistStore';
 import ProtectedRoute from './components/ProtectedRoute';
 import SearchOverlay from './components/SearchOverlay';
 import CartDrawer from './components/CartDrawer';
+import { motion, AnimatePresence } from 'framer-motion';
 
 import Home from './pages/Home';
 import Shop from './pages/Shop';
@@ -27,6 +28,7 @@ export default function App() {
   const { session, profile, initialize, signOut } = useAuthStore();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   const cartItems = useCartStore((state) => state.items);
   const cartCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
@@ -44,11 +46,18 @@ export default function App() {
         {/* Sticky Minimal Navigation */}
         <header className="sticky top-0 z-50 bg-white border-b border-border">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            {/* Left Nav */}
+            {/* Left Nav (Desktop) / Hamburger (Mobile) */}
             <div className="flex items-center gap-6">
-              <Link to="/shop" className="text-sm font-medium tracking-wide uppercase hover:text-accent-hover transition-colors">
+              <Link to="/shop" className="hidden md:block text-sm font-medium tracking-wide uppercase hover:text-accent-hover transition-colors">
                 Shop
               </Link>
+              <button 
+                onClick={() => setIsMobileMenuOpen(true)}
+                className="md:hidden p-2 hover:bg-bg-subtle transition-colors rounded-full"
+                aria-label="Toggle Menu"
+              >
+                <Menu size={20} className="stroke-[1.5]" />
+              </button>
             </div>
 
             {/* Center Logo */}
@@ -58,8 +67,8 @@ export default function App() {
               </Link>
             </div>
 
-            {/* Right Icons */}
-            <div className="flex items-center gap-4">
+            {/* Right Icons (Desktop) */}
+            <div className="hidden md:flex items-center gap-4">
               <button 
                 onClick={() => setIsSearchOpen(true)}
                 aria-label="Search" 
@@ -110,8 +119,140 @@ export default function App() {
                 </button>
               )}
             </div>
+
+            {/* Right Icons (Mobile) */}
+            <div className="flex md:hidden items-center gap-2">
+              <button 
+                onClick={() => setIsCartOpen(true)}
+                aria-label="Cart" 
+                className="p-2 hover:bg-bg-subtle transition-colors rounded-full relative"
+              >
+                <ShoppingBag size={20} className="stroke-[1.5]" />
+                {cartCount > 0 && (
+                  <span className="absolute top-1.5 right-1.5 bg-accent text-white text-[9px] font-bold w-3.5 h-3.5 flex items-center justify-center rounded-full scale-90">
+                    {cartCount}
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
         </header>
+
+        {/* Mobile Sidebar Menu Drawer */}
+        <AnimatePresence>
+          {isMobileMenuOpen && (
+            <div className="fixed inset-0 z-50 md:hidden">
+              {/* Backdrop */}
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="fixed inset-0 bg-black/50 backdrop-blur-xs"
+              />
+              
+              {/* Menu Container */}
+              <motion.div 
+                initial={{ x: '-100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '-100%' }}
+                transition={{ type: 'tween', duration: 0.3 }}
+                className="fixed inset-y-0 left-0 w-80 max-w-[85vw] bg-white border-r border-border p-6 shadow-2xl flex flex-col justify-between"
+              >
+                <div className="space-y-8">
+                  {/* Header */}
+                  <div className="flex justify-between items-center pb-4 border-b border-border">
+                    <span className="text-lg font-heading font-black tracking-[0.2em] uppercase">
+                      Zenphire
+                    </span>
+                    <button 
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="p-1 hover:bg-bg-subtle rounded-full text-text-secondary hover:text-text-primary"
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
+
+                  {/* Navigation Links */}
+                  <nav className="flex flex-col gap-6 text-sm font-bold uppercase tracking-wider text-text-primary">
+                    <Link 
+                      to="/shop" 
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="hover:text-accent transition-colors flex items-center gap-2"
+                    >
+                      Shop Collection
+                    </Link>
+                    
+                    <button 
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        setIsSearchOpen(true);
+                      }}
+                      className="text-left hover:text-accent transition-colors flex items-center gap-2 font-bold uppercase tracking-wider"
+                    >
+                      Search
+                    </button>
+
+                    <Link 
+                      to="/wishlist" 
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="hover:text-accent transition-colors flex items-center justify-between"
+                    >
+                      <span>Wishlist</span>
+                      {wishlistCount > 0 && (
+                        <span className="bg-accent text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                          {wishlistCount}
+                        </span>
+                      )}
+                    </Link>
+
+                    <Link 
+                      to="/account" 
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="hover:text-accent transition-colors"
+                    >
+                      My Account
+                    </Link>
+
+                    {profile?.role === 'admin' && (
+                      <Link 
+                        to="/admin" 
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="text-accent flex items-center gap-1.5"
+                      >
+                        <Shield size={14} /> Admin Console
+                      </Link>
+                    )}
+                  </nav>
+                </div>
+
+                {/* Footer / Sign Out */}
+                <div className="pt-6 border-t border-border">
+                  {session ? (
+                    <button
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        signOut();
+                      }}
+                      className="w-full flex items-center justify-center gap-2 border border-sale text-sale py-3 text-xs font-bold uppercase tracking-widest hover:bg-sale/5 transition-colors"
+                    >
+                      <LogOut size={14} /> Sign Out
+                    </button>
+                  ) : (
+                    <Link
+                      to="/account"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="w-full flex items-center justify-center gap-2 bg-accent text-white py-3 text-xs font-bold uppercase tracking-widest hover:bg-accent-hover transition-colors text-center font-bold"
+                    >
+                      Sign In / Register
+                    </Link>
+                  )}
+                </div>
+
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
 
         {/* Main Content Area */}
         <main className="flex-grow">

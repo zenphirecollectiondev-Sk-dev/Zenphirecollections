@@ -49,6 +49,11 @@ export default function ProductDetail() {
     loadProduct();
   }, [id]);
 
+  // Scroll to top on navigation transition
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [id]);
+
   const product = useMemo<any>(() => {
     if (!dbProduct) return null;
     return {

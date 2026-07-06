@@ -15,8 +15,10 @@ import {
   DollarSign,
   Loader2,
   Sliders,
-  Copy
+  Copy,
+  Calendar
 } from 'lucide-react';
+
 
 interface ProductImage {
   id?: string;
@@ -57,7 +59,27 @@ interface Category {
 
 
 export default function Admin() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'categories' | 'inventory' | 'orders'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'categories' | 'inventory' | 'orders' | 'coupons' | 'couriers'>('overview');
+
+  // Coupons state
+  const [coupons, setCoupons] = useState<any[]>([]);
+  const [isCouponModalOpen, setIsCouponModalOpen] = useState(false);
+  const [couponCodeForm, setCouponCodeForm] = useState('');
+  const [couponDiscountType, setCouponDiscountType] = useState<'percentage' | 'fixed'>('percentage');
+  const [couponValue, setCouponValue] = useState('');
+  const [couponExpiry, setCouponExpiry] = useState('');
+  const [couponMinOrder, setCouponMinOrder] = useState('');
+  const [editingCoupon, setEditingCoupon] = useState<any | null>(null);
+
+  // Courier Partners state
+  const [courierPartners, setCourierPartners] = useState<any[]>([]);
+  const [isCourierModalOpen, setIsCourierModalOpen] = useState(false);
+  const [courierNameForm, setCourierNameForm] = useState('');
+  const [courierTrackingTemplate, setCourierTrackingTemplate] = useState('');
+  const [editingCourier, setEditingCourier] = useState<any | null>(null);
+
+  // Order Fulfillment courier selection state
+  const [selectedCourierPartner, setSelectedCourierPartner] = useState('');
 
   // Loading states
   const [loadingData, setLoadingData] = useState(true);
@@ -298,6 +320,38 @@ ${titleHtml}  <thead>
       if (varErr) throw varErr;
       setLowStockCount(varData?.length || 0);
 
+      // 5. Fetch Coupons
+      try {
+        const { data: couponData, error: couponErr } = await supabase
+          .from('coupons')
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (couponErr) throw couponErr;
+        setCoupons(couponData || []);
+      } catch (cErr) {
+        console.warn('Coupons table fetch failed or not yet created.', cErr);
+        setCoupons([]);
+      }
+
+      // 6. Fetch Courier Partners (with safety fallback to default partners)
+      const defaultPartners = [
+        { id: '1', name: 'Delhivery', tracking_url_template: 'https://www.delhivery.com/track?id=' },
+        { id: '2', name: 'Blue Dart', tracking_url_template: 'https://www.bluedart.com/tracking?id=' },
+        { id: '3', name: 'DHL Express', tracking_url_template: 'https://www.dhl.com/en/express/tracking.html?AWB=' },
+        { id: '4', name: 'FedEx', tracking_url_template: 'https://www.fedex.com/apps/fedextrack/?tracknumbers=' }
+      ];
+      try {
+        const { data: partnerData, error: partnerErr } = await supabase
+          .from('courier_partners' as any)
+          .select('*')
+          .order('name', { ascending: true });
+        if (partnerErr) throw partnerErr;
+        setCourierPartners(partnerData && partnerData.length > 0 ? partnerData : defaultPartners);
+      } catch (pErr) {
+        console.warn('Courier partners fetch failed. Using default placeholders.', pErr);
+        setCourierPartners(defaultPartners);
+      }
+
     } catch (err: any) {
       console.error('Error fetching admin data:', err);
       setErrorMsg(err.message || 'Error occurred while loading data.');
@@ -314,6 +368,7 @@ ${titleHtml}  <thead>
     setSelectedOrder(order);
     setOrderUpdateStatus(order.status);
     setOrderUpdateTracking(order.tracking_id || '');
+    setSelectedCourierPartner(order.courier_name || '');
     setLoadingOrderItems(true);
     setIsOrderModalOpen(true);
     try {
@@ -345,12 +400,18 @@ ${titleHtml}  <thead>
   const handleUpdateOrder = async () => {
     if (!selectedOrder) return;
     try {
+      // Store the partner's base tracking website URL — customer will copy their ID and paste it there
+      const partnerObj = courierPartners.find(p => p.name === selectedCourierPartner);
+      const trackingWebsiteUrl = partnerObj ? partnerObj.tracking_url_template : null;
+
       const { error } = await supabase
-        .from('orders')
+        .from('orders' as any)
         .update({
           status: orderUpdateStatus as any,
-          tracking_id: orderUpdateTracking || null
-        })
+          tracking_id: orderUpdateTracking || null,
+          courier_name: selectedCourierPartner || null,
+          courier_tracking_url: trackingWebsiteUrl
+        } as any)
         .eq('id', selectedOrder.id);
 
       if (error) throw error;
@@ -361,6 +422,88 @@ ${titleHtml}  <thead>
     } catch (err: any) {
       console.error('Error updating order:', err);
       triggerNotification(err.message || 'Could not update order status.', true);
+    }
+  };
+
+  // Handle Coupon Submit
+  const handleCouponSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!couponCodeForm.trim() || !couponValue || !couponExpiry) {
+      triggerNotification('Please fill out all coupon fields.', true);
+      return;
+    }
+
+    const payload = {
+      code: couponCodeForm.trim().toUpperCase(),
+      discount_type: couponDiscountType,
+      value: parseFloat(couponValue),
+      expiry: new Date(couponExpiry).toISOString(),
+      min_order_value: parseFloat(couponMinOrder || '0')
+    };
+
+    try {
+      if (editingCoupon) {
+        const { error } = await supabase
+          .from('coupons')
+          .update(payload)
+          .eq('id', editingCoupon.id);
+        if (error) throw error;
+        triggerNotification(`Coupon "${couponCodeForm}" updated successfully.`);
+      } else {
+        const { error } = await supabase
+          .from('coupons')
+          .insert(payload);
+        if (error) throw error;
+        triggerNotification(`Coupon "${couponCodeForm}" created successfully.`);
+      }
+      setIsCouponModalOpen(false);
+      fetchData();
+    } catch (err: any) {
+      console.error('Error saving coupon:', err);
+      triggerNotification(err.message || 'Failed to save coupon.', true);
+    }
+  };
+
+  // Handle Courier Submit
+  const handleCourierSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!courierNameForm.trim() || !courierTrackingTemplate.trim()) {
+      triggerNotification('Please fill out all courier partner fields.', true);
+      return;
+    }
+
+    const payload = {
+      name: courierNameForm.trim(),
+      tracking_url_template: courierTrackingTemplate.trim()
+    };
+
+    // Check if editingCourier has a real UUID (36 chars with hyphens)
+    // Fallback default partners have simple numeric string IDs like '1', '2'
+    const isRealDbEntry = editingCourier &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(editingCourier.id);
+
+    try {
+      if (isRealDbEntry) {
+        // Real DB record — update it
+        const { error } = await supabase
+          .from('courier_partners' as any)
+          .update(payload)
+          .eq('id', editingCourier.id);
+        if (error) throw error;
+        triggerNotification(`Courier Partner "${courierNameForm}" updated successfully.`);
+      } else {
+        // No real DB ID (new entry or fallback placeholder) — insert new record
+        const { error } = await supabase
+          .from('courier_partners' as any)
+          .insert(payload as any);
+        if (error) throw error;
+        triggerNotification(`Courier Partner "${courierNameForm}" saved successfully.`);
+      }
+      setIsCourierModalOpen(false);
+      fetchData();
+    } catch (err: any) {
+      console.error('Error saving courier partner:', err);
+      triggerNotification(err.message || 'Failed to save courier partner.', true);
     }
   };
 
@@ -768,13 +911,25 @@ ${titleHtml}  <thead>
             Manage your catalog items, inventory levels, sizing rules, and stat analysis.
           </p>
         </div>
-        <button
-          onClick={fetchData}
-          disabled={loadingData}
-          className="border border-border bg-white text-text-primary px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-bg-subtle transition-all flex items-center gap-2 shadow-sm disabled:opacity-50"
-        >
-          <RefreshCw size={12} className={loadingData ? 'animate-spin' : ''} /> Sync Data
-        </button>
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Customer Orders quick count — clickable shortcut */}
+          <button
+            onClick={() => setActiveTab('orders')}
+            className="border border-border bg-bg-subtle px-4 py-2 text-xs font-bold flex items-center gap-2 hover:border-accent hover:bg-white transition-all cursor-pointer"
+            title="View Customer Orders"
+          >
+            <Package size={12} className="text-text-secondary" />
+            <span className="text-text-secondary uppercase tracking-wider">Orders</span>
+            <span className="bg-accent text-white text-[10px] font-black px-1.5 py-0.5 min-w-[18px] text-center">{recentOrders.length}</span>
+          </button>
+          <button
+            onClick={fetchData}
+            disabled={loadingData}
+            className="border border-border bg-white text-text-primary px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-bg-subtle transition-all flex items-center gap-2 shadow-sm disabled:opacity-50"
+          >
+            <RefreshCw size={12} className={loadingData ? 'animate-spin' : ''} /> Sync Data
+          </button>
+        </div>
       </div>
 
       {/* Notifications banner */}
@@ -803,58 +958,50 @@ ${titleHtml}  <thead>
         )}
       </AnimatePresence>
 
-      {/* Navigation sub-tabs */}
-      <div className="flex border-b border-border mb-8 overflow-x-auto">
-        <button
-          onClick={() => setActiveTab('overview')}
-          className={`py-3.5 px-6 text-xs font-bold tracking-widest uppercase border-b-2 whitespace-nowrap transition-all ${
-            activeTab === 'overview'
-              ? 'border-accent text-text-primary font-black'
-              : 'border-transparent text-text-secondary hover:text-text-primary'
-          }`}
-        >
-          Overview Statistics
-        </button>
-        <button
-          onClick={() => setActiveTab('products')}
-          className={`py-3.5 px-6 text-xs font-bold tracking-widest uppercase border-b-2 whitespace-nowrap transition-all ${
-            activeTab === 'products'
-              ? 'border-accent text-text-primary font-black'
-              : 'border-transparent text-text-secondary hover:text-text-primary'
-          }`}
-        >
-          Product Catalog ({products.length})
-        </button>
-        <button
-          onClick={() => setActiveTab('categories')}
-          className={`py-3.5 px-6 text-xs font-bold tracking-widest uppercase border-b-2 whitespace-nowrap transition-all ${
-            activeTab === 'categories'
-              ? 'border-accent text-text-primary font-black'
-              : 'border-transparent text-text-secondary hover:text-text-primary'
-          }`}
-        >
-          Categories & Sizing
-        </button>
-        <button
-          onClick={() => setActiveTab('inventory')}
-          className={`py-3.5 px-6 text-xs font-bold tracking-widest uppercase border-b-2 whitespace-nowrap transition-all ${
-            activeTab === 'inventory'
-              ? 'border-accent text-text-primary font-black'
-              : 'border-transparent text-text-secondary hover:text-text-primary'
-          }`}
-        >
-          Inventory Stock Ledger
-        </button>
-        <button
-          onClick={() => setActiveTab('orders')}
-          className={`py-3.5 px-6 text-xs font-bold tracking-widest uppercase border-b-2 whitespace-nowrap transition-all ${
-            activeTab === 'orders'
-              ? 'border-accent text-text-primary font-black'
-              : 'border-transparent text-text-secondary hover:text-text-primary'
-          }`}
-        >
-          Customer Orders ({recentOrders.length})
-        </button>
+      {/* Navigation sub-tabs — mobile: dropdown select / desktop: pill tabs */}
+      <div className="mb-8">
+        {/* Mobile Dropdown (visible on small screens only) */}
+        <div className="md:hidden">
+          <select
+            value={activeTab}
+            onChange={(e) => setActiveTab(e.target.value as any)}
+            className="w-full px-4 py-3 border border-border bg-white text-text-primary text-xs font-bold uppercase tracking-wider focus:outline-none focus:border-accent appearance-none cursor-pointer"
+            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', paddingRight: '36px' }}
+          >
+            <option value="overview">Overview Statistics</option>
+            <option value="products">Product Catalog ({products.length})</option>
+            <option value="categories">Categories &amp; Sizing</option>
+            <option value="inventory">Inventory Stock Ledger</option>
+            <option value="orders">Customer Orders ({recentOrders.length})</option>
+            <option value="coupons">Manage Coupons ({coupons.length})</option>
+            <option value="couriers">Courier Partners ({courierPartners.length})</option>
+          </select>
+        </div>
+
+        {/* Desktop Pill Tabs (hidden on mobile) */}
+        <div className="hidden md:flex border-b border-border overflow-x-auto">
+          {([
+            { key: 'overview', label: 'Overview Statistics' },
+            { key: 'products', label: `Product Catalog (${products.length})` },
+            { key: 'categories', label: 'Categories & Sizing' },
+            { key: 'inventory', label: 'Inventory Stock Ledger' },
+            { key: 'orders', label: `Customer Orders (${recentOrders.length})` },
+            { key: 'coupons', label: `Manage Coupons (${coupons.length})` },
+            { key: 'couriers', label: `Courier Partners (${courierPartners.length})` },
+          ] as { key: typeof activeTab; label: string }[]).map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setActiveTab(key)}
+              className={`py-3.5 px-5 text-xs font-bold tracking-widest uppercase border-b-2 whitespace-nowrap transition-all flex-shrink-0 ${
+                activeTab === key
+                  ? 'border-accent text-text-primary font-black'
+                  : 'border-transparent text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* TABS CONTAINER */}
@@ -1468,6 +1615,236 @@ ${titleHtml}  <thead>
           </motion.div>
         )}
 
+        {/* TAB 6: MANAGE COUPONS */}
+        {activeTab === 'coupons' && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="grid grid-cols-1 lg:grid-cols-12 gap-8"
+          >
+            {/* Left Column: Coupon list */}
+            <div className="lg:col-span-8 bg-white border border-border/80 p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)]">
+              <div className="flex justify-between items-center mb-4 pb-2 border-b border-border">
+                <h3 className="text-xs font-heading font-black uppercase tracking-wider text-text-primary">
+                  Coupon Discounts List
+                </h3>
+                <button
+                  onClick={() => {
+                    setEditingCoupon(null);
+                    setCouponCodeForm('');
+                    setCouponDiscountType('percentage');
+                    setCouponValue('');
+                    setCouponExpiry('');
+                    setCouponMinOrder('');
+                    setIsCouponModalOpen(true);
+                  }}
+                  className="bg-accent text-white px-3.5 py-1.5 text-[9px] font-bold uppercase tracking-widest hover:bg-accent-hover transition-colors shadow-sm"
+                >
+                  Create Coupon
+                </button>
+              </div>
+
+              {coupons.length === 0 ? (
+                <p className="text-xs text-text-secondary text-center py-8">No coupons defined in database.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-border text-[9px] uppercase tracking-wider text-text-secondary">
+                        <th className="py-2.5">Code</th>
+                        <th className="py-2.5">Type</th>
+                        <th className="py-2.5">Value</th>
+                        <th className="py-2.5">Min Order</th>
+                        <th className="py-2.5">Expiry Date</th>
+                        <th className="py-2.5">Status</th>
+                        <th className="py-2.5 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {coupons.map((c) => {
+                        const isExpired = new Date(c.expiry) < new Date();
+                        return (
+                          <tr key={c.id} className="hover:bg-bg-subtle">
+                            <td className="py-3 font-bold text-text-primary uppercase tracking-wide text-[11px]">{c.code}</td>
+                            <td className="py-3 text-[10px] text-text-secondary uppercase">{c.discount_type}</td>
+                            <td className="py-3 font-bold text-text-primary">
+                              {c.discount_type === 'percentage' ? `${c.value}%` : `₹${Number(c.value).toFixed(2)}`}
+                            </td>
+                            <td className="py-3 text-[10px] text-text-secondary">₹{Number(c.min_order_value || 0).toFixed(2)}</td>
+                            <td className="py-3 text-[10px] text-text-secondary font-mono">{new Date(c.expiry).toLocaleDateString()}</td>
+                            <td className="py-3 text-[10px]">
+                              <span className={`px-2 py-0.5 border text-[8px] font-black uppercase tracking-widest ${
+                                isExpired 
+                                  ? 'bg-red-50 text-sale border-red-200' 
+                                  : 'bg-green-50 text-green-700 border-green-200'
+                              }`}>
+                                {isExpired ? 'Expired' : 'Active'}
+                              </span>
+                            </td>
+                            <td className="py-3 text-right">
+                              <div className="flex gap-2 justify-end">
+                                <button
+                                  onClick={() => {
+                                    setEditingCoupon(c);
+                                    setCouponCodeForm(c.code);
+                                    setCouponDiscountType(c.discount_type);
+                                    setCouponValue(c.value.toString());
+                                    setCouponExpiry(new Date(c.expiry).toISOString().split('T')[0]);
+                                    setCouponMinOrder(c.min_order_value.toString());
+                                    setIsCouponModalOpen(true);
+                                  }}
+                                  className="p-1.5 hover:bg-bg-subtle text-text-secondary hover:text-accent transition-colors"
+                                >
+                                  <Edit2 size={12} />
+                                </button>
+                                <button
+                                  onClick={async () => {
+                                    if (!confirm('Are you sure you want to delete this coupon?')) return;
+                                    try {
+                                      const { error } = await supabase.from('coupons').delete().eq('id', c.id);
+                                      if (error) throw error;
+                                      triggerNotification('Coupon deleted successfully.');
+                                      fetchData();
+                                    } catch (err: any) {
+                                      triggerNotification(err.message || 'Could not delete coupon.', true);
+                                    }
+                                  }}
+                                  className="p-1.5 hover:bg-bg-subtle text-text-secondary hover:text-sale transition-colors"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Right Column: Conditions explanation info */}
+            <div className="lg:col-span-4 bg-white border border-border/80 p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)] space-y-4">
+              <h3 className="text-xs font-heading font-black uppercase tracking-wider text-text-primary pb-2 border-b border-border">
+                Coupon Rules & Validation
+              </h3>
+              <p className="text-xs text-text-secondary leading-relaxed">
+                Configure promotional campaigns for customers. Rules validated at checkout:
+              </p>
+              <div className="space-y-3 text-xs leading-relaxed text-text-secondary">
+                <div className="bg-bg-subtle p-3.5 border-l-2 border-accent">
+                  <strong className="text-text-primary block mb-1">Calendar Expiration</strong>
+                  Coupon codes expire automatically based on the UTC datetime saved in the database.
+                </div>
+                <div className="bg-bg-subtle p-3.5 border-l-2 border-accent">
+                  <strong className="text-text-primary block mb-1">Minimum Order Value</strong>
+                  Enforce a threshold. Customers cannot apply coupons unless their shopping subtotal meets this value.
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* TAB 7: COURIER PARTNERS */}
+        {activeTab === 'couriers' && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="grid grid-cols-1 lg:grid-cols-12 gap-8"
+          >
+            {/* Left Column: Courier list */}
+            <div className="lg:col-span-8 bg-white border border-border/80 p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)]">
+              <div className="flex justify-between items-center mb-4 pb-2 border-b border-border">
+                <h3 className="text-xs font-heading font-black uppercase tracking-wider text-text-primary">
+                  Courier Shipping Partners
+                </h3>
+                <button
+                  onClick={() => {
+                    setEditingCourier(null);
+                    setCourierNameForm('');
+                    setCourierTrackingTemplate('');
+                    setIsCourierModalOpen(true);
+                  }}
+                  className="bg-accent text-white px-3.5 py-1.5 text-[9px] font-bold uppercase tracking-widest hover:bg-accent-hover transition-colors shadow-sm"
+                >
+                  Add Partner
+                </button>
+              </div>
+
+              {courierPartners.length === 0 ? (
+                <p className="text-xs text-text-secondary text-center py-8">No courier partners defined in database.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-border text-[9px] uppercase tracking-wider text-text-secondary">
+                        <th className="py-2.5">Name</th>
+                        <th className="py-2.5">Tracking Link Template</th>
+                        <th className="py-2.5 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {courierPartners.map((p) => (
+                        <tr key={p.id} className="hover:bg-bg-subtle">
+                          <td className="py-3 font-bold text-text-primary uppercase tracking-wide text-[11px]">{p.name}</td>
+                          <td className="py-3 font-mono text-[10px] text-text-secondary truncate max-w-md">{p.tracking_url_template}</td>
+                          <td className="py-3 text-right">
+                            <div className="flex gap-2 justify-end">
+                              <button
+                                onClick={() => {
+                                  setEditingCourier(p);
+                                  setCourierNameForm(p.name);
+                                  setCourierTrackingTemplate(p.tracking_url_template);
+                                  setIsCourierModalOpen(true);
+                                }}
+                                className="p-1.5 hover:bg-bg-subtle text-text-secondary hover:text-accent transition-colors"
+                              >
+                                <Edit2 size={12} />
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  if (!confirm('Are you sure you want to delete this courier partner?')) return;
+                                  try {
+                                    const { error } = await supabase.from('courier_partners' as any).delete().eq('id', p.id);
+                                    if (error) throw error;
+                                    triggerNotification('Courier partner deleted successfully.');
+                                    fetchData();
+                                  } catch (err: any) {
+                                    triggerNotification(err.message || 'Could not delete courier partner.', true);
+                                  }
+                                }}
+                                className="p-1.5 hover:bg-bg-subtle text-text-secondary hover:text-sale transition-colors"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Right Column: Help details */}
+            <div className="lg:col-span-4 bg-white border border-border/80 p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)] space-y-4">
+              <h3 className="text-xs font-heading font-black uppercase tracking-wider text-text-primary pb-2 border-b border-border">
+                Tracking Link Configuration
+              </h3>
+              <p className="text-xs text-text-secondary leading-relaxed">
+                Courier Partners define links used to track customer orders.
+              </p>
+              <div className="bg-bg-subtle p-3.5 border-l-2 border-accent text-xs text-text-secondary">
+                <span className="font-bold text-text-primary block mb-1">Link Template Example</span>
+                Use tracking parameters that accept the ID at the end:
+                <br />
+                <code className="bg-white px-1 border border-border mt-1 block py-1 font-mono text-[9px]">https://www.delhivery.com/track?id=</code>
+              </div>
+            </div>
+          </motion.div>
+        )}
       </div>
 
       {/* ==========================================
@@ -2436,6 +2813,33 @@ ${titleHtml}  <thead>
                     </div>
                   </div>
 
+                  {/* Financial Breakdown / Coupon info */}
+                  <div className="bg-bg-subtle p-5 border border-border">
+                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-text-primary mb-3 pb-1 border-b border-border">
+                      Financial Transaction Receipt
+                    </h4>
+                    <div className="space-y-2 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-text-secondary">Subtotal:</span>
+                        <span className="font-semibold text-text-primary font-mono">₹{Number(selectedOrder.subtotal || selectedOrder.total).toFixed(2)}</span>
+                      </div>
+                      {selectedOrder.coupon_code && (
+                        <div className="flex justify-between text-emerald-700 font-bold">
+                          <span>Coupon Discount ({selectedOrder.coupon_code}):</span>
+                          <span className="font-mono">-₹{Number(selectedOrder.discount_amount || 0).toFixed(2)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between">
+                        <span className="text-text-secondary">Shipping Cost:</span>
+                        <span className="font-semibold text-text-primary font-mono">₹{Number(selectedOrder.shipping_cost || 0).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between border-t border-border pt-2 text-sm font-bold">
+                        <span>Grand Total Paid:</span>
+                        <span className="text-accent font-mono">₹{Number(selectedOrder.total).toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Order Items list */}
                   <div className="border border-border">
                     <h4 className="text-[10px] font-bold uppercase tracking-wider text-text-primary p-4 bg-bg-subtle border-b border-border">
@@ -2487,7 +2891,7 @@ ${titleHtml}  <thead>
                       Fulfillment Controls
                     </h4>
 
-                    {/* Status selection */}
+                     {/* Status selection */}
                     <div>
                       <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
                         Order Status
@@ -2502,6 +2906,25 @@ ${titleHtml}  <thead>
                         <option value="shipped">Shipped (Dispatched)</option>
                         <option value="delivered">Delivered</option>
                         <option value="cancelled">Cancelled (Voided)</option>
+                      </select>
+                    </div>
+
+                    {/* Courier Partner Selection */}
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
+                        Courier Partner
+                      </label>
+                      <select
+                        value={selectedCourierPartner}
+                        onChange={(e) => setSelectedCourierPartner(e.target.value)}
+                        className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent"
+                      >
+                        <option value="">Select Carrier...</option>
+                        {courierPartners.map((partner) => (
+                          <option key={partner.id} value={partner.name}>
+                            {partner.name}
+                          </option>
+                        ))}
                       </select>
                     </div>
 
@@ -2538,6 +2961,227 @@ ${titleHtml}  <thead>
                   </div>
                 </div>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ==========================================
+          COUPON EDIT/ADD DIALOG MODAL
+          ========================================== */}
+      <AnimatePresence>
+        {isCouponModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsCouponModalOpen(false)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="relative w-full max-w-lg bg-white border border-border p-6 md:p-8 shadow-2xl z-10 flex flex-col max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex justify-between items-center border-b border-border pb-4 mb-6">
+                <div>
+                  <span className="text-[9px] uppercase tracking-widest text-text-secondary font-black bg-bg-subtle px-2 py-0.5 border border-border">
+                    {editingCoupon ? 'Edit Campaign' : 'New Campaign'}
+                  </span>
+                  <h3 className="text-lg font-heading font-black uppercase mt-1 text-text-primary">
+                    {editingCoupon ? 'Modify Coupon' : 'Create Coupon Code'}
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setIsCouponModalOpen(false)}
+                  className="p-1.5 text-text-secondary hover:text-text-primary hover:bg-bg-subtle transition-colors rounded-full"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <form onSubmit={handleCouponSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
+                    Coupon Code
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={couponCodeForm}
+                    onChange={(e) => setCouponCodeForm(e.target.value.toUpperCase())}
+                    className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent font-mono uppercase"
+                    placeholder="e.g. EXTRA20"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
+                      Discount Type
+                    </label>
+                    <select
+                      value={couponDiscountType}
+                      onChange={(e: any) => setCouponDiscountType(e.target.value)}
+                      className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent"
+                    >
+                      <option value="percentage">Percentage (%)</option>
+                      <option value="fixed">Fixed Amount (₹)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
+                      Value
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      step="any"
+                      value={couponValue}
+                      onChange={(e) => setCouponValue(e.target.value)}
+                      className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent"
+                      placeholder={couponDiscountType === 'percentage' ? 'e.g. 10 for 10%' : 'e.g. 100 for ₹100'}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1 flex items-center gap-1">
+                      <Calendar size={11} /> Expiry Date
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={couponExpiry}
+                      onChange={(e) => setCouponExpiry(e.target.value)}
+                      className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent cursor-pointer font-bold uppercase text-[10px]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
+                      Min Order Value (₹)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={couponMinOrder}
+                      onChange={(e) => setCouponMinOrder(e.target.value)}
+                      className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent font-bold"
+                      placeholder="e.g. 1000"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-4 border-t border-border">
+                  <button
+                    type="button"
+                    onClick={() => setIsCouponModalOpen(false)}
+                    className="px-4 py-2 border border-border bg-white text-text-primary text-[10px] font-bold uppercase tracking-wider hover:bg-bg-subtle transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-accent text-white text-[10px] font-bold uppercase tracking-wider hover:bg-accent-hover transition-colors shadow-sm"
+                  >
+                    Save Coupon
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ==========================================
+          COURIER PARTNER EDIT/ADD DIALOG MODAL
+          ========================================== */}
+      <AnimatePresence>
+        {isCourierModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsCourierModalOpen(false)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="relative w-full max-w-lg bg-white border border-border p-6 md:p-8 shadow-2xl z-10 flex flex-col max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex justify-between items-center border-b border-border pb-4 mb-6">
+                <div>
+                  <span className="text-[9px] uppercase tracking-widest text-text-secondary font-black bg-bg-subtle px-2 py-0.5 border border-border">
+                    {editingCourier ? 'Edit Partner' : 'New Carrier'}
+                  </span>
+                  <h3 className="text-lg font-heading font-black uppercase mt-1 text-text-primary">
+                    {editingCourier ? 'Modify Courier Partner' : 'Register Courier Partner'}
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setIsCourierModalOpen(false)}
+                  className="p-1.5 text-text-secondary hover:text-text-primary hover:bg-bg-subtle transition-colors rounded-full"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <form onSubmit={handleCourierSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
+                    Courier Partner Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={courierNameForm}
+                    onChange={(e) => setCourierNameForm(e.target.value)}
+                    className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent font-bold"
+                    placeholder="e.g. Delhivery"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
+                    Tracking URL Template Link
+                  </label>
+                  <input
+                    type="url"
+                    required
+                    value={courierTrackingTemplate}
+                    onChange={(e) => setCourierTrackingTemplate(e.target.value)}
+                    className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent font-mono"
+                    placeholder="e.g. https://www.delhivery.com/track?id="
+                  />
+                  <p className="text-[10px] text-text-secondary mt-1">
+                    Enter the carrier tracking page URL. The tracking ID will be appended directly to the end of this link.
+                  </p>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-4 border-t border-border">
+                  <button
+                    type="button"
+                    onClick={() => setIsCourierModalOpen(false)}
+                    className="px-4 py-2 border border-border bg-white text-text-primary text-[10px] font-bold uppercase tracking-wider hover:bg-bg-subtle transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-accent text-white text-[10px] font-bold uppercase tracking-wider hover:bg-accent-hover transition-colors shadow-sm"
+                  >
+                    Save Partner
+                  </button>
+                </div>
+              </form>
             </motion.div>
           </div>
         )}

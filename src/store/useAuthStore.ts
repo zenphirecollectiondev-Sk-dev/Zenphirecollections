@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import type { Session, User } from '@supabase/supabase-js';
+import { useWishlistStore } from './useWishlistStore';
 
 export interface Profile {
   id: string;
@@ -48,9 +49,11 @@ export const useAuthStore = create<AuthState>((set) => ({
         }
         console.warn("[Auth] Profile loaded:", profile);
         set({ session, user: session.user, profile: profile as Profile || null, loading: false });
+        useWishlistStore.getState().fetchWishlist(session.user.id);
       } else {
         console.warn("[Auth] No initial session found.");
         set({ session: null, user: null, profile: null, loading: false });
+        useWishlistStore.getState().clearWishlist();
       }
 
       // Set up auth state change listener
@@ -68,8 +71,10 @@ export const useAuthStore = create<AuthState>((set) => ({
           }
           console.warn("[Auth] Profile updated on event:", profile);
           set({ session, user: session.user, profile: profile as Profile || null, loading: false });
+          useWishlistStore.getState().fetchWishlist(session.user.id);
         } else {
           set({ session: null, user: null, profile: null, loading: false });
+          useWishlistStore.getState().clearWishlist();
         }
       });
     } catch (error) {
@@ -81,6 +86,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       await supabase.auth.signOut();
       set({ session: null, user: null, profile: null });
+      useWishlistStore.getState().clearWishlist();
     } catch (error) {
       console.error('Error signing out:', error);
     }
