@@ -146,6 +146,7 @@ export default function Home() {
             <Link
               key={col.id}
               to={col.link}
+              onClick={() => window.scrollTo({ top: 0, behavior: 'instant' })}
               className="flex-shrink-0 w-72 md:w-96 snap-start group block"
             >
               <div className="relative aspect-[4/5] bg-bg-subtle overflow-hidden border border-border">
@@ -284,6 +285,7 @@ export default function Home() {
             <div>
               <Link
                 to="/shop"
+                onClick={() => window.scrollTo({ top: 0, behavior: 'instant' })}
                 className="inline-flex items-center gap-2 bg-accent text-white px-6 py-3 text-sm font-medium uppercase tracking-wider hover:bg-accent-hover transition-colors"
               >
                 Discover Collection

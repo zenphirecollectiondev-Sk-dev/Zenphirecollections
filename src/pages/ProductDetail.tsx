@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Heart, ShoppingBag, ChevronRight, Check, AlertCircle, X, Loader2 } from 'lucide-react';
 import { useCartStore } from '../store/useCartStore';
 import { useWishlistStore } from '../store/useWishlistStore';
@@ -157,6 +157,8 @@ export default function ProductDetail() {
   const [selectedColor, setSelectedColor] = useState<string>('');
   const [activeImageIdx, setActiveImageIdx] = useState<number>(0);
   const [isAdded, setIsAdded] = useState(false);
+  const [viewBag, setViewBag] = useState(false);
+  const navigate = useNavigate();
 
   const addItem = useCartStore((state) => state.addItem);
 
@@ -223,9 +225,19 @@ export default function ProductDetail() {
         image: product.product_images[0]?.url || linenShirt
       });
 
+      // Phase 1: Green 'Added ✓' for 1.5s
       setIsAdded(true);
-      setTimeout(() => setIsAdded(false), 2000);
+      setViewBag(false);
+      setTimeout(() => {
+        setIsAdded(false);
+        // Phase 2: 'View Bag' button
+        setViewBag(true);
+      }, 1500);
     }
+  };
+
+  const handleViewBag = () => {
+    navigate('/cart');
   };
 
   return (
@@ -380,14 +392,30 @@ export default function ProductDetail() {
 
             {/* CTA Buttons */}
             <div className="flex gap-4 pt-4">
-              <button
-                disabled={isOutOfStock}
-                onClick={handleAddToCart}
-                className="flex-1 bg-accent text-white py-4 font-bold uppercase text-xs tracking-widest hover:bg-accent-hover transition-colors disabled:bg-border disabled:text-text-secondary disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                <ShoppingBag size={16} />
-                {isAdded ? 'Added' : isOutOfStock ? 'Sold Out' : selectedSize ? 'Add to Cart' : 'Select Size'}
-              </button>
+              {viewBag ? (
+                <button
+                  onClick={handleViewBag}
+                  className="flex-1 bg-emerald-600 text-white py-4 font-bold uppercase text-xs tracking-widest hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2"
+                >
+                  <ShoppingBag size={16} />
+                  View Bag
+                </button>
+              ) : (
+                <button
+                  disabled={isOutOfStock}
+                  onClick={handleAddToCart}
+                  className={`flex-1 py-4 font-bold uppercase text-xs tracking-widest transition-colors flex items-center justify-center gap-2 ${
+                    isAdded
+                      ? 'bg-emerald-600 text-white'
+                      : isOutOfStock
+                      ? 'bg-border text-text-secondary cursor-not-allowed'
+                      : 'bg-accent text-white hover:bg-accent-hover'
+                  }`}
+                >
+                  <ShoppingBag size={16} />
+                  {isAdded ? 'Added ✓' : isOutOfStock ? 'Sold Out' : selectedSize ? 'Add to Cart' : 'Select Size'}
+                </button>
+              )}
               
               <button 
                 onClick={() => toggleWishlist(product.id)}
@@ -466,14 +494,30 @@ export default function ProductDetail() {
           <span className="text-[10px] uppercase tracking-wider text-text-secondary">Price</span>
           <span className="text-base font-bold text-text-primary">₹{Number(product.base_price || 0).toFixed(2)}</span>
         </div>
-        <button
-          disabled={isOutOfStock}
-          onClick={handleAddToCart}
-          className="flex-grow bg-accent text-white py-3.5 px-4 font-bold uppercase text-xs tracking-wider hover:bg-accent-hover transition-colors disabled:bg-border disabled:text-text-secondary flex items-center justify-center gap-2"
-        >
-          <ShoppingBag size={14} />
-          {isAdded ? 'Added' : isOutOfStock ? 'Sold Out' : selectedSize ? 'Add to Cart' : 'Select Size'}
-        </button>
+        {viewBag ? (
+          <button
+            onClick={handleViewBag}
+            className="flex-grow bg-emerald-600 text-white py-3.5 px-4 font-bold uppercase text-xs tracking-wider hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2"
+          >
+            <ShoppingBag size={14} />
+            View Bag
+          </button>
+        ) : (
+          <button
+            disabled={isOutOfStock}
+            onClick={handleAddToCart}
+            className={`flex-grow py-3.5 px-4 font-bold uppercase text-xs tracking-wider transition-colors flex items-center justify-center gap-2 ${
+              isAdded
+                ? 'bg-emerald-600 text-white'
+                : isOutOfStock
+                ? 'bg-border text-text-secondary cursor-not-allowed'
+                : 'bg-accent text-white hover:bg-accent-hover'
+            }`}
+          >
+            <ShoppingBag size={14} />
+            {isAdded ? 'Added ✓' : isOutOfStock ? 'Sold Out' : selectedSize ? 'Add to Cart' : 'Select Size'}
+          </button>
+        )}
       </div>
 
       {/* SIZE GUIDE OVERLAY DIALOG MODAL */}
