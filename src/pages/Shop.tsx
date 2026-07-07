@@ -1,17 +1,17 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { SlidersHorizontal, X, ChevronDown, Heart, Loader2 } from 'lucide-react';
+import { SlidersHorizontal, X, ChevronDown, Heart, Loader2, ShoppingBag, ArrowRight } from 'lucide-react';
 import { useWishlistStore } from '../store/useWishlistStore';
 import { getActiveProducts, getCategories } from '../lib/supabase';
 import linenShirt from '../assets/product_linen_shirt.png';
 
 export default function Shop() {
   const { toggleWishlist, isWishlisted } = useWishlistStore();
+  const [heartId, setHeartId] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const activeCategory = searchParams.get('category') || 'all';
   const activeGender = searchParams.get('gender') || 'all';
 
-  // Live database states
   const [dbProducts, setDbProducts] = useState<any[]>([]);
   const [dbCategories, setDbCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -19,14 +19,11 @@ export default function Shop() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [prodData, catData] = await Promise.all([
-          getActiveProducts(),
-          getCategories()
-        ]);
+        const [prodData, catData] = await Promise.all([getActiveProducts(), getCategories()]);
         setDbProducts(prodData || []);
         setDbCategories(catData || []);
       } catch (err) {
-        console.warn('Could not load shop page data from Supabase:', err);
+        console.warn('Shop load error:', err);
       } finally {
         setLoading(false);
       }
@@ -37,7 +34,6 @@ export default function Shop() {
   const products = useMemo(() => dbProducts, [dbProducts]);
   const categories = useMemo(() => dbCategories, [dbCategories]);
 
-  // Filters State
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
   const [maxPrice, setMaxPrice] = useState<number>(15000);
   const [sortBy, setSortBy] = useState<string>('newest');
@@ -45,25 +41,16 @@ export default function Shop() {
 
   const sizesList = ['S', 'M', 'L', 'XL'];
 
-  // Handle category change
   const handleCategoryChange = (slug: string) => {
     searchParams.delete('gender');
-    if (slug === 'all') {
-      searchParams.delete('category');
-    } else {
-      searchParams.set('category', slug);
-    }
+    slug === 'all' ? searchParams.delete('category') : searchParams.set('category', slug);
     setSearchParams(searchParams);
   };
 
-  // Toggle size selection
   const handleSizeToggle = (size: string) => {
-    setSelectedSizes((prev) =>
-      prev.includes(size) ? prev.filter((s) => s !== size) : [...prev, size]
-    );
+    setSelectedSizes((prev) => prev.includes(size) ? prev.filter((s) => s !== size) : [...prev, size]);
   };
 
-  // Reset all filters
   const resetFilters = () => {
     searchParams.delete('category');
     searchParams.delete('gender');
@@ -72,152 +59,127 @@ export default function Shop() {
     setMaxPrice(15000);
   };
 
-  // Filter and Sort Logic
+  const handleWishlist = (id: string) => {
+    toggleWishlist(id);
+    setHeartId(id);
+    setTimeout(() => setHeartId(null), 400);
+  };
+
   const filteredProducts = useMemo(() => {
     let result = [...products];
-
-    // Filter by Category
     if (activeCategory !== 'all') {
       const categoryObj = categories.find((c) => c.slug === activeCategory);
       if (categoryObj) {
         result = result.filter((p) => {
           if (p.category_id === categoryObj.id) return true;
           const prodCat = categories.find((c) => c.id === p.category_id);
-          if (prodCat && prodCat.parent_category_id === categoryObj.id) return true;
-          return false;
+          return prodCat?.parent_category_id === categoryObj.id;
         });
       }
     }
-
-    // Filter by Gender
     if (activeGender !== 'all') {
       result = result.filter((p) => {
         const prodCat = categories.find((c) => c.id === p.category_id);
-        if (prodCat) {
-          return prodCat.name.toLowerCase() === activeGender.toLowerCase();
-        }
-        return false;
+        return prodCat?.name?.toLowerCase() === activeGender.toLowerCase();
       });
     }
-
-    // Filter by Price
     result = result.filter((p) => p.base_price <= maxPrice);
-
-    // Filter by Sizes
     if (selectedSizes.length > 0) {
       result = result.filter((p) =>
-        p.product_variants && p.product_variants.some(
-          (v: any) => selectedSizes.includes(v.size) && v.stock_qty > 0
-        )
+        p.product_variants?.some((v: any) => selectedSizes.includes(v.size) && v.stock_qty > 0)
       );
     }
-
-    // Sorting
-    if (sortBy === 'price-asc') {
-      result.sort((a, b) => a.base_price - b.base_price);
-    } else if (sortBy === 'price-desc') {
-      result.sort((a, b) => b.base_price - a.base_price);
-    } else if (sortBy === 'newest') {
-      result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    }
-
+    if (sortBy === 'price-asc') result.sort((a, b) => a.base_price - b.base_price);
+    else if (sortBy === 'price-desc') result.sort((a, b) => b.base_price - a.base_price);
+    else result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     return result;
   }, [products, categories, activeCategory, activeGender, maxPrice, selectedSizes, sortBy]);
 
   if (loading) {
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center">
-        <Loader2 size={32} className="animate-spin text-text-secondary mb-2" />
-        <p className="text-xs uppercase tracking-widest text-text-secondary font-bold">
-          Loading Catalog...
-        </p>
+        <Loader2 size={28} className="animate-spin text-text-secondary mb-3" />
+        <p className="text-[10px] uppercase tracking-widest text-text-secondary font-bold anim-fade-in">Loading Catalog</p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 min-h-screen">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 min-h-screen overflow-x-hidden">
+
       {/* Page Header */}
-      <div className="border-b border-border pb-6 mb-8 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+      <div className="border-b border-border pb-6 mb-8 flex flex-col md:flex-row md:items-end md:justify-between gap-3">
         <div>
-          <span className="text-xs uppercase tracking-[0.2em] text-text-secondary font-bold">
-            Zenphire Catalog
-          </span>
+          <p className="text-[10px] uppercase tracking-[0.25em] text-text-secondary font-bold">Zenphire Catalog</p>
           <h1 className="text-3xl font-heading font-black uppercase mt-1">
-            {activeCategory !== 'all' 
-              ? `${activeCategory} Collection` 
-              : activeGender !== 'all' 
-                ? `${activeGender}'s Collection` 
-                : 'Shop All'}
+            {activeCategory !== 'all' ? `${activeCategory} Collection`
+              : activeGender !== 'all' ? `${activeGender}'s Collection`
+              : 'Shop All'}
           </h1>
         </div>
-        <p className="text-sm text-text-secondary">
-          Showing {filteredProducts.length} results
-        </p>
+        <p className="text-xs text-text-secondary">{filteredProducts.length} results</p>
       </div>
 
-      {/* Control Bar (Mobile toggle and Desktop sort dropdown) */}
-      <div className="flex justify-between items-center mb-8 bg-bg-subtle border border-border p-4 md:py-3">
+      {/* Control Bar */}
+      <div className="flex justify-between items-center mb-8 border border-border p-3.5 md:p-3 bg-bg-subtle">
+        {/* Mobile filter trigger */}
         <button
           onClick={() => setIsMobileFilterOpen(true)}
-          className="flex items-center gap-2 text-sm uppercase tracking-wider font-semibold text-text-primary md:hidden"
+          className="btn flex items-center gap-2 text-xs uppercase tracking-wider font-semibold text-text-primary md:hidden"
         >
-          <SlidersHorizontal size={16} />
-          Filters {selectedSizes.length > 0 || activeCategory !== 'all' ? `(${1 + selectedSizes.length})` : ''}
+          <SlidersHorizontal size={14} />
+          Filters
+          {(selectedSizes.length > 0 || activeCategory !== 'all') && (
+            <span className="bg-accent text-white text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full">
+              {selectedSizes.length + (activeCategory !== 'all' ? 1 : 0)}
+            </span>
+          )}
         </button>
 
+        {/* Desktop filter status */}
         <div className="hidden md:flex items-center gap-2">
-          <span className="text-xs uppercase tracking-wider text-text-secondary">
-            Filter status:
-          </span>
+          <span className="text-[10px] uppercase tracking-wider text-text-secondary">Filters:</span>
           {(selectedSizes.length > 0 || activeCategory !== 'all' || maxPrice < 15000) ? (
-            <button
-              onClick={resetFilters}
-              className="text-xs uppercase tracking-wider text-sale font-bold flex items-center gap-1 hover:underline"
-            >
-              Reset Filters <X size={12} />
+            <button onClick={resetFilters} className="btn text-[10px] uppercase tracking-wider text-sale font-bold flex items-center gap-1">
+              Reset <X size={11} />
             </button>
           ) : (
-            <span className="text-xs text-text-secondary italic">None active</span>
+            <span className="text-[10px] text-text-secondary italic">None active</span>
           )}
         </div>
 
-        {/* Sort Select */}
+        {/* Sort */}
         <div className="flex items-center gap-2 ml-auto">
-          <label htmlFor="sortBy" className="text-xs uppercase tracking-wider text-text-secondary hidden sm:inline">
-            Sort by:
-          </label>
+          <label htmlFor="sortBy" className="text-[10px] uppercase tracking-wider text-text-secondary hidden sm:inline">Sort:</label>
           <div className="relative">
             <select
               id="sortBy"
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="appearance-none bg-white border border-border text-xs uppercase tracking-wider font-semibold py-2 pl-4 pr-10 rounded-none focus:outline-none focus:border-accent cursor-pointer"
+              className="appearance-none bg-white border border-border text-[10px] uppercase tracking-wider font-semibold py-2 pl-3 pr-8 focus:outline-none focus:border-accent cursor-pointer transition-colors duration-150"
             >
               <option value="newest">New Arrivals</option>
-              <option value="price-asc">Price: Low to High</option>
-              <option value="price-desc">Price: High to Low</option>
+              <option value="price-asc">Price: Low → High</option>
+              <option value="price-desc">Price: High → Low</option>
             </select>
-            <ChevronDown size={14} className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none text-text-secondary" />
+            <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-text-secondary" />
           </div>
         </div>
       </div>
 
-      {/* Product list grid with filters sidebar */}
+      {/* Layout: sidebar + grid */}
       <div className="flex gap-10">
-        {/* DESKTOP SIDEBAR FILTER */}
-        <aside className="w-64 flex-shrink-0 hidden md:block space-y-8">
-          {/* Categories */}
+
+        {/* DESKTOP SIDEBAR */}
+        <aside className="w-56 flex-shrink-0 hidden md:block space-y-8">
           {categories.length > 0 && (
             <div>
-              <h3 className="text-xs font-heading font-bold uppercase tracking-wider text-text-primary mb-4 pb-2 border-b border-border">
-                Collections
-              </h3>
+              <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-primary mb-4 pb-2 border-b border-border">Collections</h3>
               <ul className="space-y-2">
                 <li>
                   <button
                     onClick={() => handleCategoryChange('all')}
-                    className={`text-sm tracking-wide ${activeCategory === 'all' ? 'font-bold text-text-primary underline underline-offset-4' : 'text-text-secondary hover:text-text-primary'}`}
+                    className={`nav-link text-sm tracking-wide ${activeCategory === 'all' ? 'font-bold text-text-primary' : 'text-text-secondary'}`}
                   >
                     All Collections
                   </button>
@@ -226,7 +188,7 @@ export default function Shop() {
                   <li key={c.id}>
                     <button
                       onClick={() => handleCategoryChange(c.slug)}
-                      className={`text-sm tracking-wide capitalize ${activeCategory === c.slug ? 'font-bold text-text-primary underline underline-offset-4' : 'text-text-secondary hover:text-text-primary'}`}
+                      className={`nav-link text-sm tracking-wide capitalize ${activeCategory === c.slug ? 'font-bold text-text-primary' : 'text-text-secondary'}`}
                     >
                       {c.name}
                     </button>
@@ -236,22 +198,17 @@ export default function Shop() {
             </div>
           )}
 
-          {/* Sizes */}
           <div>
-            <h3 className="text-xs font-heading font-bold uppercase tracking-wider text-text-primary mb-4 pb-2 border-b border-border">
-              Filter by Size
-            </h3>
+            <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-primary mb-4 pb-2 border-b border-border">Size</h3>
             <div className="flex flex-wrap gap-2">
               {sizesList.map((size) => {
-                const isSelected = selectedSizes.includes(size);
+                const isSel = selectedSizes.includes(size);
                 return (
                   <button
                     key={size}
                     onClick={() => handleSizeToggle(size)}
-                    className={`w-10 h-10 border text-xs font-medium flex items-center justify-center transition-colors rounded-none ${
-                      isSelected
-                        ? 'bg-accent border-accent text-white font-bold'
-                        : 'border-border text-text-primary bg-white hover:border-accent'
+                    className={`size-btn w-10 h-10 border text-xs font-semibold flex items-center justify-center ${
+                      isSel ? 'bg-accent border-accent text-white selected' : 'border-border text-text-primary bg-white hover:border-accent'
                     }`}
                   >
                     {size}
@@ -261,82 +218,60 @@ export default function Shop() {
             </div>
           </div>
 
-          {/* Price Range */}
           <div>
-            <div className="flex justify-between items-center mb-3">
-              <h3 className="text-xs font-heading font-bold uppercase tracking-wider text-text-primary pb-2 border-b border-border w-full flex justify-between">
-                <span>Max Price</span>
-                <span className="text-text-secondary">₹{maxPrice}</span>
-              </h3>
-            </div>
+            <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-primary mb-3 pb-2 border-b border-border flex justify-between">
+              <span>Max Price</span>
+              <span className="text-text-secondary font-normal">₹{maxPrice.toLocaleString()}</span>
+            </h3>
             <input
-              type="range"
-              min="100"
-              max="15000"
-              step="100"
+              type="range" min="100" max="15000" step="100"
               value={maxPrice}
               onChange={(e) => setMaxPrice(parseInt(e.target.value))}
-              className="w-full accent-accent bg-bg-subtle h-1.5 cursor-pointer"
+              className="w-full accent-accent h-1 cursor-pointer"
             />
           </div>
         </aside>
 
-        {/* MAIN PRODUCT GRID CONTAINER */}
-        <main className="flex-1">
+        {/* PRODUCT GRID */}
+        <main className="flex-1 min-w-0">
           {filteredProducts.length === 0 ? (
-            <div className="text-center py-20 bg-bg-subtle border border-border">
-              <p className="text-text-secondary font-medium mb-4">No products found matching active filters.</p>
-              <button
-                onClick={resetFilters}
-                className="bg-accent text-white px-6 py-2.5 text-xs font-medium uppercase tracking-wider hover:bg-accent-hover transition-colors"
-              >
+            <div className="text-center py-20 bg-bg-subtle border border-border anim-fade-in">
+              <p className="text-sm text-text-secondary mb-5">No products match the active filters.</p>
+              <button onClick={resetFilters} className="btn btn-primary bg-accent text-white px-6 py-2.5 text-xs font-bold uppercase tracking-widest hover:bg-accent-hover">
                 Clear Filters
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-y-10 gap-x-4 md:gap-8">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-y-8 gap-x-4 md:gap-x-6 anim-stagger">
               {filteredProducts.map((product) => (
-                <Link
-                  key={product.id}
-                  to={`/product/${product.slug}`}
-                  className="group"
-                >
-                  <div className="aspect-[3/4] bg-bg-subtle overflow-hidden border border-border relative mb-4">
+                <Link key={product.id} to={`/product/${product.slug}`} className="group product-card block">
+                  <div className="aspect-[3/4] bg-bg-subtle overflow-hidden border border-border relative mb-3">
                     <img
-                      src={product.product_images && product.product_images[0]?.url || linenShirt}
+                      src={product.product_images?.[0]?.url || linenShirt}
                       alt={product.name}
-                      className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                      className="card-img w-full h-full object-cover object-center"
                     />
-                    {product.product_variants && product.product_variants.every((v: any) => v.stock_qty === 0) && (
-                      <div className="absolute top-2 left-2 bg-sale text-white text-[10px] uppercase font-bold tracking-wider px-2 py-1">
-                        Sold Out
-                      </div>
+                    {product.product_variants?.every((v: any) => v.stock_qty === 0) && (
+                      <div className="absolute top-2 left-2 bg-sale text-white text-[9px] uppercase font-bold tracking-wider px-2 py-0.5">Sold Out</div>
                     )}
+                    <div className="card-overlay absolute bottom-0 left-0 right-0 bg-white/90 py-2.5 px-4 flex items-center justify-between">
+                      <span className="text-[9px] uppercase font-bold tracking-widest text-text-primary flex items-center gap-1">
+                        <ShoppingBag size={10} /> Quick View
+                      </span>
+                      <ArrowRight size={11} className="text-text-secondary" />
+                    </div>
                     <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        toggleWishlist(product.id);
-                      }}
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleWishlist(product.id); }}
                       aria-label="Toggle Wishlist"
-                      className="absolute top-3 right-3 p-1.5 bg-white/80 hover:bg-white text-text-primary border border-border shadow-sm rounded-full transition-colors z-10"
+                      className={`wishlist-btn absolute top-2.5 right-2.5 p-1.5 bg-white/90 border border-border/60 rounded-full z-10 ${heartId === product.id ? 'anim-heart-pop' : ''}`}
                     >
-                      <Heart
-                        size={14}
-                        className={isWishlisted(product.id) ? 'fill-sale stroke-sale' : 'stroke-text-primary'}
-                      />
+                      <Heart size={13} className={isWishlisted(product.id) ? 'fill-sale stroke-sale' : 'stroke-text-primary'} />
                     </button>
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-[10px] uppercase tracking-widest text-text-secondary font-bold">
-                      Zenphire
-                    </p>
-                    <h3 className="text-sm font-medium text-text-primary group-hover:underline truncate">
-                      {product.name}
-                    </h3>
-                    <p className="text-sm font-semibold text-text-primary">
-                      ₹{Number(product.base_price || 0).toFixed(2)}
-                    </p>
+                  <div className="space-y-0.5">
+                    <p className="text-[9px] uppercase tracking-widest text-text-secondary font-bold">Zenphire</p>
+                    <h3 className="text-sm font-medium text-text-primary group-hover:underline underline-offset-2 truncate">{product.name}</h3>
+                    <p className="text-sm font-semibold text-text-primary">₹{Number(product.base_price || 0).toFixed(2)}</p>
                   </div>
                 </Link>
               ))}
@@ -345,79 +280,53 @@ export default function Shop() {
         </main>
       </div>
 
-      {/* 5. MOBILE FILTER DRAWER BOTTOM SHEET */}
+      {/* MOBILE FILTER BOTTOM SHEET */}
       {isMobileFilterOpen && (
         <div className="fixed inset-0 z-[100] md:hidden">
-          {/* Backdrop */}
-          <div
-            onClick={() => setIsMobileFilterOpen(false)}
-            className="fixed inset-0 bg-black/40 transition-opacity"
-          ></div>
-
-          {/* Drawer content */}
-          <div className="fixed bottom-0 left-0 right-0 max-h-[85vh] bg-white border-t border-border flex flex-col p-6 space-y-6 overflow-y-auto animate-slide-up shadow-2xl">
-            <div className="flex justify-between items-center pb-2 border-b border-border">
-              <h2 className="font-heading font-black text-lg uppercase tracking-wider">
-                Filters
-              </h2>
-              <button
-                onClick={() => setIsMobileFilterOpen(false)}
-                className="p-1 hover:bg-bg-subtle transition-colors rounded-full"
-              >
-                <X size={20} />
+          <div onClick={() => setIsMobileFilterOpen(false)} className="fixed inset-0 bg-black/40 lightbox-backdrop" />
+          <div className="fixed bottom-0 left-0 right-0 max-h-[82vh] bg-white border-t border-border flex flex-col p-6 space-y-6 overflow-y-auto drawer-bottom shadow-2xl">
+            <div className="flex justify-between items-center pb-3 border-b border-border">
+              <h2 className="font-heading font-black text-base uppercase tracking-widest">Filters</h2>
+              <button onClick={() => setIsMobileFilterOpen(false)} className="btn-icon p-1.5 hover:bg-bg-subtle rounded-full">
+                <X size={18} />
               </button>
             </div>
 
-            {/* Mobile Collections */}
             {categories.length > 0 && (
               <div>
-                <h3 className="text-xs font-heading font-bold uppercase tracking-wider text-text-primary mb-3">
-                  Collections
-                </h3>
+                <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-primary mb-3">Collections</h3>
                 <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => handleCategoryChange('all')}
-                    className={`px-4 py-2 border text-xs font-semibold uppercase tracking-wider transition-colors ${
-                      activeCategory === 'all'
-                        ? 'bg-accent border-accent text-white'
-                        : 'border-border bg-white text-text-primary hover:border-accent'
-                    }`}
-                  >
-                    All Collections
-                  </button>
-                  {categories.filter((c) => !c.parent_category_id).map((c) => (
-                    <button
-                      key={c.id}
-                      onClick={() => handleCategoryChange(c.slug)}
-                      className={`px-4 py-2 border text-xs font-semibold uppercase tracking-wider transition-colors ${
-                        activeCategory === c.slug
-                          ? 'bg-accent border-accent text-white'
-                          : 'border-border bg-white text-text-primary hover:border-accent'
-                      }`}
-                    >
-                      {c.name}
-                    </button>
-                  ))}
+                  {['all', ...categories.filter((c) => !c.parent_category_id)].map((c: any) => {
+                    const slug = typeof c === 'string' ? c : c.slug;
+                    const label = typeof c === 'string' ? 'All' : c.name;
+                    const isActive = activeCategory === slug;
+                    return (
+                      <button
+                        key={slug}
+                        onClick={() => handleCategoryChange(slug)}
+                        className={`btn px-4 py-2 border text-[10px] font-semibold uppercase tracking-wider ${
+                          isActive ? 'bg-accent border-accent text-white' : 'border-border bg-white text-text-primary hover:border-accent'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
 
-            {/* Mobile Sizes */}
             <div>
-              <h3 className="text-xs font-heading font-bold uppercase tracking-wider text-text-primary mb-3">
-                Sizes
-              </h3>
+              <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-primary mb-3">Size</h3>
               <div className="flex gap-2">
                 {sizesList.map((size) => {
-                  const isSelected = selectedSizes.includes(size);
+                  const isSel = selectedSizes.includes(size);
                   return (
                     <button
                       key={size}
                       onClick={() => handleSizeToggle(size)}
-                      className={`w-10 h-10 border text-xs font-medium flex items-center justify-center transition-colors rounded-none ${
-                        isSelected
-                          ? 'bg-accent border-accent text-white font-bold'
-                          : 'border-border text-text-primary bg-white hover:border-accent'
+                      className={`size-btn w-10 h-10 border text-xs font-semibold flex items-center justify-center ${
+                        isSel ? 'bg-accent border-accent text-white selected' : 'border-border text-text-primary bg-white'
                       }`}
                     >
                       {size}
@@ -427,37 +336,22 @@ export default function Shop() {
               </div>
             </div>
 
-            {/* Mobile Price */}
             <div>
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="text-xs font-heading font-bold uppercase tracking-wider text-text-primary">
-                  Max Price
-                </h3>
-                <span className="text-xs font-bold text-text-primary">₹{maxPrice}</span>
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-primary">Max Price</h3>
+                <span className="text-xs font-bold text-text-primary">₹{maxPrice.toLocaleString()}</span>
               </div>
-              <input
-                type="range"
-                min="100"
-                max="15000"
-                step="100"
-                value={maxPrice}
+              <input type="range" min="100" max="15000" step="100" value={maxPrice}
                 onChange={(e) => setMaxPrice(parseInt(e.target.value))}
-                className="w-full accent-accent bg-bg-subtle h-1.5 cursor-pointer"
+                className="w-full accent-accent h-1 cursor-pointer"
               />
             </div>
 
-            {/* Mobile Action Buttons */}
-            <div className="flex gap-4 pt-4 border-t border-border">
-              <button
-                onClick={resetFilters}
-                className="flex-1 py-3 border border-border text-xs font-semibold uppercase tracking-wider hover:bg-bg-subtle transition-colors text-center"
-              >
-                Reset All
+            <div className="flex gap-3 pt-3 border-t border-border">
+              <button onClick={resetFilters} className="btn flex-1 py-3 border border-border text-[10px] font-bold uppercase tracking-widest hover:bg-bg-subtle">
+                Reset
               </button>
-              <button
-                onClick={() => setIsMobileFilterOpen(false)}
-                className="flex-1 py-3 bg-accent hover:bg-accent-hover text-white text-xs font-semibold uppercase tracking-wider transition-colors text-center"
-              >
+              <button onClick={() => setIsMobileFilterOpen(false)} className="btn btn-primary flex-1 py-3 bg-accent text-white text-[10px] font-bold uppercase tracking-widest hover:bg-accent-hover">
                 Apply
               </button>
             </div>

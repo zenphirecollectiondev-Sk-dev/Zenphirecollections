@@ -42,18 +42,15 @@ export default function App() {
 
   return (
     <Router>
-      <div className="min-h-screen bg-bg text-text-primary flex flex-col font-sans">
+      <div className="min-h-screen bg-bg text-text-primary flex flex-col font-sans overflow-x-hidden w-full relative">
         {/* Sticky Minimal Navigation */}
         <header className="sticky top-0 z-50 bg-white border-b border-border">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             {/* Left Nav (Desktop) / Hamburger (Mobile) */}
             <div className="flex items-center gap-6">
-              <Link to="/shop" className="hidden md:block text-sm font-medium tracking-wide uppercase hover:text-accent-hover transition-colors">
-                Shop
-              </Link>
               <button 
                 onClick={() => setIsMobileMenuOpen(true)}
-                className="md:hidden p-2 hover:bg-bg-subtle transition-colors rounded-full"
+                className="btn-icon md:hidden p-2 hover:bg-bg-subtle rounded-full"
                 aria-label="Toggle Menu"
               >
                 <Menu size={20} className="stroke-[1.5]" />
@@ -72,15 +69,15 @@ export default function App() {
               <button 
                 onClick={() => setIsSearchOpen(true)}
                 aria-label="Search" 
-                className="p-2 hover:bg-bg-subtle transition-colors rounded-full"
+                className="btn-icon p-2 hover:bg-bg-subtle rounded-full"
               >
-                <Search size={20} className="stroke-[1.5]" />
+                <Search size={19} className="stroke-[1.5]" />
               </button>
               
-              <Link to="/wishlist" aria-label="Wishlist" className="p-2 hover:bg-bg-subtle transition-colors rounded-full relative">
-                <Heart size={20} className="stroke-[1.5]" />
+              <Link to="/wishlist" aria-label="Wishlist" className="btn-icon p-2 hover:bg-bg-subtle rounded-full relative">
+                <Heart size={19} className="stroke-[1.5]" />
                 {wishlistCount > 0 && (
-                  <span className="absolute top-1.5 right-1.5 bg-accent text-white text-[9px] font-bold w-3.5 h-3.5 flex items-center justify-center rounded-full scale-90">
+                  <span className="absolute top-1.5 right-1.5 bg-accent text-white text-[8px] font-bold w-3.5 h-3.5 flex items-center justify-center rounded-full">
                     {wishlistCount}
                   </span>
                 )}
@@ -89,23 +86,23 @@ export default function App() {
               <button 
                 onClick={() => setIsCartOpen(true)}
                 aria-label="Cart" 
-                className="p-2 hover:bg-bg-subtle transition-colors rounded-full relative"
+                className="btn-icon p-2 hover:bg-bg-subtle rounded-full relative"
               >
-                <ShoppingBag size={20} className="stroke-[1.5]" />
+                <ShoppingBag size={19} className="stroke-[1.5]" />
                 {cartCount > 0 && (
-                  <span className="absolute top-1.5 right-1.5 bg-accent text-white text-[9px] font-bold w-3.5 h-3.5 flex items-center justify-center rounded-full scale-90">
+                  <span className="absolute top-1.5 right-1.5 bg-accent text-white text-[8px] font-bold w-3.5 h-3.5 flex items-center justify-center rounded-full">
                     {cartCount}
                   </span>
                 )}
               </button>
 
-              <Link to="/account" aria-label="Account" className="p-2 hover:bg-bg-subtle transition-colors rounded-full">
-                <User size={20} className="stroke-[1.5]" />
+              <Link to="/account" aria-label="Account" className="btn-icon p-2 hover:bg-bg-subtle rounded-full">
+                <User size={19} className="stroke-[1.5]" />
               </Link>
 
               {profile?.role === 'admin' && (
-                <Link to="/admin" aria-label="Admin Console" className="p-2 hover:bg-bg-subtle transition-colors rounded-full text-text-secondary hover:text-text-primary">
-                  <Shield size={20} className="stroke-[1.5]" />
+                <Link to="/admin" aria-label="Admin Console" className="btn-icon p-2 hover:bg-bg-subtle rounded-full text-text-secondary">
+                  <Shield size={19} className="stroke-[1.5]" />
                 </Link>
               )}
 
@@ -113,9 +110,9 @@ export default function App() {
                 <button
                   onClick={signOut}
                   aria-label="Sign Out"
-                  className="p-2 hover:bg-bg-subtle transition-colors rounded-full text-text-secondary hover:text-sale"
+                  className="btn-icon p-2 hover:bg-bg-subtle rounded-full text-text-secondary hover:text-sale"
                 >
-                  <LogOut size={20} className="stroke-[1.5]" />
+                  <LogOut size={19} className="stroke-[1.5]" />
                 </button>
               )}
             </div>
@@ -125,11 +122,11 @@ export default function App() {
               <button 
                 onClick={() => setIsCartOpen(true)}
                 aria-label="Cart" 
-                className="p-2 hover:bg-bg-subtle transition-colors rounded-full relative"
+                className="btn-icon p-2 hover:bg-bg-subtle rounded-full relative"
               >
-                <ShoppingBag size={20} className="stroke-[1.5]" />
+                <ShoppingBag size={19} className="stroke-[1.5]" />
                 {cartCount > 0 && (
-                  <span className="absolute top-1.5 right-1.5 bg-accent text-white text-[9px] font-bold w-3.5 h-3.5 flex items-center justify-center rounded-full scale-90">
+                  <span className="absolute top-1.5 right-1.5 bg-accent text-white text-[8px] font-bold w-3.5 h-3.5 flex items-center justify-center rounded-full">
                     {cartCount}
                   </span>
                 )}
@@ -239,10 +236,10 @@ export default function App() {
                       <LogOut size={14} /> Sign Out
                     </button>
                   ) : (
-                    <Link
+                    <Link 
                       to="/account"
                       onClick={() => setIsMobileMenuOpen(false)}
-                      className="w-full flex items-center justify-center gap-2 bg-accent text-white py-3 text-xs font-bold uppercase tracking-widest hover:bg-accent-hover transition-colors text-center font-bold"
+                      className="btn btn-primary w-full flex items-center justify-center gap-2 bg-accent text-white py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-accent-hover"
                     >
                       Sign In / Register
                     </Link>
@@ -330,12 +327,9 @@ export default function App() {
               </ul>
             </div>
           </div>
-          <div className="max-w-7xl mx-auto mt-8 pt-8 border-t border-border flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className="text-xs text-text-secondary">
+          <div className="max-w-7xl mx-auto mt-8 pt-8 border-t border-border flex justify-center items-center">
+            <p className="text-xs text-text-secondary text-center">
               &copy; {new Date().getFullYear()} Zenphire Collections. All rights reserved.
-            </p>
-            <p className="text-xs text-text-secondary font-heading font-bold tracking-widest uppercase">
-              White & Grey Minimalist Edition
             </p>
           </div>
         </footer>

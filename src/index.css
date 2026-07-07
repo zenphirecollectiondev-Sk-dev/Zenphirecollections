@@ -5,12 +5,389 @@
 @tailwind components;
 @tailwind utilities;
 
+/* =========================================
+   DESIGN TOKENS
+   All transitions share the same easing and
+   a small set of durations. This creates a
+   unified, professional rhythm.
+   ========================================= */
+
+:root {
+  /* One easing for everything — natural deceleration */
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Two durations: fast = micro-interactions, base = layout changes */
+  --dur-fast: 150ms;
+  --dur-base: 300ms;
+
+  /* For entrances only */
+  --dur-enter: 500ms;
+  --ease-enter: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* =========================================
+   BASE
+   ========================================= */
+
 @layer base {
+  html {
+    overflow-x: hidden;
+    width: 100%;
+    position: relative;
+  }
+
   body {
     @apply bg-bg text-text-primary font-sans antialiased;
+    overflow-x: hidden;
+    width: 100%;
+    position: relative;
   }
-  
+
   h1, h2, h3, h4, h5, h6 {
     @apply font-heading tracking-tight text-text-primary;
   }
+}
+
+/* =========================================
+   KEYFRAMES
+   ========================================= */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1);    }
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0);    }
+}
+
+@keyframes slideInUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+@keyframes heartPop {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.3); }
+  65%  { transform: scale(0.92); }
+  100% { transform: scale(1); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+/* =========================================
+   ENTRANCE UTILITY CLASSES
+   ========================================= */
+
+.anim-fade-in {
+  animation: fadeIn var(--dur-enter) var(--ease-enter) both;
+}
+
+.anim-fade-up {
+  animation: fadeUp var(--dur-enter) var(--ease-enter) both;
+}
+
+.anim-scale-in {
+  animation: scaleIn var(--dur-enter) var(--ease-enter) both;
+}
+
+/* Stagger: add to parent, children stagger 50ms */
+.anim-stagger > * {
+  animation: fadeUp var(--dur-enter) var(--ease-enter) both;
+}
+.anim-stagger > *:nth-child(1) { animation-delay:   0ms; }
+.anim-stagger > *:nth-child(2) { animation-delay:  50ms; }
+.anim-stagger > *:nth-child(3) { animation-delay: 100ms; }
+.anim-stagger > *:nth-child(4) { animation-delay: 150ms; }
+.anim-stagger > *:nth-child(5) { animation-delay: 200ms; }
+.anim-stagger > *:nth-child(6) { animation-delay: 250ms; }
+
+/* Heart pop on wishlist toggle */
+.anim-heart-pop {
+  animation: heartPop 400ms var(--ease) both;
+}
+
+/* Shimmer skeleton */
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+/* =========================================
+   UNIFIED BUTTON SYSTEM
+
+   ONE transition definition.
+   Every interactive element uses the same
+   easing and duration — no exceptions.
+
+   Hover: translateY(-1px) — barely perceptible,
+   professional lift. Not a bounce or jump.
+   Active: scale(0.98) — confirms the click.
+   ========================================= */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    transform       var(--dur-fast) var(--ease),
+    box-shadow      var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) var(--ease),
+    border-color    var(--dur-fast) var(--ease),
+    color           var(--dur-fast) var(--ease),
+    opacity         var(--dur-fast) var(--ease);
+  will-change: transform;
+  cursor: pointer;
+  user-select: none;
+}
+
+.btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+  box-shadow: none !important;
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Variant: primary — subtle elevation on hover */
+.btn-primary:hover:not(:disabled) {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+/* Variant: icon — no vertical shift, just a clean scale */
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    transform        var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) var(--ease),
+    color            var(--dur-fast) var(--ease);
+  will-change: transform;
+  cursor: pointer;
+}
+
+.btn-icon:hover:not(:disabled) {
+  transform: scale(1.08);
+}
+
+.btn-icon:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+/* =========================================
+   NAV LINK — animated underline
+   ========================================= */
+
+.nav-link {
+  position: relative;
+  transition: color var(--dur-fast) var(--ease);
+}
+
+.nav-link::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  width: 0;
+  height: 1px;
+  background-color: currentColor;
+  transition: width var(--dur-base) var(--ease);
+}
+
+.nav-link:hover::after,
+.nav-link.active::after {
+  width: 100%;
+}
+
+/* =========================================
+   SIZE SELECTOR BUTTONS
+   ========================================= */
+
+.size-btn {
+  transition:
+    transform        var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) var(--ease),
+    border-color     var(--dur-fast) var(--ease),
+    color            var(--dur-fast) var(--ease);
+  will-change: transform;
+}
+
+.size-btn:not(:disabled):hover {
+  transform: scale(1.06);
+}
+
+.size-btn.selected {
+  transform: scale(1.06);
+}
+
+.size-btn:not(:disabled):active {
+  transform: scale(0.95);
+}
+
+/* =========================================
+   PRODUCT CARD
+   ========================================= */
+
+.product-card {
+  transition: transform var(--dur-base) var(--ease);
+  will-change: transform;
+}
+
+.product-card:hover {
+  transform: translateY(-3px);
+}
+
+/* Image zoom — slower, smoother */
+.product-card .card-img {
+  transition: transform var(--dur-base) var(--ease);
+  will-change: transform;
+}
+
+.product-card:hover .card-img {
+  transform: scale(1.05);
+}
+
+/* Hover overlay — fade + 4px rise */
+.product-card .card-overlay {
+  opacity: 0;
+  transform: translateY(6px);
+  transition:
+    opacity   var(--dur-base) var(--ease),
+    transform var(--dur-base) var(--ease);
+}
+
+.product-card:hover .card-overlay {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* =========================================
+   CATEGORY CARD
+   ========================================= */
+
+.category-card {
+  transition:
+    transform        var(--dur-base) var(--ease),
+    border-color     var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) var(--ease),
+    box-shadow       var(--dur-base) var(--ease);
+  will-change: transform;
+}
+
+.category-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+
+.category-card:active {
+  transform: translateY(0) scale(0.99);
+  box-shadow: none;
+}
+
+/* =========================================
+   WISHLIST HEART
+   ========================================= */
+
+.wishlist-btn {
+  transition:
+    transform        var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) var(--ease);
+  will-change: transform;
+}
+
+.wishlist-btn:hover {
+  transform: scale(1.1);
+}
+
+.wishlist-btn:active {
+  transform: scale(0.9);
+}
+
+/* =========================================
+   HERO CONTENT ENTRANCE
+   ========================================= */
+
+.hero-content {
+  animation: fadeUp var(--dur-enter) var(--ease-enter) 200ms both;
+}
+
+/* =========================================
+   DRAWERS / MODALS
+   ========================================= */
+
+.drawer-right {
+  animation: slideInRight var(--dur-base) var(--ease) both;
+}
+
+.drawer-bottom {
+  animation: slideInUp var(--dur-base) var(--ease) both;
+}
+
+/* =========================================
+   IMAGE LIGHTBOX
+   ========================================= */
+
+.lightbox-backdrop {
+  animation: fadeIn var(--dur-fast) var(--ease) both;
+}
+
+.lightbox-img {
+  animation: scaleIn var(--dur-base) var(--ease-enter) both;
+}
+
+/* =========================================
+   SCROLLBARS
+   ========================================= */
+
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #E5E5E5 transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  height: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #E5E5E5;
+  border-radius: 4px;
+}
+
+.custom-scrollbar:hover::-webkit-scrollbar-thumb {
+  background-color: #A3A3A3;
 }

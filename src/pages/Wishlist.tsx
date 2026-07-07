@@ -61,30 +61,27 @@ export default function Wishlist() {
           </p>
           <Link
             to="/shop"
-            className="inline-flex items-center gap-2 bg-accent text-white px-6 py-3 text-xs font-semibold uppercase tracking-wider hover:bg-accent-hover transition-colors"
+            className="btn btn-primary inline-flex items-center gap-2 bg-accent text-white px-6 py-3 text-xs font-bold uppercase tracking-widest hover:bg-accent-hover"
           >
-            Start Shopping <ArrowRight size={14} />
+            Start Shopping <ArrowRight size={13} />
           </Link>
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
           {wishlistProducts.map((product) => (
-            <div key={product.id} className="group relative">
-              {/* Image box */}
-              <div className="aspect-[3/4] bg-bg-subtle overflow-hidden border border-border relative mb-4">
+            <div key={product.id} className="group product-card relative">
+              <div className="aspect-[3/4] bg-bg-subtle overflow-hidden border border-border relative mb-3">
                 <Link to={`/product/${product.slug}`}>
                   <img
                     src={product.product_images && product.product_images[0]?.url || linenShirt}
                     alt={product.name}
-                    className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                    className="card-img w-full h-full object-cover object-center"
                   />
                 </Link>
-                
-                {/* Remove from wishlist button */}
                 <button
                   onClick={() => toggleWishlist(product.id)}
                   aria-label="Remove from wishlist"
-                  className="absolute top-3 right-3 p-2 bg-white/80 hover:bg-white text-sale border border-border shadow-sm rounded-full transition-colors"
+                  className="wishlist-btn absolute top-2.5 right-2.5 p-2 bg-white/90 text-sale border border-border/60 rounded-full"
                 >
                   <Trash2 size={16} className="stroke-[1.5]" />
                 </button>

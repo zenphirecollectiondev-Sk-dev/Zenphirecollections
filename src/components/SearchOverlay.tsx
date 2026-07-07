@@ -86,9 +86,9 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
           <button
             onClick={onClose}
             aria-label="Close search"
-            className="p-2 hover:bg-bg-subtle transition-colors rounded-full ml-4"
+            className="btn-icon p-2 hover:bg-bg-subtle rounded-full ml-4"
           >
-            <X size={24} />
+            <X size={22} />
           </button>
         </div>
       </div>

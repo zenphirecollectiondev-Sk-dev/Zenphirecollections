@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -59,7 +59,7 @@ interface Category {
 
 
 export default function Admin() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'categories' | 'inventory' | 'orders' | 'coupons' | 'couriers'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'categories' | 'inventory' | 'orders' | 'coupons' | 'couriers' | 'homepage'>('overview');
 
   // Coupons state
   const [coupons, setCoupons] = useState<any[]>([]);
@@ -165,6 +165,27 @@ export default function Admin() {
   ]);
   const [generatedHtml, setGeneratedHtml] = useState('');
   const [isCopied, setIsCopied] = useState(false);
+
+  // Homepage state variables
+  const [heroImageUrl, setHeroImageUrl] = useState('');
+  const [heroImagePosition, setHeroImagePosition] = useState('center');
+  const [theEditImageUrl, setTheEditImageUrl] = useState('');
+  const [theEditImagePosition, setTheEditImagePosition] = useState('center');
+  const [bestSellersIds, setBestSellersIds] = useState<string[]>([]);
+  const [newArrivalsIds, setNewArrivalsIds] = useState<string[]>([]);
+  const [isSavingHomepage, setIsSavingHomepage] = useState(false);
+  const [isUploadingHero, setIsUploadingHero] = useState(false);
+  const [isUploadingTheEdit, setIsUploadingTheEdit] = useState(false);
+
+  const [heroDragActive, setHeroDragActive] = useState(false);
+  const [theEditDragActive, setTheEditDragActive] = useState(false);
+  
+  const heroContainerRef = useRef<HTMLDivElement>(null);
+  const editContainerRef = useRef<HTMLDivElement>(null);
+
+  // Search queries for selectors
+  const [bestSellersSearch, setBestSellersSearch] = useState('');
+  const [newArrivalsSearch, setNewArrivalsSearch] = useState('');
 
   const getCategoryColumns = (category: string) => {
     switch (category) {
@@ -352,6 +373,27 @@ ${titleHtml}  <thead>
         setCourierPartners(defaultPartners);
       }
 
+      // 7. Fetch Homepage Config (graceful table error fallback)
+      try {
+        const { data, error: hpErr } = await supabase
+          .from('homepage_config' as any)
+          .select('*')
+          .eq('id', 'global')
+          .maybeSingle();
+        if (hpErr) throw hpErr;
+        const hpData = data as any;
+        if (hpData) {
+          setHeroImageUrl(hpData.hero_image_url || '');
+          setHeroImagePosition(hpData.hero_image_position || 'center');
+          setTheEditImageUrl(hpData.the_edit_image_url || '');
+          setTheEditImagePosition(hpData.the_edit_image_position || 'center');
+          setBestSellersIds(hpData.best_sellers_ids || []);
+          setNewArrivalsIds(hpData.new_arrivals_ids || []);
+        }
+      } catch (hErr) {
+        console.warn('homepage_config table fetch failed or not yet created. Using defaults.', hErr);
+      }
+
     } catch (err: any) {
       console.error('Error fetching admin data:', err);
       setErrorMsg(err.message || 'Error occurred while loading data.');
@@ -504,6 +546,151 @@ ${titleHtml}  <thead>
     } catch (err: any) {
       console.error('Error saving courier partner:', err);
       triggerNotification(err.message || 'Failed to save courier partner.', true);
+    }
+  };
+
+  // Find product search matches for Best Sellers
+  const bestSellersMatches = useMemo(() => {
+    if (!bestSellersSearch.trim()) return [];
+    return products.filter(p => 
+      p.name.toLowerCase().includes(bestSellersSearch.toLowerCase()) &&
+      !bestSellersIds.includes(p.id)
+    );
+  }, [products, bestSellersSearch, bestSellersIds]);
+
+  // Find product search matches for New Arrivals
+  const newArrivalsMatches = useMemo(() => {
+    if (!newArrivalsSearch.trim()) return [];
+    return products.filter(p => 
+      p.name.toLowerCase().includes(newArrivalsSearch.toLowerCase()) &&
+      !newArrivalsIds.includes(p.id)
+    );
+  }, [products, newArrivalsSearch, newArrivalsIds]);
+
+  // Handle local image upload to Supabase Storage with Base64 fallback
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'hero' | 'edit') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Image is too large. Please select an image under 5MB.");
+      return;
+    }
+
+    const setLoader = type === 'hero' ? setIsUploadingHero : setIsUploadingTheEdit;
+    setLoader(true);
+
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${type}-${Date.now()}.${fileExt}`;
+      const filePath = `banners/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('homepage-assets')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (uploadError) {
+        throw new Error(uploadError.message);
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('homepage-assets')
+        .getPublicUrl(filePath);
+
+      if (type === 'hero') {
+        setHeroImageUrl(publicUrl);
+      } else {
+        setTheEditImageUrl(publicUrl);
+      }
+      
+      triggerNotification(`${type === 'hero' ? 'Hero' : 'The Edit'} image uploaded successfully!`);
+    } catch (err: any) {
+      console.warn('Storage bucket upload failed, using Data URL fallback.', err);
+      // Data URL fallback if bucket doesn't exist
+      const reader = new FileReader();
+      reader.onload = (uploadEvent) => {
+        const base64 = uploadEvent.target?.result as string;
+        if (type === 'hero') {
+          setHeroImageUrl(base64);
+        } else {
+          setTheEditImageUrl(base64);
+        }
+        triggerNotification(`${type === 'hero' ? 'Hero' : 'The Edit'} image loaded locally.`);
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setLoader(false);
+    }
+  };
+
+  const handleHeroDrag = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!heroDragActive || !heroContainerRef.current) return;
+    const rect = heroContainerRef.current.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    const posX = Math.max(0, Math.min(100, Math.round(x)));
+    const posY = Math.max(0, Math.min(100, Math.round(y)));
+    setHeroImagePosition(`${posX}% ${posY}%`);
+  };
+
+  const handleEditDrag = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!theEditDragActive || !editContainerRef.current) return;
+    const rect = editContainerRef.current.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    const posX = Math.max(0, Math.min(100, Math.round(x)));
+    const posY = Math.max(0, Math.min(100, Math.round(y)));
+    setTheEditImagePosition(`${posX}% ${posY}%`);
+  };
+
+  const handleHeroTouchDrag = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!heroContainerRef.current) return;
+    const touch = e.touches[0];
+    const rect = heroContainerRef.current.getBoundingClientRect();
+    const x = ((touch.clientX - rect.left) / rect.width) * 100;
+    const y = ((touch.clientY - rect.top) / rect.height) * 100;
+    const posX = Math.max(0, Math.min(100, Math.round(x)));
+    const posY = Math.max(0, Math.min(100, Math.round(y)));
+    setHeroImagePosition(`${posX}% ${posY}%`);
+  };
+
+  const handleEditTouchDrag = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!editContainerRef.current) return;
+    const touch = e.touches[0];
+    const rect = editContainerRef.current.getBoundingClientRect();
+    const x = ((touch.clientX - rect.left) / rect.width) * 100;
+    const y = ((touch.clientY - rect.top) / rect.height) * 100;
+    const posX = Math.max(0, Math.min(100, Math.round(x)));
+    const posY = Math.max(0, Math.min(100, Math.round(y)));
+    setTheEditImagePosition(`${posX}% ${posY}%`);
+  };
+
+  // Save Homepage Settings
+  const handleSaveHomepage = async () => {
+    setIsSavingHomepage(true);
+    try {
+      const { error } = await supabase
+        .from('homepage_config' as any)
+        .upsert({
+          id: 'global',
+          hero_image_url: heroImageUrl.trim() || null,
+          hero_image_position: heroImagePosition,
+          the_edit_image_url: theEditImageUrl.trim() || null,
+          the_edit_image_position: theEditImagePosition,
+          best_sellers_ids: bestSellersIds,
+          new_arrivals_ids: newArrivalsIds,
+          updated_at: new Date().toISOString()
+        });
+      if (error) throw error;
+      triggerNotification('Homepage configuration saved successfully!');
+    } catch (err: any) {
+      console.error('Error saving homepage config:', err);
+      triggerNotification(err.message || 'Failed to save homepage settings. Make sure you created the homepage_config table.', true);
+    } finally {
+      setIsSavingHomepage(false);
     }
   };
 
@@ -975,6 +1162,7 @@ ${titleHtml}  <thead>
             <option value="orders">Customer Orders ({recentOrders.length})</option>
             <option value="coupons">Manage Coupons ({coupons.length})</option>
             <option value="couriers">Courier Partners ({courierPartners.length})</option>
+            <option value="homepage">Homepage Settings</option>
           </select>
         </div>
 
@@ -988,6 +1176,7 @@ ${titleHtml}  <thead>
             { key: 'orders', label: `Customer Orders (${recentOrders.length})` },
             { key: 'coupons', label: `Manage Coupons (${coupons.length})` },
             { key: 'couriers', label: `Courier Partners (${courierPartners.length})` },
+            { key: 'homepage', label: 'Homepage Settings' },
           ] as { key: typeof activeTab; label: string }[]).map(({ key, label }) => (
             <button
               key={key}
@@ -1841,6 +2030,418 @@ ${titleHtml}  <thead>
                 Use tracking parameters that accept the ID at the end:
                 <br />
                 <code className="bg-white px-1 border border-border mt-1 block py-1 font-mono text-[9px]">https://www.delhivery.com/track?id=</code>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* TAB 8: HOMEPAGE SETTINGS */}
+        {activeTab === 'homepage' && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="grid grid-cols-1 lg:grid-cols-12 gap-8"
+          >
+            {/* Left Side: Configuration Fields */}
+            <div className="lg:col-span-8 space-y-8 bg-white border border-border/80 p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)]">
+              <div>
+                <h3 className="text-xs font-heading font-black uppercase tracking-wider text-text-primary pb-2 border-b border-border">
+                  Banners & Creative Assets Settings
+                </h3>
+              </div>
+
+              {/* Banners block */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Hero Banner Setting */}
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
+                      Hero Banner Image File
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      disabled={isUploadingHero}
+                      onChange={(e) => handleImageUpload(e, 'hero')}
+                      className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent file:mr-4 file:py-1 file:px-2 file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
+                    />
+                    {isUploadingHero && (
+                      <span className="text-[9px] text-text-secondary mt-1 block font-bold animate-pulse">
+                        Uploading image file...
+                      </span>
+                    )}
+                    <span className="text-[9px] text-text-secondary mt-1 block font-semibold">
+                      Recommended: 1920 × 1200px (portrait ratio optimal for desktop split showcase).
+                    </span>
+                    {heroImageUrl && (
+                      <div className="flex justify-between items-center mt-2 bg-bg-subtle p-2 border border-border">
+                        <span className="text-[10px] text-text-secondary truncate max-w-[200px] font-semibold">Image file loaded</span>
+                        <button
+                          type="button"
+                          onClick={() => setHeroImageUrl('')}
+                          className="text-[10px] text-sale font-bold hover:underline cursor-pointer"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Hero preview - Drag to adjust */}
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider block">
+                      Crop Adjustment (Click & Drag Image to adjust positioning)
+                    </span>
+                    <div 
+                      ref={heroContainerRef}
+                      onMouseDown={() => setHeroDragActive(true)}
+                      onMouseMove={handleHeroDrag}
+                      onMouseUp={() => setHeroDragActive(false)}
+                      onMouseLeave={() => setHeroDragActive(false)}
+                      onTouchMove={handleHeroTouchDrag}
+                      className="border border-border bg-bg-subtle aspect-[16/9] relative overflow-hidden group select-none cursor-move"
+                    >
+                      {heroImageUrl ? (
+                        <>
+                          <img 
+                            src={heroImageUrl} 
+                            alt="Hero Preview" 
+                            className="w-full h-full object-cover pointer-events-none"
+                            style={{ objectPosition: heroImagePosition }}
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                            <span className="text-[10px] text-white font-bold uppercase tracking-widest bg-black/60 px-3 py-1.5 border border-white/20">
+                              Click &amp; Drag to adjust focus
+                            </span>
+                          </div>
+                          <div className="absolute bottom-2 left-2 bg-black/80 px-2 py-0.5 border border-white/10 text-[9px] font-mono text-white/95 pointer-events-none rounded">
+                            Pivot: {heroImagePosition === 'center' ? '50% 50%' : heroImagePosition}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center text-[10px] text-text-secondary/70 italic font-semibold pointer-events-none">
+                          No custom hero image file loaded.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* The Edit Banner Setting */}
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
+                      "The Edit" Banner Image File
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      disabled={isUploadingTheEdit}
+                      onChange={(e) => handleImageUpload(e, 'edit')}
+                      className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent file:mr-4 file:py-1 file:px-2 file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
+                    />
+                    {isUploadingTheEdit && (
+                      <span className="text-[9px] text-text-secondary mt-1 block font-bold animate-pulse">
+                        Uploading image file...
+                      </span>
+                    )}
+                    <span className="text-[9px] text-text-secondary mt-1 block font-semibold">
+                      Recommended: 800 × 600px (4:3 landscape ratio).
+                    </span>
+                    {theEditImageUrl && (
+                      <div className="flex justify-between items-center mt-2 bg-bg-subtle p-2 border border-border">
+                        <span className="text-[10px] text-text-secondary truncate max-w-[200px] font-semibold">Image file loaded</span>
+                        <button
+                          type="button"
+                          onClick={() => setTheEditImageUrl('')}
+                          className="text-[10px] text-sale font-bold hover:underline cursor-pointer"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* The Edit preview - Drag to adjust */}
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider block">
+                      Crop Adjustment (Click & Drag Image to adjust positioning)
+                    </span>
+                    <div 
+                      ref={editContainerRef}
+                      onMouseDown={() => setTheEditDragActive(true)}
+                      onMouseMove={handleEditDrag}
+                      onMouseUp={() => setTheEditDragActive(false)}
+                      onMouseLeave={() => setTheEditDragActive(false)}
+                      onTouchMove={handleEditTouchDrag}
+                      className="border border-border bg-bg-subtle aspect-[16/9] relative overflow-hidden group select-none cursor-move"
+                    >
+                      {theEditImageUrl ? (
+                        <>
+                          <img 
+                            src={theEditImageUrl} 
+                            alt="The Edit Preview" 
+                            className="w-full h-full object-cover pointer-events-none"
+                            style={{ objectPosition: theEditImagePosition }}
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                            <span className="text-[10px] text-white font-bold uppercase tracking-widest bg-black/60 px-3 py-1.5 border border-white/20">
+                              Click &amp; Drag to adjust focus
+                            </span>
+                          </div>
+                          <div className="absolute bottom-2 left-2 bg-black/80 px-2 py-0.5 border border-white/10 text-[9px] font-mono text-white/95 pointer-events-none rounded">
+                            Pivot: {theEditImagePosition === 'center' ? '50% 50%' : theEditImagePosition}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center text-[10px] text-text-secondary/70 italic font-semibold pointer-events-none">
+                          No custom "The Edit" image file loaded.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Dynamic Highlights Collections */}
+              <div className="border-t border-border pt-6 space-y-6">
+                <h3 className="text-xs font-heading font-black uppercase tracking-wider text-text-primary">
+                  Homepage Featured Collections
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Best Sellers Search-and-Select */}
+                  <div className="space-y-4">
+                    <div className="relative">
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
+                        Best Sellers (Max 4 products)
+                      </label>
+                      <div className="relative">
+                        <Search size={12} className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-text-secondary" />
+                        <input
+                          type="text"
+                          value={bestSellersSearch}
+                          onChange={(e) => setBestSellersSearch(e.target.value)}
+                          placeholder="Search dress name to add..."
+                          className="w-full pl-9 pr-4 py-2 border border-border bg-white text-xs focus:outline-none focus:border-accent"
+                        />
+                      </div>
+                      {/* Search Matches dropdown list */}
+                      {bestSellersMatches.length > 0 && (
+                        <div className="absolute z-20 w-full max-h-48 overflow-y-auto border border-border bg-white mt-1 shadow-lg divide-y divide-border/60">
+                          {bestSellersMatches.map(p => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => {
+                                if (bestSellersIds.length >= 4) {
+                                  alert("Best Sellers is capped at 4 items.");
+                                  return;
+                                }
+                                setBestSellersIds([...bestSellersIds, p.id]);
+                                setBestSellersSearch('');
+                              }}
+                              className="w-full text-left p-3 hover:bg-bg-subtle text-xs flex justify-between items-center transition-colors font-semibold"
+                            >
+                              <span>{p.name}</span>
+                              <span className="text-[10px] text-text-secondary font-bold font-mono">₹{p.base_price}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Selected Best Sellers List */}
+                    <div className="border border-border bg-bg-subtle p-3 space-y-2 min-h-36 flex flex-col justify-start">
+                      {bestSellersIds.length === 0 ? (
+                        <p className="text-[10px] text-text-secondary/70 italic text-center my-auto font-semibold">
+                          No custom Best Sellers. Falls back to default.
+                        </p>
+                      ) : (
+                        bestSellersIds.map((id, index) => {
+                          const p = products.find(prod => prod.id === id);
+                          if (!p) return null;
+                          return (
+                            <div key={id} className="bg-white border border-border/80 p-2.5 flex justify-between items-center text-xs font-semibold">
+                              <span className="truncate">{p.name}</span>
+                              <div className="flex gap-2 items-center flex-shrink-0">
+                                {/* Sort buttons */}
+                                <button
+                                  type="button"
+                                  disabled={index === 0}
+                                  onClick={() => {
+                                    const next = [...bestSellersIds];
+                                    const temp = next[index];
+                                    next[index] = next[index - 1];
+                                    next[index - 1] = temp;
+                                    setBestSellersIds(next);
+                                  }}
+                                  className="text-text-secondary hover:text-accent disabled:opacity-30 text-[9px] px-1 hover:bg-bg-subtle border border-transparent rounded cursor-pointer"
+                                >
+                                  ▲
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={index === bestSellersIds.length - 1}
+                                  onClick={() => {
+                                    const next = [...bestSellersIds];
+                                    const temp = next[index];
+                                    next[index] = next[index + 1];
+                                    next[index + 1] = temp;
+                                    setBestSellersIds(next);
+                                  }}
+                                  className="text-text-secondary hover:text-accent disabled:opacity-30 text-[9px] px-1 hover:bg-bg-subtle border border-transparent rounded cursor-pointer"
+                                >
+                                  ▼
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setBestSellersIds(bestSellersIds.filter(item => item !== id))}
+                                  className="text-text-secondary hover:text-sale p-1 cursor-pointer"
+                                >
+                                  <X size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+
+                  {/* New Arrivals Search-and-Select */}
+                  <div className="space-y-4">
+                    <div className="relative">
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
+                        New Arrivals (Max 4 products)
+                      </label>
+                      <div className="relative">
+                        <Search size={12} className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-text-secondary" />
+                        <input
+                          type="text"
+                          value={newArrivalsSearch}
+                          onChange={(e) => setNewArrivalsSearch(e.target.value)}
+                          placeholder="Search dress name to add..."
+                          className="w-full pl-9 pr-4 py-2 border border-border bg-white text-xs focus:outline-none focus:border-accent"
+                        />
+                      </div>
+                      {/* Search Matches dropdown list */}
+                      {newArrivalsMatches.length > 0 && (
+                        <div className="absolute z-20 w-full max-h-48 overflow-y-auto border border-border bg-white mt-1 shadow-lg divide-y divide-border/60">
+                          {newArrivalsMatches.map(p => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => {
+                                if (newArrivalsIds.length >= 4) {
+                                  alert("New Arrivals is capped at 4 items.");
+                                  return;
+                                }
+                                setNewArrivalsIds([...newArrivalsIds, p.id]);
+                                setNewArrivalsSearch('');
+                              }}
+                              className="w-full text-left p-3 hover:bg-bg-subtle text-xs flex justify-between items-center transition-colors font-semibold"
+                            >
+                              <span>{p.name}</span>
+                              <span className="text-[10px] text-text-secondary font-bold font-mono">₹{p.base_price}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Selected New Arrivals List */}
+                    <div className="border border-border bg-bg-subtle p-3 space-y-2 min-h-36 flex flex-col justify-start">
+                      {newArrivalsIds.length === 0 ? (
+                        <p className="text-[10px] text-text-secondary/70 italic text-center my-auto font-semibold">
+                          No custom New Arrivals. Falls back to default.
+                        </p>
+                      ) : (
+                        newArrivalsIds.map((id, index) => {
+                          const p = products.find(prod => prod.id === id);
+                          if (!p) return null;
+                          return (
+                            <div key={id} className="bg-white border border-border/80 p-2.5 flex justify-between items-center text-xs font-semibold">
+                              <span className="truncate">{p.name}</span>
+                              <div className="flex gap-2 items-center flex-shrink-0">
+                                {/* Sort buttons */}
+                                <button
+                                  type="button"
+                                  disabled={index === 0}
+                                  onClick={() => {
+                                    const next = [...newArrivalsIds];
+                                    const temp = next[index];
+                                    next[index] = next[index - 1];
+                                    next[index - 1] = temp;
+                                    setNewArrivalsIds(next);
+                                  }}
+                                  className="text-text-secondary hover:text-accent disabled:opacity-30 text-[9px] px-1 hover:bg-bg-subtle border border-transparent rounded cursor-pointer"
+                                >
+                                  ▲
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={index === newArrivalsIds.length - 1}
+                                  onClick={() => {
+                                    const next = [...newArrivalsIds];
+                                    const temp = next[index];
+                                    next[index] = next[index + 1];
+                                    next[index + 1] = temp;
+                                    setNewArrivalsIds(next);
+                                  }}
+                                  className="text-text-secondary hover:text-accent disabled:opacity-30 text-[9px] px-1 hover:bg-bg-subtle border border-transparent rounded cursor-pointer"
+                                >
+                                  ▼
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setNewArrivalsIds(newArrivalsIds.filter(item => item !== id))}
+                                  className="text-text-secondary hover:text-sale p-1 cursor-pointer"
+                                >
+                                  <X size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Controls save */}
+              <div className="border-t border-border pt-6 flex justify-end">
+                <button
+                  type="button"
+                  disabled={isSavingHomepage}
+                  onClick={handleSaveHomepage}
+                  className="bg-accent text-white px-8 py-3 text-xs font-bold uppercase tracking-widest hover:bg-accent-hover transition-colors flex items-center justify-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
+                >
+                  {isSavingHomepage ? <Loader2 size={12} className="animate-spin" /> : null}
+                  Save Homepage Settings
+                </button>
+              </div>
+            </div>
+
+            {/* Right Side: Quick Instructions/Help */}
+            <div className="lg:col-span-4 bg-white border border-border/80 p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)] space-y-4 h-fit">
+              <h3 className="text-xs font-heading font-black uppercase tracking-wider text-text-primary pb-2 border-b border-border">
+                Content Manager Help
+              </h3>
+              <div className="space-y-3.5 text-xs text-text-secondary leading-relaxed">
+                <div className="bg-bg-subtle p-3.5 border-l-2 border-accent">
+                  <strong className="text-text-primary block mb-1">Image URLs</strong>
+                  Paste external HTTPS image URLs (e.g. from your cloud storage or Unsplash). The system loads them directly.
+                </div>
+                <div className="bg-bg-subtle p-3.5 border-l-2 border-accent">
+                  <strong className="text-text-primary block mb-1">View Focus Adjuster</strong>
+                  Since banners are cropped based on viewport width (especially the split screen hero), you can select where the image should pivot (`center`, `top`, `bottom`) to keep focal features visible.
+                </div>
+                <div className="bg-bg-subtle p-3.5 border-l-2 border-accent">
+                  <strong className="text-text-primary block mb-1">Highlight Fallbacks</strong>
+                  If no custom Best Sellers or New Arrivals are selected here, the main page falls back to general catalog query defaults (e.g., first few products or latest releases).
+                </div>
               </div>
             </div>
           </motion.div>

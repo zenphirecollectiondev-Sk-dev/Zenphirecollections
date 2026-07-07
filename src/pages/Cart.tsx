@@ -30,9 +30,9 @@ export default function Cart() {
           </p>
           <Link
             to="/shop"
-            className="inline-flex items-center gap-2 bg-accent text-white px-6 py-3 text-xs font-semibold uppercase tracking-wider hover:bg-accent-hover transition-colors"
+            className="btn btn-primary inline-flex items-center gap-2 bg-accent text-white px-6 py-3 text-xs font-bold uppercase tracking-widest hover:bg-accent-hover"
           >
-            Explore Catalog <ArrowRight size={14} />
+            Explore Catalog <ArrowRight size={13} />
           </Link>
         </div>
       ) : (
@@ -147,13 +147,13 @@ export default function Cart() {
               <div className="pt-2">
                 <Link
                   to="/checkout"
-                  className="block w-full bg-accent text-white py-4 font-bold uppercase text-xs tracking-widest hover:bg-accent-hover transition-colors text-center"
+                  className="btn btn-primary block w-full bg-accent text-white py-4 font-bold uppercase text-[10px] tracking-widest hover:bg-accent-hover text-center"
                 >
                   Proceed to Checkout
                 </Link>
                 <Link
                   to="/shop"
-                  className="block w-full border border-border bg-white text-text-primary py-3 font-semibold uppercase text-xs tracking-wider hover:bg-bg-subtle transition-colors text-center mt-3"
+                  className="btn block w-full border border-border bg-white text-text-primary py-3 font-semibold uppercase text-[10px] tracking-widest hover:bg-bg-subtle text-center mt-3"
                 >
                   Continue Shopping
                 </Link>

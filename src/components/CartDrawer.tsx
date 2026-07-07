@@ -38,9 +38,9 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
           <button
             onClick={onClose}
             aria-label="Close cart"
-            className="p-1 hover:bg-bg-subtle transition-colors rounded-full"
+            className="btn-icon p-1.5 hover:bg-bg-subtle rounded-full"
           >
-            <X size={22} />
+            <X size={20} />
           </button>
         </div>
 
@@ -52,7 +52,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
               <p className="text-text-secondary font-medium text-sm">Your shopping cart is empty.</p>
               <button
                 onClick={onClose}
-                className="bg-accent text-white px-6 py-3 text-xs font-semibold uppercase tracking-wider hover:bg-accent-hover transition-colors"
+                className="btn btn-primary bg-accent text-white px-6 py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-accent-hover"
               >
                 Continue Shopping
               </button>
@@ -134,14 +134,14 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
               <Link
                 to="/checkout"
                 onClick={onClose}
-                className="block w-full bg-accent text-white py-4 font-bold uppercase text-xs tracking-widest hover:bg-accent-hover transition-colors text-center"
+                className="btn btn-primary block w-full bg-accent text-white py-4 font-bold uppercase text-[10px] tracking-widest hover:bg-accent-hover text-center"
               >
                 Proceed to Checkout
               </Link>
               <Link
                 to="/cart"
                 onClick={onClose}
-                className="block w-full border border-border bg-white text-text-primary py-3 font-semibold uppercase text-xs tracking-wider hover:bg-bg-subtle transition-colors text-center"
+                className="btn block w-full border border-border bg-white text-text-primary py-3 font-semibold uppercase text-[10px] tracking-widest hover:bg-bg-subtle text-center"
               >
                 View Full Cart
               </Link>

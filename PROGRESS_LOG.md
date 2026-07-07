@@ -7,6 +7,30 @@
 
 ---
 
+## [2026-07-08] — Session: Dynamic Homepage Config, System Uploads, Drag-to-Crop & Mobile Overlay
+**What was done:**
+- Created a dynamic `homepage_config` database table schema in `supabase_schema.sql` to manage banners, crop positions, and custom selected highlight products.
+- Implemented the **Homepage Settings** tab inside the Admin panel (`Admin.tsx`) supporting:
+  - Direct system image file uploads (`<input type="file" />`) targeting Supabase Storage's `homepage-assets` bucket, with a local Base64 FileReader fallback.
+  - Interactive click-and-drag crop adjustment, allowing admins to drag image previews to generate percentage coordinates (`X% Y%`) and live-preview alignment in real-time.
+  - Search-and-select widgets for Best Sellers and New Arrivals product selections (capped at 4, supporting reordering and deletion).
+- Integrated dynamic configuration loading in `Home.tsx`, mapping alignment parameters and customized highlight product lists with graceful default fallbacks.
+- Redesigned the storefront mobile Hero layout, overlaying high-contrast typography directly on the bottom of the banner inside a custom curved radial vignette (85% max opacity).
+- Swapped hardcoded aspect ratios on Hero (`h-[75vh]/h-[80vh]`) and "The Edit" (`max-h-[75vh]`) banners to naturally scale and adapt to uploaded media dimensions.
+- Cleaned up aesthetics: Removed the "Volume 01 / Winter 26" label, changed the primary CTA button text to "Discover Form", and verified a clean `npm run build` with zero errors.
+
+**Files touched:**
+- `supabase_schema.sql`
+- `src/pages/Admin.tsx`
+- `src/pages/Home.tsx`
+- `walkthrough.md`
+- `task.md`
+- `PROGRESS_LOG.md`
+
+**Status:** ✅ Complete — admin homepage config panel and responsive visual overrides are fully integrated and verified.
+
+---
+
 ## [2026-07-04] — Session: Admin Dashboard, Catalog Sync & Size Guide Generator Upgrades
 **What was done:**
 - Added size guide database columns (`size_guide_html` to categories; `size_guide_type` and `custom_size_guide_html` to products) to SQL schema and TypeScript typings.
