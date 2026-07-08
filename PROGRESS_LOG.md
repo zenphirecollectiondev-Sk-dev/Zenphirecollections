@@ -5,6 +5,99 @@
 - At the END of every session (before committing): add a new entry below, newest on top.
 - Never delete old entries — this is the permanent build history.
 
+
+## [2026-07-08] — Session: Heading & Subheading Color Utility Classes
+**What was done:**
+- Configured heading primary start, mid, end and heading secondary tokens in Tailwind configuration and CSS `:root`.
+- Created Class 1 `.heading-primary` utility featuring a slow, loopable, animated text-fill gradient using Vercel/Geist-style dark-green values, with robust fallback controls for browsers without `background-clip: text` support or for users with `prefers-reduced-motion` enabled.
+- Created Class 2 `.subheading-primary` utility rendering a static gold color matching the accent brass/gold tokens.
+- Applied `.heading-primary` and `.subheading-primary` to the "Gender Collections" heading pair on `Home.tsx` as a verified render test.
+- Documented styling updates in `Zenphire_Collections_Roadmap (1).md` and verified clean compilation via `npm run build`.
+
+**Files touched:**
+- `tailwind.config.js`
+- `src/index.css`
+- `src/pages/Home.tsx`
+- `Zenphire_Collections_Roadmap (1).md`
+- `PROGRESS_LOG.md`
+
+**Status:** ✅ Complete — heading classes are ready for global use and compile successfully.
+
+---
+
+## [2026-07-08] — Session: Gold Gradient Accents & Primary CTA Button Refactoring
+**What was done:**
+- Configured muted gold color `accent-gold` (`#B8975A`) and `gradient-accent-line` (`#00221A` to `#B8975A`) tokens in Tailwind configuration and CSS `:root`.
+- Added absolute green-to-gold 2px gradient lines to the bottom edge of the sticky storefront header seam and the top edge of the footer seam.
+- Added text NavLinks (`Shop`, `Wishlist`, `Account`) to the desktop header, styled with responsive green-to-gold active/hover underline states.
+- Implemented product card image hover micro-interactions: a 2px bottom gradient underline grows outward from the left when product cards are hovered in the homepage, catalog, and wishlist grids.
+- Refactored storefront category chips on the mobile filter panel to replace the solid active state borders with a bottom gradient underline.
+- Globally updated `.btn-primary` buttons in `src/index.css` to feature the deep green background `#00221A` with a blurred gold gradient glow bottom underline on hover.
+- Refactored all customer-facing checkout, cart, product detail, account, and onboarding CTA buttons to inherit the global `.btn-primary` class rules, removing inline overrides.
+- Documented styling updates in `Zenphire_Collections_Roadmap (1).md` and verified clean compilation via `npm run build`.
+
+**Files touched:**
+- `tailwind.config.js`
+- `src/index.css`
+- `src/App.tsx`
+- `src/pages/Home.tsx`
+- `src/pages/Shop.tsx`
+- `src/pages/Wishlist.tsx`
+- `src/pages/Cart.tsx`
+- `src/pages/ProductDetail.tsx`
+- `src/components/CartDrawer.tsx`
+- `src/pages/Checkout.tsx`
+- `src/pages/Account.tsx`
+- `src/pages/auth/ForgotPassword.tsx`
+- `src/pages/auth/Onboarding.tsx`
+- `Zenphire_Collections_Roadmap (1).md`
+- `PROGRESS_LOG.md`
+
+**Status:** ✅ Complete — all gradient line accents and primary CTA button styles are fully integrated and compile successfully.
+
+---
+
+## [2026-07-08] — Session: Dark Ambient Moving Gradient Header & Footer
+**What was done:**
+- Configured 5 new design tokens for the dark ambient green system in `tailwind.config.js` and `src/index.css`.
+- Renamed the `.header-ambient-gradient` utility class to a generic `.ambient-green-gradient` class featuring the 3-stop diagonal shifting gradient keyframe loop (`@keyframes ambientMotion`).
+- Updated the header layout in `src/App.tsx` to set all title bar icons (hamburger menu, search, wishlist, cart, account, console, sign-out) to pure white (`text-white`) at rest on customer-facing pages.
+- Changed the header wishlist and cart count badges to display with a clean white background and dark text overlay (`bg-white text-header-base`) for premium visual contrast.
+- Updated the footer in `src/App.tsx` to feature the same animated `.ambient-green-gradient` as the header, bookending the site structure with a cohesive green design treatment.
+- Refactored footer typography to align with the new dark background, converting section headers, description copy, links, and borders to white and translucent color stops.
+- Integrated the updated styling details into `Zenphire_Collections_Roadmap (1).md` and verified a successful production build with zero errors.
+
+**Files touched:**
+- `tailwind.config.js`
+- `src/index.css`
+- `src/App.tsx`
+- `Zenphire_Collections_Roadmap (1).md`
+- `PROGRESS_LOG.md`
+
+**Status:** ✅ Complete — dark ambient header/footer gradients and white icon styling are fully integrated and compile successfully.
+
+---
+
+## [2026-07-08] — Session: Direct File Uploads for Gender Collections & Categories Mockups
+**What was done:**
+- Extended database schema in `supabase_schema.sql` to include `image_url` on categories, and `men_collection_image_url`, `women_collection_image_url`, `unisex_collection_image_url` on `homepage_config`.
+- Updated TypeScript table typings in `src/types/database.ts` to support category cover image URLs.
+- Implemented file upload capability in `Admin.tsx` under the **Homepage Settings** tab for the three gender collections, enabling administrators to choose local files to upload to Supabase storage.
+- Added visual crop previews and clear image buttons for each uploaded gender mockup.
+- Implemented category cover image upload inputs and previews inside the category editing/creation modal form, removing raw URL text input fields completely.
+- Added a cover image thumbnail preview column inside the Admin Category listing table.
+- Bound storefront `Home.tsx` to render these dynamically uploaded mockup and category images, with clean fallbacks to standard visual assets if empty.
+- Verified a successful production build with `npm run build` and zero compilation/types check diagnostics.
+
+**Files touched:**
+- `supabase_schema.sql`
+- `src/types/database.ts`
+- `src/pages/Admin.tsx`
+- `src/pages/Home.tsx`
+- `PROGRESS_LOG.md`
+
+**Status:** ✅ Complete — direct file uploads for collections and categories mockups are fully integrated and verified.
+
 ---
 
 ## [2026-07-08] — Session: Dynamic Homepage Config, System Uploads, Drag-to-Crop & Mobile Overlay

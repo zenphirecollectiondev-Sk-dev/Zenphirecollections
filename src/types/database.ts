@@ -54,6 +54,7 @@ export interface Database {
           slug: string
           parent_category_id: string | null
           size_guide_html: string | null
+          image_url: string | null
           created_at: string
         }
         Insert: {
@@ -62,6 +63,7 @@ export interface Database {
           slug: string
           parent_category_id?: string | null
           size_guide_html?: string | null
+          image_url?: string | null
           created_at?: string
         }
         Update: {
@@ -70,6 +72,7 @@ export interface Database {
           slug?: string
           parent_category_id?: string | null
           size_guide_html?: string | null
+          image_url?: string | null
           created_at?: string
         }
         Relationships: [

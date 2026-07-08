@@ -4,19 +4,19 @@ import { useAuthStore } from '../store/useAuthStore';
 import { supabase, getUserAddresses, getUserOrders } from '../lib/supabase';
 import type { AddressRow } from '../lib/supabase';
 import { z } from 'zod';
-import { 
-  User, 
-  Phone, 
-  Calendar, 
-  Mail, 
-  MapPin, 
-  Plus, 
-  Trash2, 
-  Edit2, 
-  LogOut, 
-  Loader2, 
-  Check, 
-  Package, 
+import {
+  User,
+  Phone,
+  Calendar,
+  Mail,
+  MapPin,
+  Plus,
+  Trash2,
+  Edit2,
+  LogOut,
+  Loader2,
+  Check,
+  Package,
   AlertCircle,
   Copy,
   ExternalLink
@@ -67,7 +67,7 @@ const addressSchema = z.object({
 export default function Account() {
   const navigate = useNavigate();
   const { user, profile, updateProfile, signOut } = useAuthStore();
-  
+
   // Tabs
   const [activeTab, setActiveTab] = useState<'profile' | 'orders'>('profile');
 
@@ -91,7 +91,7 @@ export default function Account() {
   const [addresses, setAddresses] = useState<AddressRow[]>([]);
   const [addressFormOpen, setAddressFormOpen] = useState(false);
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
-  
+
   // Address Form fields
   const [recipientName, setRecipientName] = useState('');
   const [phonePrimary, setPhonePrimary] = useState('');
@@ -101,7 +101,7 @@ export default function Account() {
   const [state, setState] = useState('');
   const [pincode, setPincode] = useState('');
   const [isDefault, setIsDefault] = useState(false);
-  
+
   // Validation Errors state (for inline inputs)
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [addressError, setAddressError] = useState<string | null>(null);
@@ -164,7 +164,7 @@ export default function Account() {
   const handleProfileSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
-    
+
     setLoadingProfile(true);
     setProfileSuccess(false);
     setProfileError(null);
@@ -202,9 +202,9 @@ export default function Account() {
   // Set default address (with Optimistic State Updates)
   const handleSetDefaultAddress = async (addressId: string) => {
     if (!user) return;
-    
+
     const fallbackAddresses = [...addresses];
-    
+
     // Optimistic Update: instantly set target default and toggle off others
     const optimisticallyUpdated = addresses.map(addr => ({
       ...addr,
@@ -219,7 +219,7 @@ export default function Account() {
         .eq('id', addressId);
 
       if (error) throw error;
-      
+
       // Pull fresh data to verify local state matches DB
       const data = await getUserAddresses(user.id);
       setAddresses(data);
@@ -364,14 +364,14 @@ export default function Account() {
   const getTimelineInfo = (status: string) => {
     const steps = ['pending', 'processing', 'shipped', 'delivered'];
     const displayNames = ['Ordered', 'Processing', 'Shipped', 'Delivered'];
-    
+
     let activeIndex = steps.indexOf(status.toLowerCase());
-    
+
     // Fallback/boundary checking
     if (status.toLowerCase() === 'cancelled') {
       return { steps: ['Ordered', 'Cancelled'], activeIndex: 1, isCancelled: true };
     }
-    
+
     if (activeIndex === -1) activeIndex = 0; // Default to first step
     return { steps: displayNames, activeIndex, isCancelled: false };
   };
@@ -403,21 +403,19 @@ export default function Account() {
       <div className="flex border-b border-border mb-8">
         <button
           onClick={() => setActiveTab('profile')}
-          className={`py-3.5 px-6 text-xs font-bold tracking-widest uppercase border-b-2 transition-all ${
-            activeTab === 'profile'
+          className={`py-3.5 px-6 text-xs font-bold tracking-widest uppercase border-b-2 transition-all ${activeTab === 'profile'
               ? 'border-accent text-text-primary'
               : 'border-transparent text-text-secondary hover:text-text-primary'
-          }`}
+            }`}
         >
           Profile & Addresses
         </button>
         <button
           onClick={() => setActiveTab('orders')}
-          className={`py-3.5 px-6 text-xs font-bold tracking-widest uppercase border-b-2 transition-all ${
-            activeTab === 'orders'
+          className={`py-3.5 px-6 text-xs font-bold tracking-widest uppercase border-b-2 transition-all ${activeTab === 'orders'
               ? 'border-accent text-text-primary'
               : 'border-transparent text-text-secondary hover:text-text-primary'
-          }`}
+            }`}
         >
           Order History ({orders.length})
         </button>
@@ -426,10 +424,10 @@ export default function Account() {
       {/* Tab Contents */}
       {activeTab === 'profile' ? (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          
+
           {/* Left Column: Personal Profile */}
           <div className="lg:col-span-5 bg-white border border-border/80 p-6 md:p-8 shadow-[0_4px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_24px_rgba(0,0,0,0.06)] transition-all">
-            
+
             {!isEditingProfile ? (
               /* VIEW MODE */
               <div className="space-y-6">
@@ -607,7 +605,7 @@ export default function Account() {
                     <button
                       type="submit"
                       disabled={loadingProfile}
-                      className="w-1/2 bg-accent text-white py-3 font-bold uppercase text-[10px] tracking-widest hover:bg-accent-hover transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                      className="btn btn-primary w-1/2 py-3 font-bold uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 disabled:opacity-50"
                     >
                       {loadingProfile ? (
                         <Loader2 size={13} className="animate-spin" />
@@ -667,9 +665,8 @@ export default function Account() {
                         placeholder="Name of the person receiving the delivery"
                         value={recipientName}
                         onChange={(e) => setRecipientName(e.target.value)}
-                        className={`w-full px-3 py-2 border bg-white text-text-primary text-xs focus:outline-none focus:border-accent ${
-                          validationErrors.recipient_name ? 'border-sale' : 'border-border'
-                        }`}
+                        className={`w-full px-3 py-2 border bg-white text-text-primary text-xs focus:outline-none focus:border-accent ${validationErrors.recipient_name ? 'border-sale' : 'border-border'
+                          }`}
                       />
                       {validationErrors.recipient_name && (
                         <p className="text-[10px] text-sale font-medium mt-1">{validationErrors.recipient_name}</p>
@@ -688,9 +685,8 @@ export default function Account() {
                           placeholder="10-digit mobile number"
                           value={phonePrimary}
                           onChange={(e) => setPhonePrimary(e.target.value)}
-                          className={`w-full px-3 py-2 border bg-white text-text-primary text-xs focus:outline-none focus:border-accent ${
-                            validationErrors.phone_primary ? 'border-sale' : 'border-border'
-                          }`}
+                          className={`w-full px-3 py-2 border bg-white text-text-primary text-xs focus:outline-none focus:border-accent ${validationErrors.phone_primary ? 'border-sale' : 'border-border'
+                            }`}
                         />
                         {validationErrors.phone_primary && (
                           <p className="text-[10px] text-sale font-medium mt-1">{validationErrors.phone_primary}</p>
@@ -706,9 +702,8 @@ export default function Account() {
                           placeholder="Alternate 10-digit mobile"
                           value={phoneSecondary}
                           onChange={(e) => setPhoneSecondary(e.target.value)}
-                          className={`w-full px-3 py-2 border bg-white text-text-primary text-xs focus:outline-none focus:border-accent ${
-                            validationErrors.phone_secondary ? 'border-sale' : 'border-border'
-                          }`}
+                          className={`w-full px-3 py-2 border bg-white text-text-primary text-xs focus:outline-none focus:border-accent ${validationErrors.phone_secondary ? 'border-sale' : 'border-border'
+                            }`}
                         />
                         {validationErrors.phone_secondary && (
                           <p className="text-[10px] text-sale font-medium mt-1">{validationErrors.phone_secondary}</p>
@@ -727,9 +722,8 @@ export default function Account() {
                         placeholder="Flat/House No, Building, Street Name"
                         value={line1}
                         onChange={(e) => setLine1(e.target.value)}
-                        className={`w-full px-3 py-2 border bg-white text-text-primary text-xs focus:outline-none focus:border-accent ${
-                          validationErrors.line1 ? 'border-sale' : 'border-border'
-                        }`}
+                        className={`w-full px-3 py-2 border bg-white text-text-primary text-xs focus:outline-none focus:border-accent ${validationErrors.line1 ? 'border-sale' : 'border-border'
+                          }`}
                       />
                       {validationErrors.line1 && (
                         <p className="text-[10px] text-sale font-medium mt-1">{validationErrors.line1}</p>
@@ -748,9 +742,8 @@ export default function Account() {
                           placeholder="e.g. Mumbai"
                           value={city}
                           onChange={(e) => setCity(e.target.value)}
-                          className={`w-full px-3 py-2 border bg-white text-text-primary text-xs focus:outline-none focus:border-accent ${
-                            validationErrors.city ? 'border-sale' : 'border-border'
-                          }`}
+                          className={`w-full px-3 py-2 border bg-white text-text-primary text-xs focus:outline-none focus:border-accent ${validationErrors.city ? 'border-sale' : 'border-border'
+                            }`}
                         />
                         {validationErrors.city && (
                           <p className="text-[10px] text-sale font-medium mt-1">{validationErrors.city}</p>
@@ -766,9 +759,8 @@ export default function Account() {
                           placeholder="e.g. Maharashtra"
                           value={state}
                           onChange={(e) => setState(e.target.value)}
-                          className={`w-full px-3 py-2 border bg-white text-text-primary text-xs focus:outline-none focus:border-accent ${
-                            validationErrors.state ? 'border-sale' : 'border-border'
-                          }`}
+                          className={`w-full px-3 py-2 border bg-white text-text-primary text-xs focus:outline-none focus:border-accent ${validationErrors.state ? 'border-sale' : 'border-border'
+                            }`}
                         />
                         {validationErrors.state && (
                           <p className="text-[10px] text-sale font-medium mt-1">{validationErrors.state}</p>
@@ -784,9 +776,8 @@ export default function Account() {
                           placeholder="6-digit pincode"
                           value={pincode}
                           onChange={(e) => setPincode(e.target.value)}
-                          className={`w-full px-3 py-2 border bg-white text-text-primary text-xs focus:outline-none focus:border-accent ${
-                            validationErrors.pincode ? 'border-sale' : 'border-border'
-                          }`}
+                          className={`w-full px-3 py-2 border bg-white text-text-primary text-xs focus:outline-none focus:border-accent ${validationErrors.pincode ? 'border-sale' : 'border-border'
+                            }`}
                         />
                         {validationErrors.pincode && (
                           <p className="text-[10px] text-sale font-medium mt-1">{validationErrors.pincode}</p>
@@ -820,7 +811,7 @@ export default function Account() {
                       </button>
                       <button
                         type="submit"
-                        className="px-4 py-2.5 bg-accent text-white text-[10px] font-bold uppercase tracking-wider hover:bg-accent-hover transition-colors"
+                        className="btn btn-primary px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider"
                       >
                         {editingAddressId ? 'Update Address' : 'Save Address'}
                       </button>
@@ -848,7 +839,7 @@ export default function Account() {
                   </p>
                   <button
                     onClick={handleOpenAddForm}
-                    className="mt-4 border border-accent bg-accent text-white px-5 py-2.5 text-[10px] font-bold uppercase tracking-widest hover:bg-accent-hover transition-colors shadow-sm"
+                    className="btn btn-primary mt-4 px-5 py-2.5 text-[10px] font-bold uppercase tracking-widest shadow-sm"
                   >
                     Add your first address
                   </button>
@@ -859,11 +850,10 @@ export default function Account() {
                   {addresses.map((addr) => (
                     <div
                       key={addr.id}
-                      className={`border p-5 bg-white relative transition-all shadow-[0_2px_12px_rgba(0,0,0,0.02)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.05)] ${
-                        addr.is_default 
-                          ? 'border-accent shadow-sm ring-1 ring-accent' 
+                      className={`border p-5 bg-white relative transition-all shadow-[0_2px_12px_rgba(0,0,0,0.02)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.05)] ${addr.is_default
+                          ? 'border-accent shadow-sm ring-1 ring-accent'
                           : 'border-border hover:border-text-secondary'
-                      }`}
+                        }`}
                     >
                       {addr.is_default && (
                         <span className="absolute top-4 right-4 bg-accent text-white font-heading font-black text-[8px] uppercase tracking-widest px-2 py-0.5">
@@ -956,7 +946,7 @@ export default function Account() {
               <p className="text-[10px] text-text-secondary mt-1">Start shopping our collection of minimalist apparel.</p>
               <button
                 onClick={() => navigate('/shop')}
-                className="mt-5 border border-accent bg-accent text-white px-5 py-2.5 text-[10px] font-bold uppercase tracking-widest hover:bg-accent-hover transition-colors"
+                className="btn btn-primary mt-5 px-5 py-2.5 text-[10px] font-bold uppercase tracking-widest"
               >
                 Go to Shop
               </button>
@@ -965,7 +955,7 @@ export default function Account() {
             <div className="space-y-8">
               {orders.map((order) => {
                 const { steps, activeIndex, isCancelled } = getTimelineInfo(order.status);
-                
+
                 return (
                   <div key={order.id} className="border border-border/80 bg-white hover:shadow-md shadow-[0_2px_12px_rgba(0,0,0,0.02)] transition-all">
                     {/* Order summary header */}
@@ -998,17 +988,16 @@ export default function Account() {
                       </div>
 
                       {/* Status Badging */}
-                      <span className={`text-[9px] font-heading font-black uppercase tracking-widest px-2.5 py-1 border ${
-                        order.status.toLowerCase() === 'delivered'
+                      <span className={`text-[9px] font-heading font-black uppercase tracking-widest px-2.5 py-1 border ${order.status.toLowerCase() === 'delivered'
                           ? 'bg-green-50 text-green-700 border-green-200'
                           : order.status.toLowerCase() === 'cancelled'
-                          ? 'bg-red-50 text-sale border-red-200'
-                          : order.status.toLowerCase() === 'shipped'
-                          ? 'bg-purple-50 text-purple-700 border-purple-200'
-                          : order.status.toLowerCase() === 'processing'
-                          ? 'bg-blue-50 text-blue-700 border-blue-200'
-                          : 'bg-yellow-50 text-yellow-700 border-yellow-200'
-                      }`}>
+                            ? 'bg-red-50 text-sale border-red-200'
+                            : order.status.toLowerCase() === 'shipped'
+                              ? 'bg-purple-50 text-purple-700 border-purple-200'
+                              : order.status.toLowerCase() === 'processing'
+                                ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                : 'bg-yellow-50 text-yellow-700 border-yellow-200'
+                        }`}>
                         {order.status}
                       </span>
                     </div>
@@ -1020,12 +1009,12 @@ export default function Account() {
                         <h4 className="text-[10px] font-black uppercase tracking-widest text-text-secondary border-b border-border pb-1.5">
                           Ordered Items
                         </h4>
-                        
+
                         <div className="space-y-3">
                           {order.order_items?.map((item) => {
                             const product = item.product_variants?.products;
                             const image = product?.product_images?.[0]?.url;
-                            
+
                             return (
                               <div key={item.id} className="flex gap-4 items-center">
                                 {/* Thumbnail */}
@@ -1040,7 +1029,7 @@ export default function Account() {
                                     <Package size={20} className="text-text-secondary stroke-[1.2]" />
                                   )}
                                 </div>
-                                
+
                                 {/* Info */}
                                 <div className="flex-grow">
                                   <h5 className="text-xs font-semibold text-text-primary uppercase tracking-wide leading-snug">
@@ -1144,30 +1133,28 @@ export default function Account() {
                           {steps.map((step, idx) => {
                             const isCompleted = idx <= activeIndex;
                             const isActive = idx === activeIndex;
-                            
+
                             return (
                               <div key={step} className="relative flex items-center gap-3">
                                 {/* Timeline Dot */}
-                                <div className={`absolute -left-[19.5px] w-3 h-3 rounded-full border-2 transition-all flex items-center justify-center ${
-                                  isCancelled && idx === 1
+                                <div className={`absolute -left-[19.5px] w-3 h-3 rounded-full border-2 transition-all flex items-center justify-center ${isCancelled && idx === 1
                                     ? 'bg-sale border-sale scale-110'
-                                    : isCompleted 
-                                    ? 'bg-accent border-accent scale-110' 
-                                    : 'bg-white border-border'
-                                }`}>
+                                    : isCompleted
+                                      ? 'bg-accent border-accent scale-110'
+                                      : 'bg-white border-border'
+                                  }`}>
                                   {isCompleted && !isCancelled && (
                                     <span className="w-1 h-1 bg-white rounded-full"></span>
                                   )}
                                 </div>
 
                                 <div>
-                                  <p className={`text-xs font-bold uppercase tracking-wider ${
-                                    isCancelled && idx === 1
+                                  <p className={`text-xs font-bold uppercase tracking-wider ${isCancelled && idx === 1
                                       ? 'text-sale'
-                                      : isCompleted 
-                                      ? 'text-text-primary' 
-                                      : 'text-text-secondary opacity-60'
-                                  }`}>
+                                      : isCompleted
+                                        ? 'text-text-primary'
+                                        : 'text-text-secondary opacity-60'
+                                    }`}>
                                     {step}
                                   </p>
                                   {isActive && !isCancelled && (

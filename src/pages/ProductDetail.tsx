@@ -89,12 +89,12 @@ export default function ProductDetail() {
     loadRecommendations();
   }, [dbProduct]);
 
-  const [selectedSize, setSelectedSize]     = useState<string>('');
-  const [selectedColor, setSelectedColor]   = useState<string>('');
+  const [selectedSize, setSelectedSize] = useState<string>('');
+  const [selectedColor, setSelectedColor] = useState<string>('');
   const [activeImageIdx, setActiveImageIdx] = useState<number>(0);
-  const [isAdded, setIsAdded]               = useState(false);
-  const [viewBag, setViewBag]               = useState(false);
-  const [heartAnim, setHeartAnim]           = useState(false);
+  const [isAdded, setIsAdded] = useState(false);
+  const [viewBag, setViewBag] = useState(false);
+  const [heartAnim, setHeartAnim] = useState(false);
   const navigate = useNavigate();
   const addItem = useCartStore((state) => state.addItem);
 
@@ -107,7 +107,7 @@ export default function ProductDetail() {
     if (!isLightboxOpen) return;
     if (e.key === 'Escape') setIsLightboxOpen(false);
     if (e.key === 'ArrowRight') setLightboxIdx((i) => (i + 1) % (product?.product_images?.length || 1));
-    if (e.key === 'ArrowLeft')  setLightboxIdx((i) => (i - 1 + (product?.product_images?.length || 1)) % (product?.product_images?.length || 1));
+    if (e.key === 'ArrowLeft') setLightboxIdx((i) => (i - 1 + (product?.product_images?.length || 1)) % (product?.product_images?.length || 1));
   }, [isLightboxOpen, product]);
 
   useEffect(() => {
@@ -134,7 +134,7 @@ export default function ProductDetail() {
       <div className="min-h-[60vh] flex flex-col items-center justify-center p-8 text-center">
         <h2 className="text-xl font-heading font-bold uppercase mb-2">Product Not Found</h2>
         <p className="text-text-secondary text-sm mb-6">This product doesn't exist or has been removed.</p>
-        <Link to="/shop" className="btn btn-primary bg-accent text-white px-6 py-3 text-xs font-bold uppercase tracking-widest hover:bg-accent-hover">
+        <Link to="/shop" className="btn btn-primary px-6 py-3 text-xs font-bold uppercase tracking-widest">
           Back to Catalog
         </Link>
       </div>
@@ -142,7 +142,7 @@ export default function ProductDetail() {
   }
 
   const availableVariantsForColor: any[] = product.product_variants.filter((v: any) => v.color === selectedColor);
-  const availableColors: string[]        = Array.from(new Set(product.product_variants.map((v: any) => v.color))) as string[];
+  const availableColors: string[] = Array.from(new Set(product.product_variants.map((v: any) => v.color))) as string[];
   const selectedVariant = product.product_variants.find((v: any) => v.color === selectedColor && v.size === selectedSize);
   const isOutOfStock = selectedSize
     ? selectedVariant?.stock_qty === 0
@@ -152,14 +152,14 @@ export default function ProductDetail() {
     if (!selectedSize) { alert('Please select a size first.'); return; }
     if (selectedVariant) {
       addItem({
-        id:        `${product.id}-${selectedVariant.id}`,
+        id: `${product.id}-${selectedVariant.id}`,
         productId: product.id,
         variantId: selectedVariant.id,
-        name:      product.name,
-        size:      selectedVariant.size,
-        color:     selectedVariant.color,
-        price:     product.base_price,
-        image:     product.product_images[0]?.url || linenShirt,
+        name: product.name,
+        size: selectedVariant.size,
+        color: selectedVariant.color,
+        price: product.base_price,
+        image: product.product_images[0]?.url || linenShirt,
       });
       setIsAdded(true);
       setViewBag(false);
@@ -217,9 +217,8 @@ export default function ProductDetail() {
                 <button
                   key={img.id}
                   onClick={() => setActiveImageIdx(idx)}
-                  className={`size-btn flex-shrink-0 w-[68px] aspect-[3/4] bg-bg-subtle border overflow-hidden ${
-                    activeImageIdx === idx ? 'border-accent selected' : 'border-border'
-                  }`}
+                  className={`size-btn flex-shrink-0 w-[68px] aspect-[3/4] bg-bg-subtle border overflow-hidden ${activeImageIdx === idx ? 'border-accent selected' : 'border-border'
+                    }`}
                 >
                   <img src={img.url} alt="thumbnail" className="w-full h-full object-cover object-center" />
                 </button>
@@ -252,11 +251,10 @@ export default function ProductDetail() {
                     <button
                       key={color}
                       onClick={() => { setSelectedColor(color); setSelectedSize(''); }}
-                      className={`btn px-4 py-2 border text-[10px] font-bold uppercase tracking-widest ${
-                        selectedColor === color
+                      className={`btn px-4 py-2 border text-[10px] font-bold uppercase tracking-widest ${selectedColor === color
                           ? 'bg-accent border-accent text-white'
                           : 'border-border bg-white text-text-primary hover:border-accent'
-                      }`}
+                        }`}
                     >
                       {color}
                     </button>
@@ -282,15 +280,14 @@ export default function ProductDetail() {
                       key={size}
                       disabled={!variant}
                       onClick={() => setSelectedSize(size)}
-                      className={`size-btn w-12 h-12 border text-xs font-bold flex items-center justify-center ${
-                        !variant
+                      className={`size-btn w-12 h-12 border text-xs font-bold flex items-center justify-center transition-all ${!variant
                           ? 'opacity-30 cursor-not-allowed border-dashed border-border'
                           : !available
-                          ? 'opacity-40 cursor-not-allowed bg-bg-subtle text-text-secondary line-through border-border'
-                          : selectedSize === size
-                          ? 'bg-accent border-accent text-white selected'
-                          : 'bg-white border-border text-text-primary hover:border-accent'
-                      }`}
+                            ? 'opacity-40 cursor-not-allowed bg-bg-subtle text-text-secondary line-through border-border'
+                            : selectedSize === size
+                              ? 'ambient-green-gradient text-white border-transparent selected'
+                              : 'bg-white border-border text-text-primary hover:border-accent'
+                        }`}
                     >
                       {size}
                     </button>
@@ -317,7 +314,7 @@ export default function ProductDetail() {
               {viewBag ? (
                 <button
                   onClick={() => navigate('/cart')}
-                  className="btn btn-primary flex-1 bg-emerald-600 text-white py-4 font-bold uppercase text-[10px] tracking-widest hover:bg-emerald-700 flex items-center justify-center gap-2"
+                  className="btn btn-primary flex-1 py-4 font-bold uppercase text-[10px] tracking-widest flex items-center justify-center gap-2"
                 >
                   <ShoppingBag size={15} /> View Bag
                 </button>
@@ -325,13 +322,12 @@ export default function ProductDetail() {
                 <button
                   disabled={isOutOfStock}
                   onClick={handleAddToCart}
-                  className={`btn btn-primary flex-1 py-4 font-bold uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 ${
-                    isAdded
+                  className={`btn btn-primary flex-1 py-4 font-bold uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 ${isAdded
                       ? 'bg-emerald-600 text-white'
                       : isOutOfStock
-                      ? 'bg-border text-text-secondary cursor-not-allowed opacity-50'
-                      : 'bg-accent text-white hover:bg-accent-hover'
-                  }`}
+                        ? 'bg-border text-text-secondary cursor-not-allowed opacity-50'
+                        : ''
+                    }`}
                 >
                   <ShoppingBag size={15} />
                   {isAdded ? 'Added ✓' : isOutOfStock ? 'Sold Out' : selectedSize ? 'Add to Cart' : 'Select Size'}
@@ -425,7 +421,7 @@ export default function ProductDetail() {
                 <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: sizeGuideHtml }} />
               </div>
               <div className="border-t border-border pt-4 mt-4 flex justify-end">
-                <button onClick={() => setIsSizeGuideOpen(false)} className="btn btn-primary bg-accent text-white px-5 py-2.5 text-[10px] font-bold uppercase tracking-widest hover:bg-accent-hover">
+                <button onClick={() => setIsSizeGuideOpen(false)} className="btn btn-primary px-5 py-2.5 text-[10px] font-bold uppercase tracking-widest">
                   Close
                 </button>
               </div>
@@ -513,11 +509,10 @@ export default function ProductDetail() {
                     key={idx}
                     onClick={() => setLightboxIdx(idx)}
                     aria-label={`View image ${idx + 1}`}
-                    className={`rounded-full transition-all duration-200 ${
-                      lightboxIdx === idx
+                    className={`rounded-full transition-all duration-200 ${lightboxIdx === idx
                         ? 'bg-white w-2 h-2'
                         : 'bg-white/30 hover:bg-white/60 w-1.5 h-1.5'
-                    }`}
+                      }`}
                   />
                 ))}
               </div>

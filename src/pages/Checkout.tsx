@@ -62,7 +62,7 @@ export default function Checkout() {
           .from('addresses')
           .select('*')
           .eq('user_id', user.id);
-        
+
         if (addrError) throw addrError;
         if (data && data.length > 0) {
           setSavedAddresses(data);
@@ -78,7 +78,7 @@ export default function Checkout() {
 
   // Order Calculations
   const subtotal = useMemo(() => items.reduce((acc, item) => acc + item.price * item.quantity, 0), [items]);
-  
+
   const discount = useMemo(() => {
     if (!appliedCoupon) return 0;
     return couponDiscount;
@@ -119,19 +119,19 @@ export default function Checkout() {
       setError('Please fill in all shipping address fields.');
       return false;
     }
-    
+
     // Indian phone number validation
     const phoneRegex = /^[6-9]\d{9}$/;
     if (!phoneRegex.test(phone_primary.trim())) {
       setError('Please enter a valid 10-digit Indian mobile number for the primary contact.');
       return false;
     }
-    
+
     if (phone_secondary.trim() && !phoneRegex.test(phone_secondary.trim())) {
       setError('Please enter a valid 10-digit Indian mobile number for the alternate contact.');
       return false;
     }
-    
+
     return true;
   };
 
@@ -193,13 +193,13 @@ export default function Checkout() {
     setError(null);
 
     const trackingId = `ZP-${Math.floor(100000 + Math.random() * 900000)}-IN`;
-    
+
     // Construct address info
     let finalAddressText = '';
     if (selectedAddressId !== 'new') {
       const selected = savedAddresses.find((a) => a.id === selectedAddressId);
-      finalAddressText = selected 
-        ? `${selected.line1}, ${selected.city}, ${selected.state} - ${selected.pincode}` 
+      finalAddressText = selected
+        ? `${selected.line1}, ${selected.city}, ${selected.state} - ${selected.pincode}`
         : '';
     } else {
       finalAddressText = `${addressForm.line1}, ${addressForm.city}, ${addressForm.state} - ${addressForm.pincode}`;
@@ -338,11 +338,10 @@ export default function Checkout() {
                     <div
                       key={addr.id}
                       onClick={() => setSelectedAddressId(addr.id)}
-                      className={`p-4 border cursor-pointer flex flex-col justify-between ${
-                        selectedAddressId === addr.id
+                      className={`p-4 border cursor-pointer flex flex-col justify-between ${selectedAddressId === addr.id
                           ? 'border-accent bg-bg-subtle'
                           : 'border-border bg-white hover:border-accent'
-                      }`}
+                        }`}
                     >
                       <p className="text-sm font-medium text-text-primary leading-relaxed">{addr.line1}</p>
                       <p className="text-xs text-text-secondary mt-1">
@@ -357,11 +356,10 @@ export default function Checkout() {
                   ))}
                   <div
                     onClick={() => setSelectedAddressId('new')}
-                    className={`p-4 border cursor-pointer flex items-center justify-center border-dashed ${
-                      selectedAddressId === 'new'
+                    className={`p-4 border cursor-pointer flex items-center justify-center border-dashed ${selectedAddressId === 'new'
                         ? 'border-accent bg-bg-subtle'
                         : 'border-border bg-white hover:border-accent'
-                    }`}
+                      }`}
                   >
                     <span className="text-xs uppercase tracking-wider font-bold text-text-secondary">
                       + Add New Address
@@ -507,7 +505,7 @@ export default function Checkout() {
 
             <button
               type="submit"
-              className="w-full bg-accent text-white py-4 font-bold uppercase text-xs tracking-widest hover:bg-accent-hover transition-colors flex items-center justify-center gap-2"
+              className="btn btn-primary w-full py-4 font-bold uppercase text-xs tracking-widest flex items-center justify-center gap-2"
             >
               Continue to Review <ArrowRight size={14} />
             </button>
@@ -531,7 +529,7 @@ export default function Checkout() {
                   </div>
                 ))}
               </div>
- 
+
               <div className="border-t border-border pt-4 text-sm flex justify-between items-baseline">
                 <span className="font-heading font-bold uppercase text-xs tracking-wider">Subtotal</span>
                 <span className="font-bold text-text-primary">₹{subtotal.toFixed(2)}</span>
@@ -610,7 +608,7 @@ export default function Checkout() {
                   />
                   <button
                     type="submit"
-                    className="bg-accent text-white px-5 py-2.5 text-xs font-bold uppercase tracking-wider hover:bg-accent-hover"
+                    className="btn btn-primary px-5 py-2.5 text-xs font-bold uppercase tracking-wider"
                   >
                     Apply
                   </button>
@@ -657,14 +655,14 @@ export default function Checkout() {
                   <span>Subtotal</span>
                   <span className="font-semibold text-text-primary">₹{subtotal.toFixed(2)}</span>
                 </div>
- 
+
                 {appliedCoupon && (
                   <div className="flex justify-between text-emerald-600 font-medium">
                     <span>Coupon ({appliedCoupon.code})</span>
                     <span>-₹{discount.toFixed(2)}</span>
                   </div>
                 )}
- 
+
                 <div className="flex justify-between text-text-secondary">
                   <span>Shipping</span>
                   {shipping === 0 ? (
@@ -674,7 +672,7 @@ export default function Checkout() {
                   )}
                 </div>
               </div>
- 
+
               <div className="flex justify-between items-baseline pb-2">
                 <span className="font-heading font-bold uppercase text-xs tracking-wider">Grand Total</span>
                 <span className="text-2xl font-bold text-text-primary">₹{total.toFixed(2)}</span>
@@ -682,7 +680,7 @@ export default function Checkout() {
 
               <button
                 onClick={triggerPayment}
-                className="w-full bg-accent text-white py-4 font-bold uppercase text-xs tracking-widest hover:bg-accent-hover transition-colors flex items-center justify-center gap-2"
+                className="btn btn-primary w-full py-4 font-bold uppercase text-xs tracking-widest flex items-center justify-center gap-2"
               >
                 Proceed to Payment
               </button>
@@ -746,7 +744,7 @@ export default function Checkout() {
             <div className="pt-4 flex flex-col sm:flex-row gap-3 justify-center">
               <Link
                 to="/shop"
-                className="bg-accent text-white px-8 py-3.5 text-xs font-bold uppercase tracking-widest hover:bg-accent-hover transition-colors text-center"
+                className="btn btn-primary px-8 py-3.5 text-xs font-bold uppercase tracking-widest text-center"
               >
                 Continue Shopping
               </Link>

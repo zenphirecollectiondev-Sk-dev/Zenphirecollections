@@ -114,7 +114,7 @@ export default function Shop() {
           <h1 className="text-3xl font-heading font-black uppercase mt-1">
             {activeCategory !== 'all' ? `${activeCategory} Collection`
               : activeGender !== 'all' ? `${activeGender}'s Collection`
-              : 'Shop All'}
+                : 'Shop All'}
           </h1>
         </div>
         <p className="text-xs text-text-secondary">{filteredProducts.length} results</p>
@@ -207,9 +207,8 @@ export default function Shop() {
                   <button
                     key={size}
                     onClick={() => handleSizeToggle(size)}
-                    className={`size-btn w-10 h-10 border text-xs font-semibold flex items-center justify-center ${
-                      isSel ? 'bg-accent border-accent text-white selected' : 'border-border text-text-primary bg-white hover:border-accent'
-                    }`}
+                    className={`size-btn w-10 h-10 border text-xs font-semibold flex items-center justify-center transition-all ${isSel ? 'ambient-green-gradient text-white border-transparent selected' : 'border-border text-text-primary bg-white hover:border-accent'
+                      }`}
                   >
                     {size}
                   </button>
@@ -237,7 +236,7 @@ export default function Shop() {
           {filteredProducts.length === 0 ? (
             <div className="text-center py-20 bg-bg-subtle border border-border anim-fade-in">
               <p className="text-sm text-text-secondary mb-5">No products match the active filters.</p>
-              <button onClick={resetFilters} className="btn btn-primary bg-accent text-white px-6 py-2.5 text-xs font-bold uppercase tracking-widest hover:bg-accent-hover">
+              <button onClick={resetFilters} className="btn btn-primary px-6 py-2.5 text-xs font-bold uppercase tracking-widest">
                 Clear Filters
               </button>
             </div>
@@ -251,6 +250,7 @@ export default function Shop() {
                       alt={product.name}
                       className="card-img w-full h-full object-cover object-center"
                     />
+                    <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-accent-line scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
                     {product.product_variants?.every((v: any) => v.stock_qty === 0) && (
                       <div className="absolute top-2 left-2 bg-sale text-white text-[9px] uppercase font-bold tracking-wider px-2 py-0.5">Sold Out</div>
                     )}
@@ -304,9 +304,8 @@ export default function Shop() {
                       <button
                         key={slug}
                         onClick={() => handleCategoryChange(slug)}
-                        className={`btn px-4 py-2 border text-[10px] font-semibold uppercase tracking-wider ${
-                          isActive ? 'bg-accent border-accent text-white' : 'border-border bg-white text-text-primary hover:border-accent'
-                        }`}
+                        className={`btn px-4 py-2 border text-[10px] font-semibold uppercase tracking-wider ${isActive ? 'filter-chip-active bg-white' : 'border-border bg-white text-text-primary hover:border-accent'
+                          }`}
                       >
                         {label}
                       </button>
@@ -325,9 +324,8 @@ export default function Shop() {
                     <button
                       key={size}
                       onClick={() => handleSizeToggle(size)}
-                      className={`size-btn w-10 h-10 border text-xs font-semibold flex items-center justify-center ${
-                        isSel ? 'bg-accent border-accent text-white selected' : 'border-border text-text-primary bg-white'
-                      }`}
+                      className={`size-btn w-10 h-10 border text-xs font-semibold flex items-center justify-center transition-all ${isSel ? 'ambient-green-gradient text-white border-transparent selected' : 'border-border text-text-primary bg-white hover:border-accent'
+                        }`}
                     >
                       {size}
                     </button>
@@ -351,7 +349,7 @@ export default function Shop() {
               <button onClick={resetFilters} className="btn flex-1 py-3 border border-border text-[10px] font-bold uppercase tracking-widest hover:bg-bg-subtle">
                 Reset
               </button>
-              <button onClick={() => setIsMobileFilterOpen(false)} className="btn btn-primary flex-1 py-3 bg-accent text-white text-[10px] font-bold uppercase tracking-widest hover:bg-accent-hover">
+              <button onClick={() => setIsMobileFilterOpen(false)} className="btn btn-primary flex-1 py-3 text-[10px] font-bold uppercase tracking-widest">
                 Apply
               </button>
             </div>

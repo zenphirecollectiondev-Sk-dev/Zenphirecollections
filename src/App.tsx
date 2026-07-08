@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, useLocation, NavLink } from 'react-router-dom';
 import { ShoppingBag, Heart, User, Search, Shield, LogOut, Menu, X } from 'lucide-react';
 import { useAuthStore } from './store/useAuthStore';
 import { useCartStore } from './store/useCartStore';
@@ -25,16 +25,7 @@ import Onboarding from './pages/auth/Onboarding';
 import AuthCallback from './pages/auth/AuthCallback';
 
 export default function App() {
-  const { session, profile, initialize, signOut } = useAuthStore();
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [isCartOpen, setIsCartOpen] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  
-  const cartItems = useCartStore((state) => state.items);
-  const cartCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
-  
-  const wishlistIds = useWishlistStore((state) => state.productIds);
-  const wishlistCount = wishlistIds.length;
+  const { initialize } = useAuthStore();
 
   useEffect(() => {
     initialize();
@@ -42,300 +33,364 @@ export default function App() {
 
   return (
     <Router>
-      <div className="min-h-screen bg-bg text-text-primary flex flex-col font-sans overflow-x-hidden w-full relative">
-        {/* Sticky Minimal Navigation */}
-        <header className="sticky top-0 z-50 bg-white border-b border-border">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            {/* Left Nav (Desktop) / Hamburger (Mobile) */}
-            <div className="flex items-center gap-6">
-              <button 
-                onClick={() => setIsMobileMenuOpen(true)}
-                className="btn-icon md:hidden p-2 hover:bg-bg-subtle rounded-full"
-                aria-label="Toggle Menu"
-              >
-                <Menu size={20} className="stroke-[1.5]" />
-              </button>
-            </div>
+      <AppContent />
+    </Router>
+  );
+}
 
-            {/* Center Logo */}
-            <div className="absolute left-1/2 transform -translate-x-1/2">
-              <Link to="/" className="text-xl font-heading font-black tracking-[0.2em] uppercase select-none">
-                Zenphire
-              </Link>
-            </div>
+function AppContent() {
+  const { session, profile, signOut } = useAuthStore();
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-            {/* Right Icons (Desktop) */}
-            <div className="hidden md:flex items-center gap-4">
-              <button 
-                onClick={() => setIsSearchOpen(true)}
-                aria-label="Search" 
-                className="btn-icon p-2 hover:bg-bg-subtle rounded-full"
-              >
-                <Search size={19} className="stroke-[1.5]" />
-              </button>
-              
-              <Link to="/wishlist" aria-label="Wishlist" className="btn-icon p-2 hover:bg-bg-subtle rounded-full relative">
-                <Heart size={19} className="stroke-[1.5]" />
-                {wishlistCount > 0 && (
-                  <span className="absolute top-1.5 right-1.5 bg-accent text-white text-[8px] font-bold w-3.5 h-3.5 flex items-center justify-center rounded-full">
-                    {wishlistCount}
-                  </span>
-                )}
-              </Link>
+  const cartItems = useCartStore((state) => state.items);
+  const cartCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
 
-              <button 
-                onClick={() => setIsCartOpen(true)}
-                aria-label="Cart" 
-                className="btn-icon p-2 hover:bg-bg-subtle rounded-full relative"
-              >
-                <ShoppingBag size={19} className="stroke-[1.5]" />
-                {cartCount > 0 && (
-                  <span className="absolute top-1.5 right-1.5 bg-accent text-white text-[8px] font-bold w-3.5 h-3.5 flex items-center justify-center rounded-full">
-                    {cartCount}
-                  </span>
-                )}
-              </button>
+  const wishlistIds = useWishlistStore((state) => state.productIds);
+  const wishlistCount = wishlistIds.length;
 
-              <Link to="/account" aria-label="Account" className="btn-icon p-2 hover:bg-bg-subtle rounded-full">
-                <User size={19} className="stroke-[1.5]" />
-              </Link>
+  const location = useLocation();
+  
+  // Scope: Customer-facing pages only. Avoid admin portal and logins.
+  const isCustomerPage = !location.pathname.startsWith('/admin') && !['/login', '/signup', '/forgot-password'].includes(location.pathname);
 
-              {profile?.role === 'admin' && (
-                <Link to="/admin" aria-label="Admin Console" className="btn-icon p-2 hover:bg-bg-subtle rounded-full text-text-secondary">
-                  <Shield size={19} className="stroke-[1.5]" />
-                </Link>
-              )}
-
-              {session && (
-                <button
-                  onClick={signOut}
-                  aria-label="Sign Out"
-                  className="btn-icon p-2 hover:bg-bg-subtle rounded-full text-text-secondary hover:text-sale"
+  return (
+    <div className="min-h-screen bg-bg text-text-primary flex flex-col font-sans overflow-x-hidden w-full relative">
+      {/* Sticky Minimal Navigation with moving dark ambient gradient on customer-facing pages */}
+      <header className={`sticky top-0 z-50 transition-all duration-300 relative ${isCustomerPage ? 'ambient-green-gradient' : 'bg-white border-b border-border'}`}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          {/* Left Nav (Desktop) / Hamburger (Mobile) */}
+          <div className="flex items-center gap-6">
+            <button
+              onClick={() => setIsMobileMenuOpen(true)}
+              className={`btn-icon md:hidden p-2 rounded-full ${isCustomerPage ? 'hover:bg-white/10' : 'hover:bg-bg-subtle'}`}
+              aria-label="Toggle Menu"
+            >
+              <Menu size={20} className={`stroke-[1.5] ${isCustomerPage ? 'text-white' : 'text-text-primary'}`} />
+            </button>
+            {isCustomerPage && (
+              <nav className="hidden md:flex items-center gap-6">
+                <NavLink
+                  to="/shop"
+                  className={({ isActive }) =>
+                    `nav-item-header ${isActive ? 'active text-white' : 'text-white/70 hover:text-white'}`
+                  }
                 >
-                  <LogOut size={19} className="stroke-[1.5]" />
-                </button>
-              )}
-            </div>
-
-            {/* Right Icons (Mobile) */}
-            <div className="flex md:hidden items-center gap-2">
-              <button 
-                onClick={() => setIsCartOpen(true)}
-                aria-label="Cart" 
-                className="btn-icon p-2 hover:bg-bg-subtle rounded-full relative"
-              >
-                <ShoppingBag size={19} className="stroke-[1.5]" />
-                {cartCount > 0 && (
-                  <span className="absolute top-1.5 right-1.5 bg-accent text-white text-[8px] font-bold w-3.5 h-3.5 flex items-center justify-center rounded-full">
-                    {cartCount}
-                  </span>
-                )}
-              </button>
-            </div>
+                  Shop
+                </NavLink>
+                <NavLink
+                  to="/wishlist"
+                  className={({ isActive }) =>
+                    `nav-item-header ${isActive ? 'active text-white' : 'text-white/70 hover:text-white'}`
+                  }
+                >
+                  Wishlist
+                </NavLink>
+                <NavLink
+                  to="/account"
+                  className={({ isActive }) =>
+                    `nav-item-header ${isActive ? 'active text-white' : 'text-white/70 hover:text-white'}`
+                  }
+                >
+                  Account
+                </NavLink>
+              </nav>
+            )}
           </div>
-        </header>
+          {isCustomerPage && <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-accent-line" />}
 
-        {/* Mobile Sidebar Menu Drawer */}
-        <AnimatePresence>
-          {isMobileMenuOpen && (
-            <div className="fixed inset-0 z-50 md:hidden">
-              {/* Backdrop */}
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="fixed inset-0 bg-black/50 backdrop-blur-xs"
-              />
-              
-              {/* Menu Container */}
-              <motion.div 
-                initial={{ x: '-100%' }}
-                animate={{ x: 0 }}
-                exit={{ x: '-100%' }}
-                transition={{ type: 'tween', duration: 0.3 }}
-                className="fixed inset-y-0 left-0 w-80 max-w-[85vw] bg-white border-r border-border p-6 shadow-2xl flex flex-col justify-between"
+          {/* Center Logo */}
+          <div className="absolute left-1/2 transform -translate-x-1/2">
+            <Link to="/" className={`text-xl font-heading font-normal tracking-[0.2em] uppercase select-none transition-colors duration-200 ${isCustomerPage ? 'text-white hover:text-white' : 'text-text-primary hover:text-accent'}`}>
+              Zenphire
+            </Link>
+          </div>
+
+          {/* Right Icons (Desktop) */}
+          <div className="hidden md:flex items-center gap-4">
+            <button
+              onClick={() => setIsSearchOpen(true)}
+              aria-label="Search"
+              className={`btn-icon p-2 rounded-full transition-colors duration-200 ${isCustomerPage ? 'text-white hover:bg-white/10' : 'text-text-primary hover:bg-bg-subtle'}`}
+            >
+              <Search size={19} className="stroke-[1.5]" />
+            </button>
+
+            <Link
+              to="/wishlist"
+              aria-label="Wishlist"
+              className={`btn-icon p-2 rounded-full relative transition-colors duration-200 ${isCustomerPage ? 'text-white hover:bg-white/10' : 'text-text-primary hover:bg-bg-subtle'}`}
+            >
+              <Heart size={19} className="stroke-[1.5]" />
+              {wishlistCount > 0 && (
+                <span className={`absolute top-1.5 right-1.5 text-[8px] font-bold w-3.5 h-3.5 flex items-center justify-center rounded-full transition-all duration-300 ${isCustomerPage ? 'bg-white text-header-base' : 'bg-accent text-white'}`}>
+                  {wishlistCount}
+                </span>
+              )}
+            </Link>
+
+            <button
+              onClick={() => setIsCartOpen(true)}
+              aria-label="Cart"
+              className={`btn-icon p-2 rounded-full relative transition-colors duration-200 ${isCustomerPage ? 'text-white hover:bg-white/10' : 'text-text-primary hover:bg-bg-subtle'}`}
+            >
+              <ShoppingBag size={19} className="stroke-[1.5]" />
+              {cartCount > 0 && (
+                <span className={`absolute top-1.5 right-1.5 text-[8px] font-bold w-3.5 h-3.5 flex items-center justify-center rounded-full transition-all duration-300 ${isCustomerPage ? 'bg-white text-header-base' : 'bg-accent text-white'}`}>
+                  {cartCount}
+                </span>
+              )}
+            </button>
+
+            <Link
+              to="/account"
+              aria-label="Account"
+              className={`btn-icon p-2 rounded-full transition-colors duration-200 ${isCustomerPage ? 'text-white hover:bg-white/10' : 'text-text-primary hover:bg-bg-subtle'}`}
+            >
+              <User size={19} className="stroke-[1.5]" />
+            </Link>
+
+            {profile?.role === 'admin' && (
+              <Link
+                to="/admin"
+                aria-label="Admin Console"
+                className={`btn-icon p-2 rounded-full transition-colors duration-200 ${isCustomerPage ? 'text-white/70 hover:bg-white/10 hover:text-white' : 'text-text-secondary hover:bg-bg-subtle hover:text-text-primary'}`}
               >
-                <div className="space-y-8">
-                  {/* Header */}
-                  <div className="flex justify-between items-center pb-4 border-b border-border">
-                    <span className="text-lg font-heading font-black tracking-[0.2em] uppercase">
-                      Zenphire
-                    </span>
-                    <button 
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className="p-1 hover:bg-bg-subtle rounded-full text-text-secondary hover:text-text-primary"
-                    >
-                      <X size={20} />
-                    </button>
-                  </div>
+                <Shield size={19} className="stroke-[1.5]" />
+              </Link>
+            )}
 
-                  {/* Navigation Links */}
-                  <nav className="flex flex-col gap-6 text-sm font-bold uppercase tracking-wider text-text-primary">
-                    <Link 
-                      to="/shop" 
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className="hover:text-accent transition-colors flex items-center gap-2"
-                    >
-                      Shop Collection
-                    </Link>
-                    
-                    <button 
-                      onClick={() => {
-                        setIsMobileMenuOpen(false);
-                        setIsSearchOpen(true);
-                      }}
-                      className="text-left hover:text-accent transition-colors flex items-center gap-2 font-bold uppercase tracking-wider"
-                    >
-                      Search
-                    </button>
+            {session && (
+              <button
+                onClick={signOut}
+                aria-label="Sign Out"
+                className={`btn-icon p-2 rounded-full transition-colors duration-200 ${isCustomerPage ? 'text-white/70 hover:bg-white/10 hover:text-red-300' : 'text-text-secondary hover:bg-bg-subtle hover:text-sale'}`}
+              >
+                <LogOut size={19} className="stroke-[1.5]" />
+              </button>
+            )}
+          </div>
 
-                    <Link 
-                      to="/wishlist" 
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className="hover:text-accent transition-colors flex items-center justify-between"
-                    >
-                      <span>Wishlist</span>
-                      {wishlistCount > 0 && (
-                        <span className="bg-accent text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                          {wishlistCount}
-                        </span>
-                      )}
-                    </Link>
+          {/* Right Icons (Mobile) */}
+          <div className="flex md:hidden items-center gap-2">
+            <button
+              onClick={() => setIsCartOpen(true)}
+              aria-label="Cart"
+              className={`btn-icon p-2 rounded-full relative transition-colors duration-200 ${isCustomerPage ? 'text-white hover:bg-white/10' : 'text-text-primary hover:bg-bg-subtle'}`}
+            >
+              <ShoppingBag size={19} className="stroke-[1.5]" />
+              {cartCount > 0 && (
+                <span className={`absolute top-1.5 right-1.5 text-[8px] font-bold w-3.5 h-3.5 flex items-center justify-center rounded-full transition-all duration-300 ${isCustomerPage ? 'bg-white text-header-base' : 'bg-accent text-white'}`}>
+                  {cartCount}
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
+      </header>
 
-                    <Link 
-                      to="/account" 
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className="hover:text-accent transition-colors"
-                    >
-                      My Account
-                    </Link>
+      {/* Mobile Sidebar Menu Drawer */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <div className="fixed inset-0 z-50 md:hidden">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="fixed inset-0 bg-black/50 backdrop-blur-xs"
+            />
 
-                    {profile?.role === 'admin' && (
-                      <Link 
-                        to="/admin" 
-                        onClick={() => setIsMobileMenuOpen(false)}
-                        className="text-accent flex items-center gap-1.5"
-                      >
-                        <Shield size={14} /> Admin Console
-                      </Link>
-                    )}
-                  </nav>
+            {/* Menu Container */}
+            <motion.div
+              initial={{ x: '-100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '-100%' }}
+              transition={{ type: 'tween', duration: 0.3 }}
+              className="fixed inset-y-0 left-0 w-80 max-w-[85vw] bg-white border-r border-border p-6 shadow-2xl flex flex-col justify-between"
+            >
+              <div className="space-y-8">
+                {/* Header */}
+                <div className="flex justify-between items-center pb-4 border-b border-border">
+                  <span className="text-lg font-heading font-black tracking-[0.2em] uppercase">
+                    Zenphire
+                  </span>
+                  <button
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="p-1 hover:bg-bg-subtle rounded-full text-text-secondary hover:text-text-primary"
+                  >
+                    <X size={20} />
+                  </button>
                 </div>
 
-                {/* Footer / Sign Out */}
-                <div className="pt-6 border-t border-border">
-                  {session ? (
-                    <button
-                      onClick={() => {
-                        setIsMobileMenuOpen(false);
-                        signOut();
-                      }}
-                      className="w-full flex items-center justify-center gap-2 border border-sale text-sale py-3 text-xs font-bold uppercase tracking-widest hover:bg-sale/5 transition-colors"
-                    >
-                      <LogOut size={14} /> Sign Out
-                    </button>
-                  ) : (
-                    <Link 
-                      to="/account"
+                {/* Navigation Links */}
+                <nav className="flex flex-col gap-6 text-sm font-bold uppercase tracking-wider text-text-primary">
+                  <Link
+                    to="/shop"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="hover:text-accent transition-colors flex items-center gap-2"
+                  >
+                    Shop Collection
+                  </Link>
+
+                  <button
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      setIsSearchOpen(true);
+                    }}
+                    className="text-left hover:text-accent transition-colors flex items-center gap-2 font-bold uppercase tracking-wider"
+                  >
+                    Search
+                  </button>
+
+                  <Link
+                    to="/wishlist"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="hover:text-accent transition-colors flex items-center justify-between"
+                  >
+                    <span>Wishlist</span>
+                    {wishlistCount > 0 && (
+                      <span className="bg-accent text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                        {wishlistCount}
+                      </span>
+                    )}
+                  </Link>
+
+                  <Link
+                    to="/account"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="hover:text-accent transition-colors"
+                  >
+                    My Account
+                  </Link>
+
+                  {profile?.role === 'admin' && (
+                    <Link
+                      to="/admin"
                       onClick={() => setIsMobileMenuOpen(false)}
-                      className="btn btn-primary w-full flex items-center justify-center gap-2 bg-accent text-white py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-accent-hover"
+                      className="text-accent flex items-center gap-1.5"
                     >
-                      Sign In / Register
+                      <Shield size={14} /> Admin Console
                     </Link>
                   )}
-                </div>
+                </nav>
+              </div>
 
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>
+              {/* Footer / Sign Out */}
+              <div className="pt-6 border-t border-border">
+                {session ? (
+                  <button
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      signOut();
+                    }}
+                    className="w-full flex items-center justify-center gap-2 border border-sale text-sale py-3 text-xs font-bold uppercase tracking-widest hover:bg-sale/5 transition-colors"
+                  >
+                    <LogOut size={14} /> Sign Out
+                  </button>
+                ) : (
+                  <Link
+                    to="/account"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="btn btn-primary w-full flex items-center justify-center gap-2 bg-accent text-white py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-accent-hover"
+                  >
+                    Sign In / Register
+                  </Link>
+                )}
+              </div>
 
-        {/* Main Content Area */}
-        <main className="flex-grow">
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/shop" element={<Shop />} />
-            <Route path="/product/:id" element={
-              <ErrorBoundary>
-                <ProductDetail />
-              </ErrorBoundary>
-            } />
-            <Route path="/cart" element={<Cart />} />
-            
-            {/* Protected Checkout & Account */}
-            <Route 
-              path="/checkout" 
-              element={
-                <ProtectedRoute>
-                  <Checkout />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/account" 
-              element={
-                <ProtectedRoute>
-                  <Account />
-                </ProtectedRoute>
-              } 
-            />
-            <Route path="/onboarding" element={<Onboarding />} />
-            <Route path="/auth/callback" element={<AuthCallback />} />
-            
-            <Route path="/wishlist" element={<Wishlist />} />
-            
-            {/* Protected Admin Console */}
-            <Route 
-              path="/admin" 
-              element={
-                <ProtectedRoute allowedRoles={['admin']}>
-                  <Admin />
-                </ProtectedRoute>
-              } 
-            />
-            
-            {/* Auth Routes */}
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Signup />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-          </Routes>
-        </main>
-
-        {/* Footer */}
-        <footer className="bg-bg-subtle border-t border-border py-12 px-4 mt-auto">
-          <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div>
-              <h3 className="font-heading font-bold uppercase tracking-wider text-sm mb-4">Zenphire Collections</h3>
-              <p className="text-text-secondary text-sm max-w-xs leading-relaxed">
-                Premium modern apparel. Redefining minimal fashion for the everyday wardrobe.
-              </p>
-            </div>
-            <div>
-              <h3 className="font-heading font-bold uppercase tracking-wider text-sm mb-4">Customer Care</h3>
-              <ul className="space-y-2 text-sm text-text-secondary">
-                <li><Link to="/shop" className="hover:text-text-primary">Help & FAQ</Link></li>
-                <li><Link to="/shop" className="hover:text-text-primary">Shipping & Returns</Link></li>
-                <li><Link to="/shop" className="hover:text-text-primary">Size Guide</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-heading font-bold uppercase tracking-wider text-sm mb-4">Legal</h3>
-              <ul className="space-y-2 text-sm text-text-secondary">
-                <li><Link to="/shop" className="hover:text-text-primary">Privacy Policy</Link></li>
-                <li><Link to="/shop" className="hover:text-text-primary">Terms of Service</Link></li>
-              </ul>
-            </div>
+            </motion.div>
           </div>
-          <div className="max-w-7xl mx-auto mt-8 pt-8 border-t border-border flex justify-center items-center">
-            <p className="text-xs text-text-secondary text-center">
-              &copy; {new Date().getFullYear()} Zenphire Collections. All rights reserved.
+        )}
+      </AnimatePresence>
+
+      {/* Main Content Area */}
+      <main className="flex-grow">
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/shop" element={<Shop />} />
+          <Route path="/product/:id" element={
+            <ErrorBoundary>
+              <ProductDetail />
+            </ErrorBoundary>
+          } />
+          <Route path="/cart" element={<Cart />} />
+
+          {/* Protected Checkout & Account */}
+          <Route
+            path="/checkout"
+            element={
+              <ProtectedRoute>
+                <Checkout />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/account"
+            element={
+              <ProtectedRoute>
+                <Account />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
+
+          <Route path="/wishlist" element={<Wishlist />} />
+
+          {/* Protected Admin Console */}
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <Admin />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Auth Routes */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+        </Routes>
+      </main>
+
+      {/* Footer */}
+      <footer className="relative ambient-green-gradient border-t border-white/10 py-12 px-4 mt-auto">
+        {isCustomerPage && <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-accent-line" />}
+        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div>
+            <h3 className="font-heading font-bold uppercase tracking-wider text-sm mb-4 text-white">Zenphire Collections</h3>
+            <p className="text-white/70 text-sm max-w-xs leading-relaxed">
+              Premium modern apparel. Redefining minimal fashion for the everyday wardrobe.
             </p>
           </div>
-        </footer>
-        <SearchOverlay isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
-        <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
-      </div>
-    </Router>
+          <div>
+            <h3 className="font-heading font-bold uppercase tracking-wider text-sm mb-4 text-white">Customer Care</h3>
+            <ul className="space-y-2 text-sm text-white/70">
+              <li><Link to="/shop" className="hover:text-white transition-colors">Help & FAQ</Link></li>
+              <li><Link to="/shop" className="hover:text-white transition-colors">Shipping & Returns</Link></li>
+              <li><Link to="/shop" className="hover:text-white transition-colors">Size Guide</Link></li>
+            </ul>
+          </div>
+          <div>
+            <h3 className="font-heading font-bold uppercase tracking-wider text-sm mb-4 text-white">Legal</h3>
+            <ul className="space-y-2 text-sm text-white/70">
+              <li><Link to="/shop" className="hover:text-white transition-colors">Privacy Policy</Link></li>
+              <li><Link to="/shop" className="hover:text-white transition-colors">Terms of Service</Link></li>
+            </ul>
+          </div>
+        </div>
+        <div className="max-w-7xl mx-auto mt-8 pt-8 border-t border-white/10 flex justify-center items-center">
+          <p className="text-xs text-white/50 text-center">
+            &copy; {new Date().getFullYear()} Zenphire Collections. All rights reserved.
+          </p>
+        </div>
+      </footer>
+      <SearchOverlay isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+      <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
+    </div>
   );
 }

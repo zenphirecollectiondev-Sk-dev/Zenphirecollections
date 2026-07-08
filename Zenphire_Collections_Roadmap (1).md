@@ -79,6 +79,28 @@ Souled Store's site works because it gets out of the way of the product photogra
 --color-sale: #C0392B            /* used sparingly — only for discounts/sale tags */
 ```
 
+### Dark Ambient Moving Gradient Header (Customer-Facing Header Only)
+```
+--color-header-base: #00221A       /* near-black deep forest green, primary anchor */
+--color-header-mid: #063A2C        /* slightly lighter stop for gradient depth */
+--color-header-deep: #001510       /* near-pure black stop, deepest point */
+--color-header-text: #E8EDE9       /* soft off-white, NOT pure white — for legibility with warmth */
+--color-header-text-muted: #7A8A82  /* muted sage-grey for inactive nav items */
+```
+
+### Heading Visual Accent & Gold Tokens (Additive)
+```
+--color-heading-primary-start: #00221A   /* matches header base */
+--color-heading-primary-mid: #063A2C     /* matches header mid */
+--color-heading-primary-end: #00221A     /* matches header base for loop */
+--color-heading-secondary: #B8975A       /* muted gold, static — matches accent gold */
+```
+
+**Heading Utility Classes:**
+- `.heading-primary`: Applied to Heading 1 / main titles. Features a slow animated text-fill gradient using the heading-primary-start/mid/end variables. Automatically falls back to a solid `--color-heading-primary-mid` color in browsers without text-clip support or when `prefers-reduced-motion: reduce` is detected.
+- `.subheading-primary`: Applied to Sub Heading 1 / secondary titles. Renders as a static, visually quiet muted gold (`#B8975A`).
+
+
 ### Typography — new, minimal, clean pairing
 
 Skip the overused Inter-everywhere look. For a fashion-forward minimal store, use a font with more personality in the geometry while staying clean:

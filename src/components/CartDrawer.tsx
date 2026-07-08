@@ -52,7 +52,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
               <p className="text-text-secondary font-medium text-sm">Your shopping cart is empty.</p>
               <button
                 onClick={onClose}
-                className="btn btn-primary bg-accent text-white px-6 py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-accent-hover"
+                className="btn btn-primary px-6 py-3 text-[10px] font-bold uppercase tracking-widest"
               >
                 Continue Shopping
               </button>
@@ -67,7 +67,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                     alt={item.name}
                     className="w-20 aspect-[3/4] object-cover object-center bg-bg-subtle border border-border flex-shrink-0"
                   />
-                  
+
                   {/* Item Details */}
                   <div className="flex-1 flex flex-col justify-between">
                     <div>
@@ -125,7 +125,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
               <span className="text-sm font-semibold uppercase tracking-wider text-text-secondary">Subtotal</span>
               <span className="text-xl font-bold text-text-primary">₹{subtotal.toFixed(2)}</span>
             </div>
-            
+
             <p className="text-[11px] text-text-secondary text-center leading-relaxed">
               Shipping & taxes are calculated at checkout.
             </p>
@@ -134,7 +134,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
               <Link
                 to="/checkout"
                 onClick={onClose}
-                className="btn btn-primary block w-full bg-accent text-white py-4 font-bold uppercase text-[10px] tracking-widest hover:bg-accent-hover text-center"
+                className="btn btn-primary block w-full py-4 font-bold uppercase text-[10px] tracking-widest text-center"
               >
                 Proceed to Checkout
               </Link>

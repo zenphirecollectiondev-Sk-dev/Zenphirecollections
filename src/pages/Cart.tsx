@@ -30,7 +30,7 @@ export default function Cart() {
           </p>
           <Link
             to="/shop"
-            className="btn btn-primary inline-flex items-center gap-2 bg-accent text-white px-6 py-3 text-xs font-bold uppercase tracking-widest hover:bg-accent-hover"
+            className="btn btn-primary inline-flex items-center gap-2 px-6 py-3 text-xs font-bold uppercase tracking-widest"
           >
             Explore Catalog <ArrowRight size={13} />
           </Link>
@@ -137,7 +137,7 @@ export default function Cart() {
                     Tip: Add ₹{(1000 - subtotal).toFixed(2)} more to unlock free shipping.
                   </p>
                 )}
-                
+
                 <div className="flex justify-between items-baseline pt-4 border-t border-border">
                   <span className="font-heading font-bold uppercase text-xs tracking-wider">Total</span>
                   <span className="text-xl font-bold text-text-primary">₹{total.toFixed(2)}</span>
@@ -147,7 +147,7 @@ export default function Cart() {
               <div className="pt-2">
                 <Link
                   to="/checkout"
-                  className="btn btn-primary block w-full bg-accent text-white py-4 font-bold uppercase text-[10px] tracking-widest hover:bg-accent-hover text-center"
+                  className="btn btn-primary block w-full py-4 font-bold uppercase text-[10px] tracking-widest text-center"
                 >
                   Proceed to Checkout
                 </Link>

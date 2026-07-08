@@ -5,7 +5,7 @@ import heroBanner from '../assets/hero_banner.png';
 import { useWishlistStore } from '../store/useWishlistStore';
 import { getActiveProducts, getCategories, supabase } from '../lib/supabase';
 
-import linenShirt    from '../assets/product_linen_shirt.png';
+import linenShirt from '../assets/product_linen_shirt.png';
 import minimalJacket from '../assets/product_minimal_jacket.png';
 import tailoredPants from '../assets/product_tailored_pants.png';
 import categoryFemale from '../assets/category_female_fashion.png';
@@ -13,20 +13,21 @@ import categoryFemale from '../assets/category_female_fashion.png';
 // Image pool cycled per category index
 const CATEGORY_IMAGES = [linenShirt, categoryFemale, minimalJacket, tailoredPants];
 
-// Gender collection cards for horizontal scroll
-const genderCollections = [
-  { id: 'men',    name: 'Men',    image: linenShirt,      link: '/shop?gender=male'   },
-  { id: 'women',  name: 'Women',  image: categoryFemale,  link: '/shop?gender=female' },
-  { id: 'unisex', name: 'Unisex', image: minimalJacket,   link: '/shop?gender=unisex' },
-];
-
 export default function Home() {
   const { toggleWishlist, isWishlisted } = useWishlistStore();
-  const [products,   setProducts]   = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
-  const [loading,    setLoading]    = useState(true);
-  const [heartId,    setHeartId]    = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [heartId, setHeartId] = useState<string | null>(null);
   const [homepageConfig, setHomepageConfig] = useState<any | null>(null);
+
+  const genderCollections = useMemo(() => {
+    return [
+      { id: 'men', name: 'Men', image: homepageConfig?.men_collection_image_url || linenShirt, link: '/shop?gender=male' },
+      { id: 'women', name: 'Women', image: homepageConfig?.women_collection_image_url || categoryFemale, link: '/shop?gender=female' },
+      { id: 'unisex', name: 'Unisex', image: homepageConfig?.unisex_collection_image_url || minimalJacket, link: '/shop?gender=unisex' },
+    ];
+  }, [homepageConfig]);
 
   useEffect(() => {
     async function load() {
@@ -34,7 +35,7 @@ export default function Home() {
         const [prodData, catData] = await Promise.all([getActiveProducts(), getCategories()]);
         setProducts(prodData || []);
         setCategories((catData || []).filter((c: any) => !c.parent_category_id));
-        
+
         // Fetch homepage config gracefully
         try {
           const { data, error } = await supabase
@@ -104,7 +105,7 @@ export default function Home() {
 
       {/* ── 1. HERO (EDITORIAL OVERLAY ON MOBILE / SPLIT ON DESKTOP) ── */}
       <section className="relative bg-[#F4F4F4] h-[75vh] md:h-[80vh] flex flex-col md:flex-row items-stretch overflow-hidden border-b border-border">
-        
+
         {/* Left Content Column
             Mobile: Absolute overlay aligned to the bottom (last 25-30%)
             Desktop: Side-by-side flex column
@@ -116,15 +117,15 @@ export default function Home() {
               Raw <span className="font-semibold block font-heading tracking-wide text-white md:text-text-primary">Textures</span>
               Minimal <span className="italic block font-serif tracking-normal text-white/90 md:text-text-secondary">Form</span>
             </h1>
-            
+
             <p className="hidden sm:block text-xs md:text-sm text-white/80 md:text-text-secondary leading-relaxed max-w-sm font-sans tracking-wide">
               Organic fabrics, artisan weaves, and relaxed silhouettes designed to stand the test of time. Embodying the true essence of modern simplicity.
             </p>
-            
+
             <div className="pt-2 md:pt-4">
               <Link
                 to="/shop"
-                className="btn bg-white text-text-primary px-8 py-3.5 text-xs font-bold uppercase tracking-widest hover:bg-white/90 md:bg-text-primary md:text-white md:hover:bg-accent transition-all duration-300 shadow-xs inline-flex items-center gap-2 group"
+                className="btn ambient-green-gradient text-white px-8 py-3.5 text-xs font-bold uppercase tracking-widest hover:opacity-90 transition-all duration-300 shadow-xs inline-flex items-center gap-2 group"
               >
                 Discover Form
                 <ArrowRight size={12} className="transition-transform duration-300 group-hover:translate-x-1" />
@@ -145,11 +146,11 @@ export default function Home() {
             style={{ objectPosition: homepageConfig?.hero_image_position || 'center' }}
           />
           {/* Curved radial vignette overlay on mobile bottom section (last 35% height), sweeping curve with soft polished edges */}
-          <div 
+          <div
             className="absolute bottom-0 left-0 right-0 h-[40%] md:hidden pointer-events-none z-10"
-            style={{ 
-              background: 'radial-gradient(160% 140% at 50% 135%, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.6) 40%, rgba(0,0,0,0.25) 70%, rgba(0,0,0,0) 100%)' 
-            }} 
+            style={{
+              background: 'radial-gradient(160% 140% at 50% 135%, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.6) 40%, rgba(0,0,0,0.25) 70%, rgba(0,0,0,0) 100%)'
+            }}
           />
         </div>
       </section>
@@ -158,8 +159,8 @@ export default function Home() {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 anim-fade-up">
         <div className="flex justify-between items-end mb-8">
           <div>
-            <p className="text-[10px] uppercase tracking-[0.25em] text-text-secondary font-bold">Curated Wardrobe</p>
-            <h2 className="text-2xl md:text-3xl font-heading font-black uppercase mt-1">Gender Collections</h2>
+            <p className="text-[10px] uppercase tracking-[0.25em] subheading-primary font-bold">Curated Wardrobe</p>
+            <h2 className="heading-primary text-2xl md:text-3xl font-heading font-black uppercase mt-1 inline-block border-b-2 border-header-mid pb-1">Gender Collections</h2>
           </div>
           <Link to="/shop" className="nav-link text-xs font-semibold uppercase tracking-widest text-text-secondary hover:text-text-primary inline-flex items-center gap-1.5">
             View All <ArrowRight size={12} />
@@ -177,6 +178,7 @@ export default function Home() {
               <div className="relative aspect-[4/5] bg-bg-subtle overflow-hidden border border-border">
                 <img src={col.image} alt={col.name} className="card-img w-full h-full object-cover object-center" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+                <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-accent-line scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
                 <div className="absolute bottom-5 left-5 text-white">
                   <p className="text-base font-heading font-bold tracking-widest uppercase">{col.name}</p>
                   <p className="card-overlay text-[10px] tracking-wider opacity-80 uppercase inline-flex items-center gap-1 mt-0.5">
@@ -194,8 +196,8 @@ export default function Home() {
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 border-t border-border anim-fade-up">
           <div className="flex justify-between items-end mb-8">
             <div>
-              <p className="text-[10px] uppercase tracking-[0.25em] text-text-secondary font-bold">Browse Catalog</p>
-              <h2 className="text-2xl font-heading font-black uppercase mt-1">Shop by Category</h2>
+              <p className="text-[10px] uppercase tracking-[0.25em] subheading-primary font-bold">Browse Catalog</p>
+              <h2 className="heading-primary text-2xl font-heading font-black uppercase mt-1 inline-block border-b-2 border-header-mid pb-1">Shop by Category</h2>
             </div>
             <Link to="/shop" className="nav-link text-xs font-semibold uppercase tracking-widest text-text-secondary hover:text-text-primary inline-flex items-center gap-1.5">
               All <ArrowRight size={12} />
@@ -211,12 +213,13 @@ export default function Home() {
                 {/* Background image */}
                 <div className="aspect-[4/5] relative overflow-hidden">
                   <img
-                    src={CATEGORY_IMAGES[idx % CATEGORY_IMAGES.length]}
+                    src={cat.image_url || CATEGORY_IMAGES[idx % CATEGORY_IMAGES.length]}
                     alt={cat.name}
                     className="card-img w-full h-full object-cover object-center"
                   />
                   {/* Gradient overlay — always present, stronger at bottom */}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                  <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-accent-line scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
                   {/* Category label */}
                   <div className="absolute bottom-0 left-0 right-0 p-5 text-center">
                     <p className="text-[9px] uppercase tracking-[0.2em] text-white/50 font-semibold mb-1.5">Collection</p>
@@ -241,8 +244,8 @@ export default function Home() {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 border-t border-border anim-fade-up">
         <div className="flex justify-between items-end mb-8">
           <div>
-            <p className="text-[10px] uppercase tracking-[0.25em] text-text-secondary font-bold">Just Released</p>
-            <h2 className="text-2xl md:text-3xl font-heading font-black uppercase mt-1">New Arrivals</h2>
+            <p className="text-[10px] uppercase tracking-[0.25em] subheading-primary font-bold">Just Released</p>
+            <h2 className="heading-primary text-2xl md:text-3xl font-heading font-black uppercase mt-1 inline-block border-b-2 border-header-mid pb-1">New Arrivals</h2>
           </div>
           <Link to="/shop" className="nav-link text-xs font-semibold uppercase tracking-widest text-text-secondary hover:text-text-primary inline-flex items-center gap-1.5">
             All <ArrowRight size={12} />
@@ -265,6 +268,7 @@ export default function Home() {
                       alt={product.name}
                       className="card-img w-full h-full object-cover object-center"
                     />
+                    <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-accent-line scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
                     <div className="absolute top-2 left-2 bg-text-primary text-white text-[8px] font-black uppercase tracking-[0.2em] px-2 py-0.5">
                       New
                     </div>
@@ -300,6 +304,7 @@ export default function Home() {
                       alt={newArrivals[0].name}
                       className="card-img w-full h-full object-cover object-center"
                     />
+                    <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-accent-line scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
                     <div className="absolute top-3 left-3 bg-text-primary text-white text-[8px] font-black uppercase tracking-[0.2em] px-2.5 py-1">New</div>
                     <button
                       onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleWishlist(newArrivals[0].id); }}
@@ -325,6 +330,7 @@ export default function Home() {
                       alt={product.name}
                       className="card-img w-full h-full object-cover object-center"
                     />
+                    <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-accent-line scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
                     <div className="absolute top-2 left-2 bg-text-primary text-white text-[8px] font-black uppercase tracking-[0.2em] px-2 py-0.5">New</div>
                     <button
                       onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleWishlist(product.id); }}
@@ -349,8 +355,8 @@ export default function Home() {
       <section className="bg-bg-subtle border-y border-border py-20 my-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
           <div className="space-y-5 anim-fade-up">
-            <p className="text-[10px] uppercase tracking-[0.25em] text-text-secondary font-bold">The Edit</p>
-            <h2 className="text-3xl md:text-5xl font-heading font-black uppercase leading-tight">
+            <p className="text-[10px] uppercase tracking-[0.25em] subheading-primary font-bold">The Edit</p>
+            <h2 className="heading-primary text-3xl md:text-5xl font-heading font-black uppercase leading-tight">
               Honest Materials,<br />Artisan Craft
             </h2>
             <p className="text-sm text-text-secondary leading-relaxed max-w-md">
@@ -359,7 +365,7 @@ export default function Home() {
             <Link
               to="/shop"
               onClick={() => window.scrollTo({ top: 0, behavior: 'instant' })}
-              className="btn btn-primary inline-flex items-center gap-2 bg-accent text-white px-7 py-3 text-xs font-bold uppercase tracking-widest hover:bg-accent-hover"
+              className="btn btn-primary inline-flex items-center gap-2 px-7 py-3 text-xs font-bold uppercase tracking-widest"
             >
               Discover Collection <ArrowRight size={13} />
             </Link>
@@ -380,8 +386,8 @@ export default function Home() {
         <section className="py-14 mb-12 border-t border-border anim-fade-up">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-end mb-10">
             <div>
-              <p className="text-[10px] uppercase tracking-[0.25em] text-text-secondary font-bold">Customer Favorites</p>
-              <h2 className="text-2xl md:text-3xl font-heading font-black uppercase mt-1">Best Sellers</h2>
+              <p className="text-[10px] uppercase tracking-[0.25em] subheading-primary font-bold">Customer Favorites</p>
+              <h2 className="heading-primary text-2xl md:text-3xl font-heading font-black uppercase mt-1 inline-block border-b-2 border-header-mid pb-1">Best Sellers</h2>
             </div>
             <Link to="/shop" className="nav-link text-xs font-semibold uppercase tracking-widest text-text-secondary hover:text-text-primary inline-flex items-center gap-1.5">
               Shop All <ArrowRight size={12} />
@@ -410,6 +416,7 @@ export default function Home() {
                       alt={product.name}
                       className="card-img w-full h-full object-cover object-center"
                     />
+                    <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-accent-line scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
                     <button
                       onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleWishlist(product.id); }}
                       aria-label="Toggle Wishlist"

@@ -200,7 +200,7 @@ export default function Onboarding() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-accent text-white py-4 font-bold uppercase text-xs tracking-widest hover:bg-accent-hover transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+            className="btn btn-primary w-full py-4 font-bold uppercase text-xs tracking-widest flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {loading ? 'Saving details...' : 'Finish Setup'} <ArrowRight size={14} />
           </button>

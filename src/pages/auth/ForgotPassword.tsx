@@ -8,7 +8,7 @@ export default function ForgotPassword() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  
+
   const navigate = useNavigate();
   const { session } = useAuthStore();
 
@@ -66,7 +66,7 @@ export default function ForgotPassword() {
             </div>
             <Link
               to="/login"
-              className="inline-block bg-accent text-white px-6 py-3 font-medium uppercase text-sm tracking-wider hover:bg-accent-hover transition-colors"
+              className="btn btn-primary inline-block px-6 py-3 font-medium uppercase text-sm tracking-wider"
             >
               Back to Sign In
             </Link>
@@ -92,7 +92,7 @@ export default function ForgotPassword() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-accent text-white py-3 font-medium uppercase text-sm tracking-wider hover:bg-accent-hover transition-colors disabled:bg-text-secondary disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="btn btn-primary w-full py-3 font-medium uppercase text-sm tracking-wider disabled:bg-text-secondary disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading ? (
                 <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>

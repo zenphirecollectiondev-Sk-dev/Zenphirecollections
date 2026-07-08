@@ -54,6 +54,7 @@ interface Category {
   slug: string;
   parent_category_id: string | null;
   size_guide_html: string | null;
+  image_url: string | null;
 }
 
 
@@ -134,6 +135,8 @@ export default function Admin() {
   const [catSlug, setCatSlug] = useState('');
   const [catParent, setCatParent] = useState('');
   const [catSizeGuide, setCatSizeGuide] = useState('');
+  const [catImageUrl, setCatImageUrl] = useState('');
+  const [isUploadingCategory, setIsUploadingCategory] = useState(false);
 
   // Inventory inline edit state
   const [inlineEditStock, setInlineEditStock] = useState<Record<string, number>>({});
@@ -173,9 +176,15 @@ export default function Admin() {
   const [theEditImagePosition, setTheEditImagePosition] = useState('center');
   const [bestSellersIds, setBestSellersIds] = useState<string[]>([]);
   const [newArrivalsIds, setNewArrivalsIds] = useState<string[]>([]);
+  const [menImageUrl, setMenImageUrl] = useState('');
+  const [womenImageUrl, setWomenImageUrl] = useState('');
+  const [unisexImageUrl, setUnisexImageUrl] = useState('');
   const [isSavingHomepage, setIsSavingHomepage] = useState(false);
   const [isUploadingHero, setIsUploadingHero] = useState(false);
   const [isUploadingTheEdit, setIsUploadingTheEdit] = useState(false);
+  const [isUploadingMen, setIsUploadingMen] = useState(false);
+  const [isUploadingWomen, setIsUploadingWomen] = useState(false);
+  const [isUploadingUnisex, setIsUploadingUnisex] = useState(false);
 
   const [heroDragActive, setHeroDragActive] = useState(false);
   const [theEditDragActive, setTheEditDragActive] = useState(false);
@@ -389,6 +398,9 @@ ${titleHtml}  <thead>
           setTheEditImagePosition(hpData.the_edit_image_position || 'center');
           setBestSellersIds(hpData.best_sellers_ids || []);
           setNewArrivalsIds(hpData.new_arrivals_ids || []);
+          setMenImageUrl(hpData.men_collection_image_url || '');
+          setWomenImageUrl(hpData.women_collection_image_url || '');
+          setUnisexImageUrl(hpData.unisex_collection_image_url || '');
         }
       } catch (hErr) {
         console.warn('homepage_config table fetch failed or not yet created. Using defaults.', hErr);
@@ -568,7 +580,10 @@ ${titleHtml}  <thead>
   }, [products, newArrivalsSearch, newArrivalsIds]);
 
   // Handle local image upload to Supabase Storage with Base64 fallback
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'hero' | 'edit') => {
+  const handleImageUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    type: 'hero' | 'edit' | 'men' | 'women' | 'unisex' | 'category'
+  ) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -577,8 +592,30 @@ ${titleHtml}  <thead>
       return;
     }
 
-    const setLoader = type === 'hero' ? setIsUploadingHero : setIsUploadingTheEdit;
+    const setLoader = 
+      type === 'hero' ? setIsUploadingHero : 
+      type === 'edit' ? setIsUploadingTheEdit :
+      type === 'men' ? setIsUploadingMen :
+      type === 'women' ? setIsUploadingWomen :
+      type === 'unisex' ? setIsUploadingUnisex :
+      setIsUploadingCategory;
     setLoader(true);
+
+    const assignUrl = (url: string) => {
+      if (type === 'hero') setHeroImageUrl(url);
+      else if (type === 'edit') setTheEditImageUrl(url);
+      else if (type === 'men') setMenImageUrl(url);
+      else if (type === 'women') setWomenImageUrl(url);
+      else if (type === 'unisex') setUnisexImageUrl(url);
+      else if (type === 'category') setCatImageUrl(url);
+    };
+
+    const readableName = 
+      type === 'hero' ? 'Hero' :
+      type === 'edit' ? 'The Edit' :
+      type === 'men' ? 'Men Collection' :
+      type === 'women' ? 'Women Collection' :
+      type === 'unisex' ? 'Unisex Collection' : 'Category';
 
     try {
       const fileExt = file.name.split('.').pop();
@@ -600,25 +637,16 @@ ${titleHtml}  <thead>
         .from('homepage-assets')
         .getPublicUrl(filePath);
 
-      if (type === 'hero') {
-        setHeroImageUrl(publicUrl);
-      } else {
-        setTheEditImageUrl(publicUrl);
-      }
-      
-      triggerNotification(`${type === 'hero' ? 'Hero' : 'The Edit'} image uploaded successfully!`);
+      assignUrl(publicUrl);
+      triggerNotification(`${readableName} image uploaded successfully!`);
     } catch (err: any) {
       console.warn('Storage bucket upload failed, using Data URL fallback.', err);
       // Data URL fallback if bucket doesn't exist
       const reader = new FileReader();
       reader.onload = (uploadEvent) => {
         const base64 = uploadEvent.target?.result as string;
-        if (type === 'hero') {
-          setHeroImageUrl(base64);
-        } else {
-          setTheEditImageUrl(base64);
-        }
-        triggerNotification(`${type === 'hero' ? 'Hero' : 'The Edit'} image loaded locally.`);
+        assignUrl(base64);
+        triggerNotification(`${readableName} image loaded locally.`);
       };
       reader.readAsDataURL(file);
     } finally {
@@ -682,6 +710,9 @@ ${titleHtml}  <thead>
           the_edit_image_position: theEditImagePosition,
           best_sellers_ids: bestSellersIds,
           new_arrivals_ids: newArrivalsIds,
+          men_collection_image_url: menImageUrl.trim() || null,
+          women_collection_image_url: womenImageUrl.trim() || null,
+          unisex_collection_image_url: unisexImageUrl.trim() || null,
           updated_at: new Date().toISOString()
         });
       if (error) throw error;
@@ -971,6 +1002,7 @@ ${titleHtml}  <thead>
     setCatSlug(cat.slug);
     setCatParent(cat.parent_category_id || '');
     setCatSizeGuide(cat.size_guide_html || '');
+    setCatImageUrl(cat.image_url || '');
     setIsCategoryModalOpen(true);
   };
 
@@ -981,6 +1013,7 @@ ${titleHtml}  <thead>
     setCatSlug('');
     setCatParent('');
     setCatSizeGuide('');
+    setCatImageUrl('');
     setIsCategoryModalOpen(true);
   };
 
@@ -997,7 +1030,8 @@ ${titleHtml}  <thead>
         name: catName.trim(),
         slug: catSlug.trim() || generateSlug(catName),
         parent_category_id: catParent || null,
-        size_guide_html: catSizeGuide.trim() || null
+        size_guide_html: catSizeGuide.trim() || null,
+        image_url: catImageUrl.trim() || null
       };
 
       if (editingCategory) {
@@ -1506,6 +1540,7 @@ ${titleHtml}  <thead>
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
                       <tr className="border-b border-border text-[9px] uppercase tracking-wider text-text-secondary">
+                        <th className="py-2.5 w-14">Image</th>
                         <th className="py-2.5">Category Name</th>
                         <th className="py-2.5">Slug</th>
                         <th className="py-2.5">Size Guide</th>
@@ -1515,6 +1550,13 @@ ${titleHtml}  <thead>
                     <tbody className="divide-y divide-border">
                       {categories.map((c) => (
                         <tr key={c.id} className="hover:bg-bg-subtle">
+                          <td className="py-3">
+                            {c.image_url ? (
+                              <img src={c.image_url} alt={c.name} className="w-8 h-10 object-cover border border-border bg-bg-subtle" />
+                            ) : (
+                              <span className="text-[10px] text-text-secondary/70 italic">None</span>
+                            )}
+                          </td>
                           <td className="py-3 font-bold text-text-primary uppercase tracking-wide text-[11px]">{c.name}</td>
                           <td className="py-3 font-mono text-[10px] text-text-secondary">{c.slug}</td>
                           <td className="py-3 text-[10px]">
@@ -2199,6 +2241,125 @@ ${titleHtml}  <thead>
                         </div>
                       )}
                     </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Gender Mockups block */}
+              <div className="border-t border-border pt-6 space-y-6">
+                <h3 className="text-xs font-heading font-black uppercase tracking-wider text-text-primary">
+                  Gender Collection Mockup Banners
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Men Collection image */}
+                  <div className="space-y-3">
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
+                      Men Collection Image File
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      disabled={isUploadingMen}
+                      onChange={(e) => handleImageUpload(e, 'men')}
+                      className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent file:mr-4 file:py-1 file:px-2 file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
+                    />
+                    {isUploadingMen && (
+                      <span className="text-[9px] text-text-secondary mt-1 block font-bold animate-pulse">
+                        Uploading image file...
+                      </span>
+                    )}
+                    {menImageUrl ? (
+                      <div className="space-y-2">
+                        <div className="aspect-[4/5] bg-bg-subtle relative overflow-hidden border border-border">
+                          <img src={menImageUrl} alt="Men Preview" className="w-full h-full object-cover" />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setMenImageUrl('')}
+                          className="text-[10px] text-sale font-bold hover:underline cursor-pointer flex items-center gap-1"
+                        >
+                          <X size={10} className="stroke-[2]" /> Clear Image
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="aspect-[4/5] border border-border bg-bg-subtle flex items-center justify-center text-[10px] text-text-secondary/70 italic font-semibold rounded-none">
+                        No Men mockup loaded
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Women Collection image */}
+                  <div className="space-y-3">
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
+                      Women Collection Image File
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      disabled={isUploadingWomen}
+                      onChange={(e) => handleImageUpload(e, 'women')}
+                      className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent file:mr-4 file:py-1 file:px-2 file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
+                    />
+                    {isUploadingWomen && (
+                      <span className="text-[9px] text-text-secondary mt-1 block font-bold animate-pulse">
+                        Uploading image file...
+                      </span>
+                    )}
+                    {womenImageUrl ? (
+                      <div className="space-y-2">
+                        <div className="aspect-[4/5] bg-bg-subtle relative overflow-hidden border border-border">
+                          <img src={womenImageUrl} alt="Women Preview" className="w-full h-full object-cover" />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setWomenImageUrl('')}
+                          className="text-[10px] text-sale font-bold hover:underline cursor-pointer flex items-center gap-1"
+                        >
+                          <X size={10} className="stroke-[2]" /> Clear Image
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="aspect-[4/5] border border-border bg-bg-subtle flex items-center justify-center text-[10px] text-text-secondary/70 italic font-semibold rounded-none">
+                        No Women mockup loaded
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Unisex Collection image */}
+                  <div className="space-y-3">
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
+                      Unisex Collection Image File
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      disabled={isUploadingUnisex}
+                      onChange={(e) => handleImageUpload(e, 'unisex')}
+                      className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent file:mr-4 file:py-1 file:px-2 file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
+                    />
+                    {isUploadingUnisex && (
+                      <span className="text-[9px] text-text-secondary mt-1 block font-bold animate-pulse">
+                        Uploading image file...
+                      </span>
+                    )}
+                    {unisexImageUrl ? (
+                      <div className="space-y-2">
+                        <div className="aspect-[4/5] bg-bg-subtle relative overflow-hidden border border-border">
+                          <img src={unisexImageUrl} alt="Unisex Preview" className="w-full h-full object-cover" />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setUnisexImageUrl('')}
+                          className="text-[10px] text-sale font-bold hover:underline cursor-pointer flex items-center gap-1"
+                        >
+                          <X size={10} className="stroke-[2]" /> Clear Image
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="aspect-[4/5] border border-border bg-bg-subtle flex items-center justify-center text-[10px] text-text-secondary/70 italic font-semibold rounded-none">
+                        No Unisex mockup loaded
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -3033,6 +3194,43 @@ ${titleHtml}  <thead>
                         <option key={c.id} value={c.id}>{c.name}</option>
                       ))}
                   </select>
+                </div>
+
+                {/* Category Cover Image */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
+                    Category Cover Image
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    disabled={isUploadingCategory}
+                    onChange={(e) => handleImageUpload(e, 'category')}
+                    className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent file:mr-4 file:py-1 file:px-2 file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
+                  />
+                  {isUploadingCategory && (
+                    <span className="text-[9px] text-text-secondary mt-1 block font-bold animate-pulse">
+                      Uploading image file...
+                    </span>
+                  )}
+                  {catImageUrl ? (
+                    <div className="mt-2 space-y-2">
+                      <div className="w-24 aspect-[4/5] bg-bg-subtle relative overflow-hidden border border-border">
+                        <img src={catImageUrl} alt="Category Preview" className="w-full h-full object-cover" />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setCatImageUrl('')}
+                        className="text-[10px] text-sale font-bold hover:underline cursor-pointer flex items-center gap-1"
+                      >
+                        <X size={10} className="stroke-[2]" /> Clear Cover Image
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="text-[9px] text-text-secondary mt-1 block font-semibold">
+                      Upload a cover image representing this category (used for storefront catalog grids).
+                    </span>
+                  )}
                 </div>
 
                 {/* Category size guide html */}

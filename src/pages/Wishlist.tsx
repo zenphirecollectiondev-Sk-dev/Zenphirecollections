@@ -61,7 +61,7 @@ export default function Wishlist() {
           </p>
           <Link
             to="/shop"
-            className="btn btn-primary inline-flex items-center gap-2 bg-accent text-white px-6 py-3 text-xs font-bold uppercase tracking-widest hover:bg-accent-hover"
+            className="btn btn-primary inline-flex items-center gap-2 px-6 py-3 text-xs font-bold uppercase tracking-widest"
           >
             Start Shopping <ArrowRight size={13} />
           </Link>
@@ -78,6 +78,7 @@ export default function Wishlist() {
                     className="card-img w-full h-full object-cover object-center"
                   />
                 </Link>
+                <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-accent-line scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
                 <button
                   onClick={() => toggleWishlist(product.id)}
                   aria-label="Remove from wishlist"

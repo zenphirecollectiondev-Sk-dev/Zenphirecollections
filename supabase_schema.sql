@@ -453,3 +453,47 @@ CREATE POLICY "Allow public read access to courier partners"
 CREATE POLICY "Allow admin full access to courier partners"
   ON public.courier_partners FOR ALL
   USING (public.is_admin());
+
+
+-- -------------------------------------------------------------
+-- MIGRATION UPGRADES (HOMEPAGE CONFIG & CATEGORIES VISUALS)
+-- -------------------------------------------------------------
+
+-- Create table for homepage configurations (banners, custom selected highlights, gender collections)
+CREATE TABLE IF NOT EXISTS public.homepage_config (
+  id text PRIMARY KEY DEFAULT 'global',
+  hero_image_url text,
+  hero_image_position text DEFAULT 'center',
+  the_edit_image_url text,
+  the_edit_image_position text DEFAULT 'center',
+  best_sellers_ids text[],
+  new_arrivals_ids text[],
+  men_collection_image_url text,
+  women_collection_image_url text,
+  unisex_collection_image_url text,
+  updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS for homepage_config
+ALTER TABLE public.homepage_config ENABLE ROW LEVEL SECURITY;
+
+-- Policies for homepage config (Everyone read; Admins write/manage)
+DROP POLICY IF EXISTS "Allow public read access to homepage_config" ON public.homepage_config;
+CREATE POLICY "Allow public read access to homepage_config"
+  ON public.homepage_config FOR SELECT
+  USING (true);
+
+DROP POLICY IF EXISTS "Allow admin full access to homepage_config" ON public.homepage_config;
+CREATE POLICY "Allow admin full access to homepage_config"
+  ON public.homepage_config FOR ALL
+  USING (public.is_admin());
+
+-- Alter categories table to support custom mockup images
+ALTER TABLE public.categories
+ADD COLUMN IF NOT EXISTS image_url text;
+
+-- Migration to alter existing homepage_config table if columns don't exist
+ALTER TABLE public.homepage_config
+ADD COLUMN IF NOT EXISTS men_collection_image_url text,
+ADD COLUMN IF NOT EXISTS women_collection_image_url text,
+ADD COLUMN IF NOT EXISTS unisex_collection_image_url text;
