@@ -4,7 +4,30 @@
 - At the START of every session: read the latest entry to know exactly where things stand.
 - At the END of every session (before committing): add a new entry below, newest on top.
 - Never delete old entries — this is the permanent build history.
+## [2026-07-11] — Session: Adaptive Layouts, Overlap Slider & Generated Assets
+**What was done:**
+- Replaced hardcoded storefront aspect ratios with a fully adaptive image layout system (`w-full h-auto block`) across all pages (Home, Shop catalog, ProductDetail, Wishlist, and Cart elements) to display portrait images without cutout clipping.
+- Implemented the mobile-optimized "Overlap Stack" slider for the homepage Shop by Category section, including dynamic active card scaling on scroll and centered typography labels.
+- Generated high-quality mock visual assets for Men's Pants, Women's Co-ords, and a T-shirt on a hanger, and integrated them into the category image pool.
+- Refactored the Best Sellers desktop carousel with circular scroll navigation arrows and a smooth 60% viewport slide animation.
 
+**Files touched:**
+- `src/index.css`
+- `src/pages/Home.tsx`
+- `src/pages/Shop.tsx`
+- `src/pages/ProductDetail.tsx`
+- `src/pages/Wishlist.tsx`
+- `src/pages/Cart.tsx`
+- `src/pages/Checkout.tsx`
+- `src/components/CartDrawer.tsx`
+- `src/components/SearchOverlay.tsx`
+- `src/pages/Admin.tsx`
+- `tailwind.config.js`
+- `PROGRESS_LOG.md`
+
+**Status:** ✅ Complete — adaptive layouts and category/best-seller slider enhancements are fully integrated.
+
+---
 
 ## [2026-07-08] — Session: Heading & Subheading Color Utility Classes
 **What was done:**

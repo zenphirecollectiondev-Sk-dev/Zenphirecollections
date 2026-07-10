@@ -54,7 +54,7 @@ export default function Cart() {
                     <img
                       src={item.image}
                       alt={item.name}
-                      className="w-16 aspect-[3/4] object-cover object-center bg-bg-subtle border border-border"
+                      className="w-16 aspect-[2/3] object-cover object-center bg-bg-subtle border border-border"
                     />
                     <div className="flex flex-col justify-between">
                       <div>

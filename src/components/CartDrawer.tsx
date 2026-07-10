@@ -65,7 +65,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                   <img
                     src={item.image}
                     alt={item.name}
-                    className="w-20 aspect-[3/4] object-cover object-center bg-bg-subtle border border-border flex-shrink-0"
+                    className="w-20 aspect-[2/3] object-cover object-center bg-bg-subtle border border-border flex-shrink-0"
                   />
 
                   {/* Item Details */}

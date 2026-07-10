@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { ArrowRight, Heart, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import heroBanner from '../assets/hero_banner.png';
@@ -9,9 +9,12 @@ import linenShirt from '../assets/product_linen_shirt.png';
 import minimalJacket from '../assets/product_minimal_jacket.png';
 import tailoredPants from '../assets/product_tailored_pants.png';
 import categoryFemale from '../assets/category_female_fashion.png';
+import productPants from '../assets/product_pants.png';
+import productCoords from '../assets/product_coords.png';
+import productTshirt from '../assets/product_tshirt.png';
 
 // Image pool cycled per category index
-const CATEGORY_IMAGES = [linenShirt, categoryFemale, minimalJacket, tailoredPants];
+const CATEGORY_IMAGES = [linenShirt, productPants, productTshirt, productCoords];
 
 export default function Home() {
   const { toggleWishlist, isWishlisted } = useWishlistStore();
@@ -20,6 +23,61 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [heartId, setHeartId] = useState<string | null>(null);
   const [homepageConfig, setHomepageConfig] = useState<any | null>(null);
+
+  const [activeCategoryIndex, setActiveCategoryIndex] = useState(0);
+  const categoryScrollRef = useRef<HTMLDivElement>(null);
+
+  // Reorder categories as requested: Shirts -> Pants -> T-shirts -> Co-ords / Accessories
+  const sortedCategories = useMemo(() => {
+    return [...categories].sort((a, b) => {
+      const aName = a.name.toLowerCase();
+      const bName = b.name.toLowerCase();
+
+      const getIndex = (name: string) => {
+        if (name.includes('shirt') && !name.includes('t-shirt') && !name.includes('tshirt')) return 0;
+        if (name.includes('pant') || name.includes('trouser') || name.includes('women')) return 1;
+        if (name.includes('t-shirt') || name.includes('tshirt') || name.includes('t shirt') || name.includes('coord') || name.includes('co-ord') || name.includes('co ord')) return 2;
+        if (name.includes('accessories') || name.includes('bag') || name.includes('cap') || name.includes('hat')) return 3;
+        return 99;
+      };
+
+      return getIndex(aName) - getIndex(bName);
+    });
+  }, [categories]);
+
+  const handleCategoryScroll = () => {
+    if (categoryScrollRef.current) {
+      const container = categoryScrollRef.current;
+      const children = container.children;
+      const containerCenter = container.scrollLeft + container.clientWidth / 2;
+
+      let closestIndex = 0;
+      let minDistance = Infinity;
+
+      for (let i = 0; i < children.length; i++) {
+        const child = children[i] as HTMLElement;
+        if (child.classList.contains('category-card')) {
+          const childCenter = child.offsetLeft + child.clientWidth / 2;
+          const distance = Math.abs(containerCenter - childCenter);
+          if (distance < minDistance) {
+            minDistance = distance;
+            closestIndex = i;
+          }
+        }
+      }
+      setActiveCategoryIndex(closestIndex);
+    }
+  };
+
+  const bestSellersScrollRef = useRef<HTMLDivElement>(null);
+
+  const scrollBestSellers = (direction: 'left' | 'right') => {
+    if (bestSellersScrollRef.current) {
+      const { scrollLeft, clientWidth } = bestSellersScrollRef.current;
+      const offset = direction === 'left' ? -clientWidth * 0.6 : clientWidth * 0.6;
+      bestSellersScrollRef.current.scrollTo({ left: scrollLeft + offset, behavior: 'smooth' });
+    }
+  };
 
   const genderCollections = useMemo(() => {
     return [
@@ -157,12 +215,12 @@ export default function Home() {
 
       {/* ── 2. GENDER COLLECTIONS ── */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 anim-fade-up">
-        <div className="flex justify-between items-end mb-8">
+        <div className="flex justify-between items-center mb-8">
           <div>
             <p className="text-[10px] uppercase tracking-[0.25em] subheading-primary font-bold">Curated Wardrobe</p>
-            <h2 className="heading-primary text-2xl md:text-3xl font-heading font-black uppercase mt-1 inline-block border-b-2 border-header-mid pb-1">Gender Collections</h2>
+            <h2 className="heading-primary text-2xl md:text-3xl font-heading font-medium mt-1 inline-block">Gender Collections</h2>
           </div>
-          <Link to="/shop" className="nav-link text-xs font-semibold uppercase tracking-widest text-text-secondary hover:text-text-primary inline-flex items-center gap-1.5">
+          <Link to="/shop" className="nav-link text-xs font-semibold uppercase tracking-widest text-accent-gold hover:opacity-80 font-heading inline-flex items-center gap-1.5 whitespace-nowrap ml-4">
             View All <ArrowRight size={12} />
           </Link>
         </div>
@@ -175,8 +233,8 @@ export default function Home() {
               onClick={() => window.scrollTo({ top: 0, behavior: 'instant' })}
               className="flex-shrink-0 w-64 md:w-80 snap-start group product-card block"
             >
-              <div className="relative aspect-[4/5] bg-bg-subtle overflow-hidden border border-border">
-                <img src={col.image} alt={col.name} className="card-img w-full h-full object-cover object-center" />
+              <div className="relative w-full bg-bg-subtle overflow-hidden border border-border">
+                <img src={col.image} alt={col.name} className="card-img w-full h-auto block" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
                 <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-accent-line scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
                 <div className="absolute bottom-5 left-5 text-white">
@@ -191,48 +249,60 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── 3. SHOP BY CATEGORY ── */}
-      {categories.length > 0 && (
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 border-t border-border anim-fade-up">
-          <div className="flex justify-between items-end mb-8">
-            <div>
-              <p className="text-[10px] uppercase tracking-[0.25em] subheading-primary font-bold">Browse Catalog</p>
-              <h2 className="heading-primary text-2xl font-heading font-black uppercase mt-1 inline-block border-b-2 border-header-mid pb-1">Shop by Category</h2>
-            </div>
-            <Link to="/shop" className="nav-link text-xs font-semibold uppercase tracking-widest text-text-secondary hover:text-text-primary inline-flex items-center gap-1.5">
-              All <ArrowRight size={12} />
-            </Link>
+      {/* ── 3. SHOP BY CATEGORY (The "Overlap Stack" Slider) ── */}
+      {sortedCategories.length > 0 && (
+        <section className="max-w-7xl mx-auto py-16 border-t border-border anim-fade-up">
+          {/* Section Header */}
+          <div className="px-4 sm:px-6 lg:px-8 mb-10 text-center md:text-left">
+            <span className="text-[10px] uppercase tracking-[0.3em] text-accent-gold font-bold block mb-1">
+              COLLECTIONS
+            </span>
+            <h2 className="text-xl font-heading font-medium tracking-widest uppercase text-text-primary">
+              SHOP BY CATEGORY
+            </h2>
           </div>
-          <div className="flex overflow-x-auto gap-3 md:gap-4 pb-5 custom-scrollbar snap-x snap-mandatory">
-            {categories.map((cat, idx) => (
-              <Link
-                key={cat.id}
-                to={`/shop?category=${cat.slug}`}
-                className="group product-card block relative overflow-hidden border border-border flex-shrink-0 w-64 md:w-80 snap-start"
-              >
-                {/* Background image */}
-                <div className="aspect-[4/5] relative overflow-hidden">
-                  <img
-                    src={cat.image_url || CATEGORY_IMAGES[idx % CATEGORY_IMAGES.length]}
-                    alt={cat.name}
-                    className="card-img w-full h-full object-cover object-center"
-                  />
-                  {/* Gradient overlay — always present, stronger at bottom */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                  <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-accent-line scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
-                  {/* Category label */}
-                  <div className="absolute bottom-0 left-0 right-0 p-5 text-center">
-                    <p className="text-[9px] uppercase tracking-[0.2em] text-white/50 font-semibold mb-1.5">Collection</p>
-                    <h3 className="text-xl md:text-2xl font-sans font-light uppercase tracking-[0.25em] text-white leading-tight">{cat.name}</h3>
-                    <p className="card-overlay text-[9px] tracking-widest text-white/70 uppercase inline-flex items-center gap-1 mt-2.5 font-semibold">
-                      Shop Now <ArrowRight size={8} />
-                    </p>
+
+          {/* Overlapping Flex Container */}
+          <div
+            ref={categoryScrollRef}
+            onScroll={handleCategoryScroll}
+            className="flex overflow-x-auto snap-x snap-mandatory scrollbar-none scroll-smooth -space-x-3 md:-space-x-4 px-[10vw] pb-6"
+            style={{ scrollPadding: '0 10vw' }}
+          >
+            {sortedCategories.map((cat, idx) => {
+              const isActive = activeCategoryIndex === idx;
+              return (
+                <Link
+                  key={cat.id}
+                  to={`/shop?category=${cat.slug}`}
+                  className="category-card group block relative flex-shrink-0 w-60 md:w-80 snap-center transition-all duration-500 ease-out"
+                  style={{
+                    opacity: isActive ? 1 : 0.75,
+                    transform: isActive ? 'scale(1.0)' : 'scale(0.92)',
+                    zIndex: isActive ? 10 : 1,
+                  }}
+                >
+                  {/* Image wrapper - strict architectural border and 3:4 aspect */}
+                  <div className="aspect-[3/4] w-full bg-bg-subtle overflow-hidden border border-border rounded-none relative">
+                    <img
+                      src={cat.image_url || CATEGORY_IMAGES[idx % CATEGORY_IMAGES.length]}
+                      alt={cat.name}
+                      className="card-img w-full h-full object-cover object-top transition-transform duration-700 ease-out group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-black/5 opacity-20 transition-opacity duration-300 group-hover:opacity-0" />
                   </div>
-                </div>
-              </Link>
-            ))}
-            {/* Right padding sentinel */}
-            <div className="flex-shrink-0 w-2 md:w-4" />
+
+                  {/* Category Label below the image */}
+                  <div className="mt-4 text-center">
+                    <h3 className="text-xs uppercase tracking-widest font-medium text-neutral-800 transition-colors duration-300 group-hover:text-accent-gold">
+                      {cat.name}
+                    </h3>
+                  </div>
+                </Link>
+              );
+            })}
+            {/* End spacing block for horizontal scroll alignment */}
+            <div className="flex-shrink-0 w-[10vw]" />
           </div>
         </section>
       )}
@@ -242,12 +312,12 @@ export default function Home() {
            Desktop: editorial magazine — hero left (tall) + 3 compact right.
       */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 border-t border-border anim-fade-up">
-        <div className="flex justify-between items-end mb-8">
+        <div className="flex justify-between items-center mb-8">
           <div>
             <p className="text-[10px] uppercase tracking-[0.25em] subheading-primary font-bold">Just Released</p>
-            <h2 className="heading-primary text-2xl md:text-3xl font-heading font-black uppercase mt-1 inline-block border-b-2 border-header-mid pb-1">New Arrivals</h2>
+            <h2 className="heading-primary text-2xl md:text-3xl font-heading font-medium mt-1 inline-block">New Arrivals</h2>
           </div>
-          <Link to="/shop" className="nav-link text-xs font-semibold uppercase tracking-widest text-text-secondary hover:text-text-primary inline-flex items-center gap-1.5">
+          <Link to="/shop" className="nav-link text-xs font-semibold uppercase tracking-widest text-accent-gold hover:opacity-80 font-heading inline-flex items-center gap-1.5 whitespace-nowrap ml-4">
             All <ArrowRight size={12} />
           </Link>
         </div>
@@ -258,15 +328,15 @@ export default function Home() {
           </div>
         ) : (
           <>
-            {/* ── MOBILE: horizontal scroll ── */}
-            <div className="flex overflow-x-auto gap-3 md:hidden pb-5 custom-scrollbar snap-x snap-mandatory">
+            {/* ── MOBILE: horizontal scroll (peek effect) ── */}
+            <div className="flex overflow-x-auto gap-4 md:hidden pb-5 scrollbar-none snap-x snap-mandatory px-4">
               {newArrivals.map((product: any) => (
-                <Link key={product.id} to={`/product/${product.slug}`} className="group product-card block flex-shrink-0 w-[70vw] snap-start">
-                  <div className="aspect-[3/4] bg-bg-subtle overflow-hidden border border-border relative">
+                <Link key={product.id} to={`/product/${product.slug}`} className="group product-card block flex-shrink-0 w-[80vw] snap-start">
+                  <div className="w-full bg-bg-subtle overflow-hidden border border-border relative">
                     <img
                       src={product.product_images[0]?.url || linenShirt}
                       alt={product.name}
-                      className="card-img w-full h-full object-cover object-center"
+                      className="card-img w-full h-auto block relative z-10"
                     />
                     <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-accent-line scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
                     <div className="absolute top-2 left-2 bg-text-primary text-white text-[8px] font-black uppercase tracking-[0.2em] px-2 py-0.5">
@@ -287,7 +357,7 @@ export default function Home() {
                   </div>
                 </Link>
               ))}
-              <div className="flex-shrink-0 w-2" />
+              <div className="w-4 shrink-0" />
             </div>
 
             {/* ── DESKTOP: editorial magazine grid ── */}
@@ -356,7 +426,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
           <div className="space-y-5 anim-fade-up">
             <p className="text-[10px] uppercase tracking-[0.25em] subheading-primary font-bold">The Edit</p>
-            <h2 className="heading-primary text-3xl md:text-5xl font-heading font-black uppercase leading-tight">
+            <h2 className="heading-primary text-4xl md:text-6xl font-pinyon normal-case leading-normal tracking-wide">
               Honest Materials,<br />Artisan Craft
             </h2>
             <p className="text-sm text-text-secondary leading-relaxed max-w-md">
@@ -384,14 +454,32 @@ export default function Home() {
       {/* ── 6. BEST SELLERS ── */}
       {bestSellers.length > 0 && (
         <section className="py-14 mb-12 border-t border-border anim-fade-up">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-end mb-10">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center mb-10">
             <div>
               <p className="text-[10px] uppercase tracking-[0.25em] subheading-primary font-bold">Customer Favorites</p>
-              <h2 className="heading-primary text-2xl md:text-3xl font-heading font-black uppercase mt-1 inline-block border-b-2 border-header-mid pb-1">Best Sellers</h2>
+              <h2 className="heading-primary text-2xl md:text-3xl font-heading font-medium mt-1 inline-block">Best Sellers</h2>
             </div>
-            <Link to="/shop" className="nav-link text-xs font-semibold uppercase tracking-widest text-text-secondary hover:text-text-primary inline-flex items-center gap-1.5">
-              Shop All <ArrowRight size={12} />
-            </Link>
+
+            {/* Scroll Navigation Arrows */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => scrollBestSellers('left')}
+                className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-text-secondary hover:text-accent-gold hover:border-accent-gold transition-colors duration-300 focus:outline-none cursor-pointer hidden md:flex"
+                aria-label="Scroll left"
+              >
+                &larr;
+              </button>
+              <button
+                onClick={() => scrollBestSellers('right')}
+                className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-text-secondary hover:text-accent-gold hover:border-accent-gold transition-colors duration-300 focus:outline-none cursor-pointer hidden md:flex"
+                aria-label="Scroll right"
+              >
+                &rarr;
+              </button>
+              <Link to="/shop" className="nav-link text-xs font-semibold uppercase tracking-widest text-accent-gold hover:opacity-80 font-heading inline-flex items-center gap-1.5 whitespace-nowrap ml-4">
+                Shop All <ArrowRight size={12} />
+              </Link>
+            </div>
           </div>
 
           {/* Scroll rail wrapper — vignette fade on the right edge hints at scrollability */}
@@ -402,7 +490,43 @@ export default function Home() {
               style={{ background: 'linear-gradient(to left, rgba(0,0,0,0.18) 0%, transparent 100%)' }}
             />
 
-            <div className="flex overflow-x-auto custom-scrollbar gap-0 pl-4 sm:pl-6 lg:pl-8 pb-5">
+            {/* ── MOBILE: 2-column grid ── */}
+            <div className="grid grid-cols-2 gap-x-4 gap-y-6 md:hidden px-4">
+              {bestSellers.map((product: any) => (
+                <Link
+                  key={product.id}
+                  to={`/product/${product.slug}`}
+                  className="group product-card block w-full"
+                >
+                  <div className="w-full bg-bg-subtle overflow-hidden border border-border relative">
+                    <img
+                      src={product.product_images[0]?.url || linenShirt}
+                      alt={product.name}
+                      className="card-img w-full h-auto block relative z-10"
+                    />
+                    <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-accent-line scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
+                    <button
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleWishlist(product.id); }}
+                      aria-label="Toggle Wishlist"
+                      className={`wishlist-btn absolute top-2.5 right-2.5 p-1.5 bg-white/90 border border-border/60 rounded-full z-10 ${heartId === product.id ? 'anim-heart-pop' : ''}`}
+                    >
+                      <Heart size={13} className={isWishlisted(product.id) ? 'fill-sale stroke-sale' : 'stroke-text-primary'} />
+                    </button>
+                  </div>
+                  <div className="mt-2.5 space-y-0.5">
+                    <p className="text-[9px] uppercase tracking-widest text-text-secondary font-bold">Zenphire</p>
+                    <h3 className="text-sm font-medium text-text-primary group-hover:underline underline-offset-2 truncate">{product.name}</h3>
+                    <p className="text-sm font-semibold text-text-primary">₹{Number(product.base_price || 0).toFixed(2)}</p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+
+            {/* ── DESKTOP: horizontal scroll ── */}
+            <div
+              ref={bestSellersScrollRef}
+              className="hidden md:flex overflow-x-auto custom-scrollbar gap-0 pl-4 sm:pl-6 lg:pl-8 pb-5 scroll-smooth"
+            >
               {bestSellers.map((product: any) => (
                 <Link
                   key={product.id}
@@ -410,11 +534,11 @@ export default function Home() {
                   className="group product-card flex-shrink-0 flex flex-col pr-4 md:pr-6"
                   style={{ width: 'clamp(200px, 26vw, 300px)' }}
                 >
-                  <div className="aspect-[3/4] bg-bg-subtle overflow-hidden border border-border relative">
+                  <div className="w-full bg-bg-subtle overflow-hidden border border-border relative">
                     <img
                       src={product.product_images[0]?.url || linenShirt}
                       alt={product.name}
-                      className="card-img w-full h-full object-cover object-center"
+                      className="card-img w-full h-auto block relative z-10"
                     />
                     <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-accent-line scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
                     <button

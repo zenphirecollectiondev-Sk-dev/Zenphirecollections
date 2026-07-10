@@ -24,6 +24,16 @@ import ForgotPassword from './pages/auth/ForgotPassword';
 import Onboarding from './pages/auth/Onboarding';
 import AuthCallback from './pages/auth/AuthCallback';
 
+function ScrollToTop() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+
+  return null;
+}
+
 export default function App() {
   const { initialize } = useAuthStore();
 
@@ -33,6 +43,7 @@ export default function App() {
 
   return (
     <Router>
+      <ScrollToTop />
       <AppContent />
     </Router>
   );
@@ -58,7 +69,7 @@ function AppContent() {
   return (
     <div className="min-h-screen bg-bg text-text-primary flex flex-col font-sans overflow-x-hidden w-full relative">
       {/* Sticky Minimal Navigation with moving dark ambient gradient on customer-facing pages */}
-      <header className={`sticky top-0 z-50 transition-all duration-300 relative ${isCustomerPage ? 'ambient-green-gradient' : 'bg-white border-b border-border'}`}>
+      <header className={`sticky top-0 z-50 transition-all duration-300 relative shadow-md ${isCustomerPage ? 'ambient-green-gradient shadow-black/15' : 'bg-white border-b border-border shadow-sm'}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           {/* Left Nav (Desktop) / Hamburger (Mobile) */}
           <div className="flex items-center gap-6">
@@ -67,14 +78,14 @@ function AppContent() {
               className={`btn-icon md:hidden p-2 rounded-full ${isCustomerPage ? 'hover:bg-white/10' : 'hover:bg-bg-subtle'}`}
               aria-label="Toggle Menu"
             >
-              <Menu size={20} className={`stroke-[1.5] ${isCustomerPage ? 'text-white' : 'text-text-primary'}`} />
+              <Menu size={20} className={`stroke-[1.5] ${isCustomerPage ? 'text-accent-gold' : 'text-text-primary'}`} />
             </button>
             {isCustomerPage && (
               <nav className="hidden md:flex items-center gap-6">
                 <NavLink
                   to="/shop"
                   className={({ isActive }) =>
-                    `nav-item-header ${isActive ? 'active text-white' : 'text-white/70 hover:text-white'}`
+                    `nav-item-header ${isActive ? 'active text-accent-gold' : 'text-accent-gold/70 hover:text-accent-gold'}`
                   }
                 >
                   Shop
@@ -82,7 +93,7 @@ function AppContent() {
                 <NavLink
                   to="/wishlist"
                   className={({ isActive }) =>
-                    `nav-item-header ${isActive ? 'active text-white' : 'text-white/70 hover:text-white'}`
+                    `nav-item-header ${isActive ? 'active text-accent-gold' : 'text-accent-gold/70 hover:text-accent-gold'}`
                   }
                 >
                   Wishlist
@@ -90,7 +101,7 @@ function AppContent() {
                 <NavLink
                   to="/account"
                   className={({ isActive }) =>
-                    `nav-item-header ${isActive ? 'active text-white' : 'text-white/70 hover:text-white'}`
+                    `nav-item-header ${isActive ? 'active text-accent-gold' : 'text-accent-gold/70 hover:text-accent-gold'}`
                   }
                 >
                   Account
@@ -102,7 +113,7 @@ function AppContent() {
 
           {/* Center Logo */}
           <div className="absolute left-1/2 transform -translate-x-1/2">
-            <Link to="/" className={`text-xl font-heading font-normal tracking-[0.2em] uppercase select-none transition-colors duration-200 ${isCustomerPage ? 'text-white hover:text-white' : 'text-text-primary hover:text-accent'}`}>
+            <Link to="/" className={`text-xl font-heading font-normal tracking-[0.2em] uppercase select-none transition-colors duration-200 ${isCustomerPage ? 'text-accent-gold hover:text-accent-gold' : 'text-text-primary hover:text-accent'}`}>
               Zenphire
             </Link>
           </div>
@@ -112,7 +123,7 @@ function AppContent() {
             <button
               onClick={() => setIsSearchOpen(true)}
               aria-label="Search"
-              className={`btn-icon p-2 rounded-full transition-colors duration-200 ${isCustomerPage ? 'text-white hover:bg-white/10' : 'text-text-primary hover:bg-bg-subtle'}`}
+              className={`btn-icon p-2 rounded-full transition-colors duration-200 ${isCustomerPage ? 'text-accent-gold hover:bg-white/10' : 'text-text-primary hover:bg-bg-subtle'}`}
             >
               <Search size={19} className="stroke-[1.5]" />
             </button>
@@ -120,7 +131,7 @@ function AppContent() {
             <Link
               to="/wishlist"
               aria-label="Wishlist"
-              className={`btn-icon p-2 rounded-full relative transition-colors duration-200 ${isCustomerPage ? 'text-white hover:bg-white/10' : 'text-text-primary hover:bg-bg-subtle'}`}
+              className={`btn-icon p-2 rounded-full relative transition-colors duration-200 ${isCustomerPage ? 'text-accent-gold hover:bg-white/10' : 'text-text-primary hover:bg-bg-subtle'}`}
             >
               <Heart size={19} className="stroke-[1.5]" />
               {wishlistCount > 0 && (
@@ -133,7 +144,7 @@ function AppContent() {
             <button
               onClick={() => setIsCartOpen(true)}
               aria-label="Cart"
-              className={`btn-icon p-2 rounded-full relative transition-colors duration-200 ${isCustomerPage ? 'text-white hover:bg-white/10' : 'text-text-primary hover:bg-bg-subtle'}`}
+              className={`btn-icon p-2 rounded-full relative transition-colors duration-200 ${isCustomerPage ? 'text-accent-gold hover:bg-white/10' : 'text-text-primary hover:bg-bg-subtle'}`}
             >
               <ShoppingBag size={19} className="stroke-[1.5]" />
               {cartCount > 0 && (
@@ -146,7 +157,7 @@ function AppContent() {
             <Link
               to="/account"
               aria-label="Account"
-              className={`btn-icon p-2 rounded-full transition-colors duration-200 ${isCustomerPage ? 'text-white hover:bg-white/10' : 'text-text-primary hover:bg-bg-subtle'}`}
+              className={`btn-icon p-2 rounded-full transition-colors duration-200 ${isCustomerPage ? 'text-accent-gold hover:bg-white/10' : 'text-text-primary hover:bg-bg-subtle'}`}
             >
               <User size={19} className="stroke-[1.5]" />
             </Link>
@@ -155,7 +166,7 @@ function AppContent() {
               <Link
                 to="/admin"
                 aria-label="Admin Console"
-                className={`btn-icon p-2 rounded-full transition-colors duration-200 ${isCustomerPage ? 'text-white/70 hover:bg-white/10 hover:text-white' : 'text-text-secondary hover:bg-bg-subtle hover:text-text-primary'}`}
+                className={`btn-icon p-2 rounded-full transition-colors duration-200 ${isCustomerPage ? 'text-accent-gold/70 hover:bg-white/10 hover:text-accent-gold' : 'text-text-secondary hover:bg-bg-subtle hover:text-text-primary'}`}
               >
                 <Shield size={19} className="stroke-[1.5]" />
               </Link>
@@ -165,7 +176,7 @@ function AppContent() {
               <button
                 onClick={signOut}
                 aria-label="Sign Out"
-                className={`btn-icon p-2 rounded-full transition-colors duration-200 ${isCustomerPage ? 'text-white/70 hover:bg-white/10 hover:text-red-300' : 'text-text-secondary hover:bg-bg-subtle hover:text-sale'}`}
+                className={`btn-icon p-2 rounded-full transition-colors duration-200 ${isCustomerPage ? 'text-accent-gold/70 hover:bg-white/10 hover:text-accent-gold' : 'text-text-secondary hover:bg-bg-subtle hover:text-sale'}`}
               >
                 <LogOut size={19} className="stroke-[1.5]" />
               </button>
@@ -177,7 +188,7 @@ function AppContent() {
             <button
               onClick={() => setIsCartOpen(true)}
               aria-label="Cart"
-              className={`btn-icon p-2 rounded-full relative transition-colors duration-200 ${isCustomerPage ? 'text-white hover:bg-white/10' : 'text-text-primary hover:bg-bg-subtle'}`}
+              className={`btn-icon p-2 rounded-full relative transition-colors duration-200 ${isCustomerPage ? 'text-accent-gold hover:bg-white/10' : 'text-text-primary hover:bg-bg-subtle'}`}
             >
               <ShoppingBag size={19} className="stroke-[1.5]" />
               {cartCount > 0 && (
@@ -214,7 +225,7 @@ function AppContent() {
               <div className="space-y-8">
                 {/* Header */}
                 <div className="flex justify-between items-center pb-4 border-b border-border">
-                  <span className="text-lg font-heading font-black tracking-[0.2em] uppercase">
+                  <span className="text-lg font-heading font-normal tracking-[0.2em] uppercase text-accent-gold">
                     Zenphire
                   </span>
                   <button
@@ -226,11 +237,11 @@ function AppContent() {
                 </div>
 
                 {/* Navigation Links */}
-                <nav className="flex flex-col gap-6 text-sm font-bold uppercase tracking-wider text-text-primary">
+                <nav className="flex flex-col gap-6 text-sm font-heading font-medium uppercase tracking-wider text-accent-gold/85">
                   <Link
                     to="/shop"
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className="hover:text-accent transition-colors flex items-center gap-2"
+                    className="hover:text-accent-gold transition-colors flex items-center gap-2"
                   >
                     Shop Collection
                   </Link>
@@ -240,7 +251,7 @@ function AppContent() {
                       setIsMobileMenuOpen(false);
                       setIsSearchOpen(true);
                     }}
-                    className="text-left hover:text-accent transition-colors flex items-center gap-2 font-bold uppercase tracking-wider"
+                    className="text-left hover:text-accent-gold transition-colors flex items-center gap-2 font-heading font-medium uppercase tracking-wider"
                   >
                     Search
                   </button>
@@ -248,11 +259,11 @@ function AppContent() {
                   <Link
                     to="/wishlist"
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className="hover:text-accent transition-colors flex items-center justify-between"
+                    className="hover:text-accent-gold transition-colors flex items-center justify-between"
                   >
                     <span>Wishlist</span>
                     {wishlistCount > 0 && (
-                      <span className="bg-accent text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                      <span className="bg-accent-gold text-header-base text-[10px] font-bold px-2 py-0.5 rounded-full">
                         {wishlistCount}
                       </span>
                     )}
@@ -261,7 +272,7 @@ function AppContent() {
                   <Link
                     to="/account"
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className="hover:text-accent transition-colors"
+                    className="hover:text-accent-gold transition-colors"
                   >
                     My Account
                   </Link>
@@ -270,7 +281,7 @@ function AppContent() {
                     <Link
                       to="/admin"
                       onClick={() => setIsMobileMenuOpen(false)}
-                      className="text-accent flex items-center gap-1.5"
+                      className="text-accent-gold flex items-center gap-1.5"
                     >
                       <Shield size={14} /> Admin Console
                     </Link>
@@ -358,28 +369,28 @@ function AppContent() {
       </main>
 
       {/* Footer */}
-      <footer className="relative ambient-green-gradient border-t border-white/10 py-12 px-4 mt-auto">
+      <footer className="relative ambient-green-gradient border-t border-white/10 py-12 px-4 mt-auto text-white/70 shadow-[0_-8px_30px_rgba(0,0,0,0.15)]">
         {isCustomerPage && <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-accent-line" />}
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
           <div>
-            <h3 className="font-heading font-bold uppercase tracking-wider text-sm mb-4 text-white">Zenphire Collections</h3>
+            <h3 className="font-heading font-bold uppercase tracking-wider text-sm mb-4 text-accent-gold">Zenphire Collections</h3>
             <p className="text-white/70 text-sm max-w-xs leading-relaxed">
               Premium modern apparel. Redefining minimal fashion for the everyday wardrobe.
             </p>
           </div>
           <div>
-            <h3 className="font-heading font-bold uppercase tracking-wider text-sm mb-4 text-white">Customer Care</h3>
+            <h3 className="font-heading font-bold uppercase tracking-wider text-sm mb-4 text-accent-gold">Customer Care</h3>
             <ul className="space-y-2 text-sm text-white/70">
-              <li><Link to="/shop" className="hover:text-white transition-colors">Help & FAQ</Link></li>
-              <li><Link to="/shop" className="hover:text-white transition-colors">Shipping & Returns</Link></li>
-              <li><Link to="/shop" className="hover:text-white transition-colors">Size Guide</Link></li>
+              <li><Link to="/shop" className="hover:text-accent-gold transition-colors">Help & FAQ</Link></li>
+              <li><Link to="/shop" className="hover:text-accent-gold transition-colors">Shipping & Returns</Link></li>
+              <li><Link to="/shop" className="hover:text-accent-gold transition-colors">Size Guide</Link></li>
             </ul>
           </div>
           <div>
-            <h3 className="font-heading font-bold uppercase tracking-wider text-sm mb-4 text-white">Legal</h3>
+            <h3 className="font-heading font-bold uppercase tracking-wider text-sm mb-4 text-accent-gold">Legal</h3>
             <ul className="space-y-2 text-sm text-white/70">
-              <li><Link to="/shop" className="hover:text-white transition-colors">Privacy Policy</Link></li>
-              <li><Link to="/shop" className="hover:text-white transition-colors">Terms of Service</Link></li>
+              <li><Link to="/shop" className="hover:text-accent-gold transition-colors">Privacy Policy</Link></li>
+              <li><Link to="/shop" className="hover:text-accent-gold transition-colors">Terms of Service</Link></li>
             </ul>
           </div>
         </div>

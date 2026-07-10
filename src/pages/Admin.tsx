@@ -2914,7 +2914,7 @@ ${titleHtml}  <thead>
                       ) : (
                         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
                           {prodImages.map((img, idx) => (
-                            <div key={idx} className="relative aspect-[3/4] bg-white border border-border overflow-hidden group">
+                            <div key={idx} className="relative aspect-[2/3] bg-white border border-border overflow-hidden group">
                               <img src={img.url} alt="product swatch" className="w-full h-full object-cover" />
                               <button
                                 type="button"

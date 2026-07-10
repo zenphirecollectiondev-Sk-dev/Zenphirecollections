@@ -110,8 +110,8 @@ export default function Shop() {
       {/* Page Header */}
       <div className="border-b border-border pb-6 mb-8 flex flex-col md:flex-row md:items-end md:justify-between gap-3">
         <div>
-          <p className="text-[10px] uppercase tracking-[0.25em] text-text-secondary font-bold">Zenphire Catalog</p>
-          <h1 className="text-3xl font-heading font-black uppercase mt-1">
+          <p className="text-[10px] uppercase tracking-[0.25em] text-accent-gold font-bold">Zenphire Catalog</p>
+          <h1 className="text-3xl font-heading font-medium uppercase mt-1">
             {activeCategory !== 'all' ? `${activeCategory} Collection`
               : activeGender !== 'all' ? `${activeGender}'s Collection`
                 : 'Shop All'}
@@ -244,11 +244,11 @@ export default function Shop() {
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-y-8 gap-x-4 md:gap-x-6 anim-stagger">
               {filteredProducts.map((product) => (
                 <Link key={product.id} to={`/product/${product.slug}`} className="group product-card block">
-                  <div className="aspect-[3/4] bg-bg-subtle overflow-hidden border border-border relative mb-3">
+                  <div className="w-full bg-bg-subtle overflow-hidden border border-border relative mb-3">
                     <img
                       src={product.product_images?.[0]?.url || linenShirt}
                       alt={product.name}
-                      className="card-img w-full h-full object-cover object-center"
+                      className="card-img w-full h-auto block relative z-10"
                     />
                     <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-accent-line scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
                     {product.product_variants?.every((v: any) => v.stock_qty === 0) && (

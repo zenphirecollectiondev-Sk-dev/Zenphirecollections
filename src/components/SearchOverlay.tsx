@@ -116,7 +116,7 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                     <img
                       src={product.product_images && product.product_images[0]?.url || linenShirt}
                       alt={product.name}
-                      className="w-12 aspect-[3/4] object-cover object-center bg-bg-subtle border border-border"
+                      className="w-12 aspect-[2/3] object-cover object-center bg-bg-subtle border border-border"
                     />
                     <div>
                       <h4 className="text-sm font-semibold text-text-primary">{product.name}</h4>

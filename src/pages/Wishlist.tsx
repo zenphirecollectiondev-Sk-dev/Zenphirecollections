@@ -70,12 +70,12 @@ export default function Wishlist() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
           {wishlistProducts.map((product) => (
             <div key={product.id} className="group product-card relative">
-              <div className="aspect-[3/4] bg-bg-subtle overflow-hidden border border-border relative mb-3">
+              <div className="w-full bg-bg-subtle overflow-hidden border border-border relative mb-3">
                 <Link to={`/product/${product.slug}`}>
                   <img
                     src={product.product_images && product.product_images[0]?.url || linenShirt}
                     alt={product.name}
-                    className="card-img w-full h-full object-cover object-center"
+                    className="card-img w-full h-auto block relative z-10"
                   />
                 </Link>
                 <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-accent-line scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />

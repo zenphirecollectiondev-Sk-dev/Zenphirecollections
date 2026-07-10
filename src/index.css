@@ -1,5 +1,14 @@
 @import "@fontsource/geist-sans";
 @import "@fontsource/inter-tight";
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Pinyon+Script&display=swap');
+
+@font-face {
+  font-family: 'Priestacy';
+  src: url('/fonts/Priestacy.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
 
 @tailwind base;
 @tailwind components;
@@ -32,7 +41,7 @@
   --color-header-text-muted: #7A8A82;
 
   /* ── Accent Line & Gold Tokens ── */
-  --color-accent-gold: #B8975A;
+  --color-accent-gold: #D4B875;
   --gradient-accent-line: var(--color-header-mid);
 
   /* ── Heading Visual Accent Tokens ── */
@@ -558,9 +567,11 @@
   0% {
     background-position: 0% 50%;
   }
+
   50% {
     background-position: 100% 50%;
   }
+
   100% {
     background-position: 0% 50%;
   }
@@ -590,10 +601,10 @@
 
 @supports (background-clip: text) or (-webkit-background-clip: text) {
   .heading-primary {
-    background-image: linear-gradient(90deg, 
-      var(--color-heading-primary-start), 
-      var(--color-heading-primary-mid), 
-      var(--color-heading-primary-end));
+    background-image: linear-gradient(90deg,
+        var(--color-heading-primary-start),
+        var(--color-heading-primary-mid),
+        var(--color-heading-primary-end));
     background-size: 200% auto;
     -webkit-background-clip: text;
     background-clip: text;
@@ -607,6 +618,7 @@
   0% {
     background-position: 0% 50%;
   }
+
   100% {
     background-position: 100% 50%;
   }

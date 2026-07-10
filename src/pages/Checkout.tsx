@@ -339,8 +339,8 @@ export default function Checkout() {
                       key={addr.id}
                       onClick={() => setSelectedAddressId(addr.id)}
                       className={`p-4 border cursor-pointer flex flex-col justify-between ${selectedAddressId === addr.id
-                          ? 'border-accent bg-bg-subtle'
-                          : 'border-border bg-white hover:border-accent'
+                        ? 'border-accent bg-bg-subtle'
+                        : 'border-border bg-white hover:border-accent'
                         }`}
                     >
                       <p className="text-sm font-medium text-text-primary leading-relaxed">{addr.line1}</p>
@@ -357,8 +357,8 @@ export default function Checkout() {
                   <div
                     onClick={() => setSelectedAddressId('new')}
                     className={`p-4 border cursor-pointer flex items-center justify-center border-dashed ${selectedAddressId === 'new'
-                        ? 'border-accent bg-bg-subtle'
-                        : 'border-border bg-white hover:border-accent'
+                      ? 'border-accent bg-bg-subtle'
+                      : 'border-border bg-white hover:border-accent'
                       }`}
                   >
                     <span className="text-xs uppercase tracking-wider font-bold text-text-secondary">
@@ -520,7 +520,7 @@ export default function Checkout() {
               <div className="max-h-60 overflow-y-auto divide-y divide-border pr-2">
                 {items.map((item) => (
                   <div key={item.id} className="py-3 flex gap-3 first:pt-0 last:pb-0">
-                    <img src={item.image} alt={item.name} className="w-10 aspect-[3/4] object-cover object-center bg-white border border-border" />
+                    <img src={item.image} alt={item.name} className="w-10 aspect-[2/3] object-cover object-center bg-white border border-border" />
                     <div className="flex-1 min-w-0">
                       <h4 className="text-xs font-semibold text-text-primary truncate">{item.name}</h4>
                       <p className="text-[10px] text-text-secondary mt-0.5">Size: {item.size} | Qty: {item.quantity}</p>

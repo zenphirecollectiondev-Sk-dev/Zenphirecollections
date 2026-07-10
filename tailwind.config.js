@@ -34,7 +34,9 @@ export default {
       },
       fontFamily: {
         sans: ['"Inter Tight"', 'sans-serif'],
-        heading: ['Geist', 'sans-serif'],
+        heading: ['Cinzel', 'serif'],
+        pinyon: ['"Pinyon Script"', 'cursive'],
+        priestacy: ['Priestacy', 'sans-serif'],
       },
     },
   },

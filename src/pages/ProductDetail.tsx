@@ -194,7 +194,7 @@ export default function ProductDetail() {
         <div className="space-y-3">
           {/* Main image — clickable for lightbox */}
           <div
-            className="aspect-[3/4] bg-bg-subtle border border-border overflow-hidden relative group cursor-zoom-in"
+            className="w-full bg-bg-subtle border border-border overflow-hidden relative group cursor-zoom-in"
             onClick={() => openLightbox(activeImageIdx)}
             role="button"
             aria-label="Enlarge image"
@@ -202,7 +202,7 @@ export default function ProductDetail() {
             <img
               src={product.product_images[activeImageIdx]?.url || linenShirt}
               alt={product.name}
-              className="w-full h-full object-cover object-center transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] group-hover:scale-[1.03]"
+              className="w-full h-auto block relative z-10 transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] group-hover:scale-[1.03]"
             />
             {/* Zoom hint */}
             <div className="absolute bottom-3 right-3 bg-white/80 border border-border/60 p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-150">
@@ -217,7 +217,7 @@ export default function ProductDetail() {
                 <button
                   key={img.id}
                   onClick={() => setActiveImageIdx(idx)}
-                  className={`size-btn flex-shrink-0 w-[68px] aspect-[3/4] bg-bg-subtle border overflow-hidden ${activeImageIdx === idx ? 'border-accent selected' : 'border-border'
+                  className={`size-btn flex-shrink-0 w-[68px] aspect-[2/3] bg-bg-subtle border overflow-hidden ${activeImageIdx === idx ? 'border-accent selected' : 'border-border'
                     }`}
                 >
                   <img src={img.url} alt="thumbnail" className="w-full h-full object-cover object-center" />
@@ -252,8 +252,8 @@ export default function ProductDetail() {
                       key={color}
                       onClick={() => { setSelectedColor(color); setSelectedSize(''); }}
                       className={`btn px-4 py-2 border text-[10px] font-bold uppercase tracking-widest ${selectedColor === color
-                          ? 'bg-accent border-accent text-white'
-                          : 'border-border bg-white text-text-primary hover:border-accent'
+                        ? 'bg-accent border-accent text-white'
+                        : 'border-border bg-white text-text-primary hover:border-accent'
                         }`}
                     >
                       {color}
@@ -281,12 +281,12 @@ export default function ProductDetail() {
                       disabled={!variant}
                       onClick={() => setSelectedSize(size)}
                       className={`size-btn w-12 h-12 border text-xs font-bold flex items-center justify-center transition-all ${!variant
-                          ? 'opacity-30 cursor-not-allowed border-dashed border-border'
-                          : !available
-                            ? 'opacity-40 cursor-not-allowed bg-bg-subtle text-text-secondary line-through border-border'
-                            : selectedSize === size
-                              ? 'ambient-green-gradient text-white border-transparent selected'
-                              : 'bg-white border-border text-text-primary hover:border-accent'
+                        ? 'opacity-30 cursor-not-allowed border-dashed border-border'
+                        : !available
+                          ? 'opacity-40 cursor-not-allowed bg-bg-subtle text-text-secondary line-through border-border'
+                          : selectedSize === size
+                            ? 'ambient-green-gradient text-white border-transparent selected'
+                            : 'bg-white border-border text-text-primary hover:border-accent'
                         }`}
                     >
                       {size}
@@ -323,10 +323,10 @@ export default function ProductDetail() {
                   disabled={isOutOfStock}
                   onClick={handleAddToCart}
                   className={`btn btn-primary flex-1 py-4 font-bold uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 ${isAdded
-                      ? 'bg-emerald-600 text-white'
-                      : isOutOfStock
-                        ? 'bg-border text-text-secondary cursor-not-allowed opacity-50'
-                        : ''
+                    ? 'bg-emerald-600 text-white'
+                    : isOutOfStock
+                      ? 'bg-border text-text-secondary cursor-not-allowed opacity-50'
+                      : ''
                     }`}
                 >
                   <ShoppingBag size={15} />
@@ -360,11 +360,11 @@ export default function ProductDetail() {
                 onClick={() => { setSelectedSize(''); setActiveImageIdx(0); }}
                 className="group product-card block"
               >
-                <div className="aspect-[3/4] bg-bg-subtle overflow-hidden border border-border relative mb-3">
+                <div className="w-full bg-bg-subtle overflow-hidden border border-border relative mb-3">
                   <img
                     src={rec.product_images?.[0]?.url || linenShirt}
                     alt={rec.name}
-                    className="card-img w-full h-full object-cover object-center"
+                    className="card-img w-full h-auto block relative z-10"
                   />
                   <button
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleWishlist(rec.id); }}
@@ -510,8 +510,8 @@ export default function ProductDetail() {
                     onClick={() => setLightboxIdx(idx)}
                     aria-label={`View image ${idx + 1}`}
                     className={`rounded-full transition-all duration-200 ${lightboxIdx === idx
-                        ? 'bg-white w-2 h-2'
-                        : 'bg-white/30 hover:bg-white/60 w-1.5 h-1.5'
+                      ? 'bg-white w-2 h-2'
+                      : 'bg-white/30 hover:bg-white/60 w-1.5 h-1.5'
                       }`}
                   />
                 ))}
