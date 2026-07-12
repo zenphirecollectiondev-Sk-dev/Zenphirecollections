@@ -7,7 +7,6 @@ import { getActiveProducts, getCategories, supabase } from '../lib/supabase';
 
 import linenShirt from '../assets/product_linen_shirt.png';
 import minimalJacket from '../assets/product_minimal_jacket.png';
-import tailoredPants from '../assets/product_tailored_pants.png';
 import categoryFemale from '../assets/category_female_fashion.png';
 import productPants from '../assets/product_pants.png';
 import productCoords from '../assets/product_coords.png';
