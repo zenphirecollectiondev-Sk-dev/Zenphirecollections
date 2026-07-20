@@ -1,10 +1,28 @@
 @import "@fontsource/geist-sans";
 @import "@fontsource/inter-tight";
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Pinyon+Script&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Italiana&family=Marcellus&family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Tenor+Sans&family=Pinyon+Script&display=swap');
 
 @font-face {
   font-family: 'Priestacy';
   src: url('/fonts/Priestacy.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Kugile';
+  src: url('/fonts/Kugile.otf') format('opentype'),
+       url('/fonts/Kugile.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Mending';
+  src: url('/fonts/Mending.otf') format('opentype'),
+       url('/fonts/Mending.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
@@ -33,6 +51,10 @@
   --dur-enter: 500ms;
   --ease-enter: cubic-bezier(0.22, 1, 0.36, 1);
 
+  /* ── 50% Gold Mixture WebApp Background ── */
+  --color-bg: #EAD8B7;
+  --color-bg-subtle: #DFCBAB;
+
   /* ── Dark Ambient Header Tokens ── */
   --color-header-base: #00221A;
   --color-header-mid: #063A2C;
@@ -40,9 +62,10 @@
   --color-header-text: #E8EDE9;
   --color-header-text-muted: #7A8A82;
 
-  /* ── Accent Line & Gold Tokens ── */
-  --color-accent-gold: #D4B875;
-  --gradient-accent-line: var(--color-header-mid);
+  /* ── Accent Line & Gold Tokens (Artisan Brass Gold) ── */
+  --color-accent-gold: #B8975A;
+  --color-accent-gold-bright: #E4C783;
+  --gradient-accent-line: linear-gradient(90deg, #00221A 0%, #B8975A 50%, #00221A 100%);
 
   /* ── Heading Visual Accent Tokens ── */
   --color-heading-primary-start: #00221A;

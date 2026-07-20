@@ -7,8 +7,8 @@ export default {
   theme: {
     extend: {
       colors: {
-        bg: '#FFFFFF',
-        'bg-subtle': '#F5F5F5',
+        bg: '#EAD8B7',
+        'bg-subtle': '#DFCBAB',
         border: '#E5E5E5',
         'text-primary': '#1A1A1A',
         'text-secondary': '#6B6B6B',
@@ -23,6 +23,7 @@ export default {
         'header-text-muted': 'var(--color-header-text-muted)',
         /* ── Muted Brass/Gold Token ── */
         'accent-gold': 'var(--color-accent-gold)',
+        'accent-gold-bright': 'var(--color-accent-gold-bright)',
         /* ── Heading Visual Accent Tokens ── */
         'heading-primary-start': 'var(--color-heading-primary-start)',
         'heading-primary-mid': 'var(--color-heading-primary-mid)',
@@ -33,8 +34,12 @@ export default {
         'gradient-accent-line': 'var(--gradient-accent-line)',
       },
       fontFamily: {
-        sans: ['"Inter Tight"', 'sans-serif'],
+        sans: ['"Avenir Next"', 'Avenir', '"Inter Tight"', 'sans-serif'],
         heading: ['Cinzel', 'serif'],
+        kugile: ['Kugile', '"Playfair Display"', '"Cormorant Garamond"', 'serif'],
+        mending: ['Mending', 'Marcellus', 'Cinzel', 'serif'],
+        artisan: ['"Cormorant Garamond"', 'serif'],
+        craft: ['"Tenor Sans"', 'sans-serif'],
         pinyon: ['"Pinyon Script"', 'cursive'],
         priestacy: ['Priestacy', 'sans-serif'],
       },

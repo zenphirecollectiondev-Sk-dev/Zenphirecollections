@@ -496,4 +496,8 @@ ADD COLUMN IF NOT EXISTS image_url text;
 ALTER TABLE public.homepage_config
 ADD COLUMN IF NOT EXISTS men_collection_image_url text,
 ADD COLUMN IF NOT EXISTS women_collection_image_url text,
-ADD COLUMN IF NOT EXISTS unisex_collection_image_url text;
+ADD COLUMN IF NOT EXISTS unisex_collection_image_url text,
+ADD COLUMN IF NOT EXISTS shirt_category_image_url text,
+ADD COLUMN IF NOT EXISTS tshirt_category_image_url text,
+ADD COLUMN IF NOT EXISTS coords_category_image_url text,
+ADD COLUMN IF NOT EXISTS pants_category_image_url text;

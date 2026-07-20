@@ -129,7 +129,7 @@ export default function Home() {
     }
     return [...products]
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-      .slice(0, 4);
+      .slice(0, 8);
   }, [products, homepageConfig]);
 
   const bestSellers = useMemo(() => {
@@ -161,13 +161,13 @@ export default function Home() {
     <div className="bg-bg min-h-screen overflow-x-hidden">
 
       {/* ── 1. HERO (EDITORIAL OVERLAY ON MOBILE / SPLIT ON DESKTOP) ── */}
-      <section className="relative bg-[#F4F4F4] h-[75vh] md:h-[80vh] flex flex-col md:flex-row items-stretch overflow-hidden border-b border-border">
+      <section className="relative bg-bg-subtle h-[75vh] md:h-[80vh] flex flex-col md:flex-row items-stretch overflow-hidden border-b border-border">
 
         {/* Left Content Column
             Mobile: Absolute overlay aligned to the bottom (last 25-30%)
             Desktop: Side-by-side flex column
         */}
-        <div className="absolute inset-0 md:relative md:w-1/2 flex flex-col justify-end md:justify-center px-6 pb-12 pt-16 md:px-16 lg:px-24 bg-transparent md:bg-[#F4F4F4] z-20">
+        <div className="absolute inset-0 md:relative md:w-1/2 flex flex-col justify-end md:justify-center px-6 pb-12 pt-16 md:px-16 lg:px-24 bg-transparent md:bg-bg-subtle z-20">
           <div className="max-w-md space-y-4 md:space-y-8 hero-content text-left">
 
             <h1 className="text-3xl md:text-6xl lg:text-7xl font-sans uppercase font-extralight tracking-tight leading-[1.05] text-white md:text-text-primary">
@@ -217,7 +217,7 @@ export default function Home() {
         <div className="flex justify-between items-center mb-8">
           <div>
             <p className="text-[10px] uppercase tracking-[0.25em] subheading-primary font-bold">Curated Wardrobe</p>
-            <h2 className="heading-primary text-2xl md:text-3xl font-heading font-medium mt-1 inline-block">Gender Collections</h2>
+            <h2 className="heading-primary text-2xl md:text-3xl font-mending font-medium mt-1 inline-block">Gender Collections</h2>
           </div>
           <Link to="/shop" className="nav-link text-xs font-semibold uppercase tracking-widest text-accent-gold hover:opacity-80 font-heading inline-flex items-center gap-1.5 whitespace-nowrap ml-4">
             View All <ArrowRight size={12} />
@@ -256,7 +256,7 @@ export default function Home() {
             <span className="text-[10px] uppercase tracking-[0.3em] text-accent-gold font-bold block mb-1">
               COLLECTIONS
             </span>
-            <h2 className="text-xl font-heading font-medium tracking-widest uppercase text-text-primary">
+            <h2 className="text-xl font-mending font-medium tracking-widest uppercase text-text-primary">
               SHOP BY CATEGORY
             </h2>
           </div>
@@ -270,6 +270,13 @@ export default function Home() {
           >
             {sortedCategories.map((cat, idx) => {
               const isActive = activeCategoryIndex === idx;
+              const catName = cat.name.toLowerCase();
+              const customCatImage =
+                (catName.includes('shirt') && !catName.includes('t-shirt') && !catName.includes('tshirt') ? homepageConfig?.shirt_category_image_url : null) ||
+                (catName.includes('t-shirt') || catName.includes('tshirt') || catName.includes('t shirt') ? homepageConfig?.tshirt_category_image_url : null) ||
+                (catName.includes('coord') || catName.includes('co-ord') || catName.includes('co ord') ? homepageConfig?.coords_category_image_url : null) ||
+                (catName.includes('pant') || catName.includes('trouser') ? homepageConfig?.pants_category_image_url : null);
+
               return (
                 <Link
                   key={cat.id}
@@ -284,7 +291,7 @@ export default function Home() {
                   {/* Image wrapper - strict architectural border and 3:4 aspect */}
                   <div className="aspect-[3/4] w-full bg-bg-subtle overflow-hidden border border-border rounded-none relative">
                     <img
-                      src={cat.image_url || CATEGORY_IMAGES[idx % CATEGORY_IMAGES.length]}
+                      src={cat.image_url || customCatImage || CATEGORY_IMAGES[idx % CATEGORY_IMAGES.length]}
                       alt={cat.name}
                       className="card-img w-full h-full object-cover object-top transition-transform duration-700 ease-out group-hover:scale-105"
                     />
@@ -310,113 +317,63 @@ export default function Home() {
            Mobile: uniform 2-col grid (same aspect, consistent).
            Desktop: editorial magazine — hero left (tall) + 3 compact right.
       */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 border-t border-border anim-fade-up">
-        <div className="flex justify-between items-center mb-8">
+      {/* ── 4. NEW ARRIVALS — Clean, Intuitive 4-Column Showcase Grid ── */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 border-t border-border anim-fade-up">
+        <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-4">
           <div>
-            <p className="text-[10px] uppercase tracking-[0.25em] subheading-primary font-bold">Just Released</p>
-            <h2 className="heading-primary text-2xl md:text-3xl font-heading font-medium mt-1 inline-block">New Arrivals</h2>
+            <span className="text-[10px] uppercase tracking-[0.25em] subheading-primary font-bold block mb-1">
+              JUST RELEASED
+            </span>
+            <h2 className="heading-primary text-2xl md:text-4xl font-mending font-medium tracking-wide">
+              New Arrivals
+            </h2>
           </div>
-          <Link to="/shop" className="nav-link text-xs font-semibold uppercase tracking-widest text-accent-gold hover:opacity-80 font-heading inline-flex items-center gap-1.5 whitespace-nowrap ml-4">
-            All <ArrowRight size={12} />
+          <Link
+            to="/shop"
+            className="nav-link text-xs font-semibold uppercase tracking-widest text-accent-gold hover:opacity-80 font-heading inline-flex items-center gap-1.5 whitespace-nowrap self-start md:self-auto"
+          >
+            Explore All New Arrivals <ArrowRight size={12} />
           </Link>
         </div>
 
         {newArrivals.length === 0 ? (
           <div className="text-center py-14 bg-bg-subtle border border-border">
-            <p className="text-xs uppercase tracking-widest text-text-secondary font-bold">No products yet.</p>
+            <p className="text-xs uppercase tracking-widest text-text-secondary font-bold">No new products available.</p>
           </div>
         ) : (
-          <>
-            {/* ── MOBILE: horizontal scroll (peek effect) ── */}
-            <div className="flex overflow-x-auto gap-4 md:hidden pb-5 scrollbar-none snap-x snap-mandatory px-4">
-              {newArrivals.map((product: any) => (
-                <Link key={product.id} to={`/product/${product.slug}`} className="group product-card block flex-shrink-0 w-[80vw] snap-start">
-                  <div className="w-full bg-bg-subtle overflow-hidden border border-border relative">
-                    <img
-                      src={product.product_images[0]?.url || linenShirt}
-                      alt={product.name}
-                      className="card-img w-full h-auto block relative z-10"
-                    />
-                    <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-accent-line scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
-                    <div className="absolute top-2 left-2 bg-text-primary text-white text-[8px] font-black uppercase tracking-[0.2em] px-2 py-0.5">
-                      New
-                    </div>
-                    <button
-                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleWishlist(product.id); }}
-                      aria-label="Toggle Wishlist"
-                      className={`wishlist-btn absolute top-2 right-2 p-1.5 bg-white/90 border border-border/60 rounded-full z-10 ${heartId === product.id ? 'anim-heart-pop' : ''}`}
-                    >
-                      <Heart size={12} className={isWishlisted(product.id) ? 'fill-sale stroke-sale' : 'stroke-text-primary'} />
-                    </button>
-                  </div>
-                  <div className="mt-2 space-y-0.5">
-                    <p className="text-[9px] uppercase tracking-widest text-text-secondary font-bold">Zenphire</p>
-                    <h3 className="text-xs font-medium text-text-primary group-hover:underline underline-offset-2 truncate">{product.name}</h3>
-                    <p className="text-xs font-semibold text-text-primary">₹{Number(product.base_price || 0).toFixed(2)}</p>
-                  </div>
-                </Link>
-              ))}
-              <div className="w-4 shrink-0" />
-            </div>
-
-            {/* ── DESKTOP: editorial magazine grid ── */}
-            <div className="hidden md:grid grid-cols-3 gap-4" style={{ gridTemplateRows: 'repeat(2, auto)' }}>
-              {/* Hero — spans 2 rows */}
-              {newArrivals[0] && (
-                <Link
-                  to={`/product/${newArrivals[0].slug}`}
-                  className="group product-card block row-span-2"
-                >
-                  <div className="h-full bg-bg-subtle overflow-hidden border border-border relative" style={{ minHeight: '480px' }}>
-                    <img
-                      src={newArrivals[0].product_images[0]?.url || linenShirt}
-                      alt={newArrivals[0].name}
-                      className="card-img w-full h-full object-cover object-center"
-                    />
-                    <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-accent-line scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
-                    <div className="absolute top-3 left-3 bg-text-primary text-white text-[8px] font-black uppercase tracking-[0.2em] px-2.5 py-1">New</div>
-                    <button
-                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleWishlist(newArrivals[0].id); }}
-                      aria-label="Toggle Wishlist"
-                      className={`wishlist-btn absolute top-3 right-3 p-1.5 bg-white/90 border border-border/60 rounded-full z-10 ${heartId === newArrivals[0].id ? 'anim-heart-pop' : ''}`}
-                    >
-                      <Heart size={13} className={isWishlisted(newArrivals[0].id) ? 'fill-sale stroke-sale' : 'stroke-text-primary'} />
-                    </button>
-                    <div className="card-overlay absolute bottom-0 left-0 right-0 p-5 bg-gradient-to-t from-black/70 to-transparent">
-                      <p className="text-[9px] uppercase tracking-widest text-white/60 font-bold mb-0.5">Zenphire</p>
-                      <h3 className="text-sm font-semibold text-white truncate">{newArrivals[0].name}</h3>
-                      <p className="text-sm font-bold text-white mt-0.5">₹{Number(newArrivals[0].base_price || 0).toFixed(2)}</p>
-                    </div>
-                  </div>
-                </Link>
-              )}
-              {/* 3 compact cards — 2 col × rows 1-2 */}
-              {newArrivals.slice(1).map((product: any) => (
-                <Link key={product.id} to={`/product/${product.slug}`} className="group product-card block">
-                  <div className="aspect-[4/3] bg-bg-subtle overflow-hidden border border-border relative">
-                    <img
-                      src={product.product_images[0]?.url || linenShirt}
-                      alt={product.name}
-                      className="card-img w-full h-full object-cover object-center"
-                    />
-                    <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-accent-line scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
-                    <div className="absolute top-2 left-2 bg-text-primary text-white text-[8px] font-black uppercase tracking-[0.2em] px-2 py-0.5">New</div>
-                    <button
-                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleWishlist(product.id); }}
-                      aria-label="Toggle Wishlist"
-                      className={`wishlist-btn absolute top-2 right-2 p-1 bg-white/90 border border-border/60 rounded-full z-10 ${heartId === product.id ? 'anim-heart-pop' : ''}`}
-                    >
-                      <Heart size={11} className={isWishlisted(product.id) ? 'fill-sale stroke-sale' : 'stroke-text-primary'} />
-                    </button>
-                  </div>
-                  <div className="mt-2 space-y-0.5">
-                    <h3 className="text-xs font-medium text-text-primary group-hover:underline underline-offset-2 truncate">{product.name}</h3>
-                    <p className="text-xs font-semibold text-text-primary">₹{Number(product.base_price || 0).toFixed(2)}</p>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+            {newArrivals.slice(0, 8).map((product: any) => (
+              <Link
+                key={product.id}
+                to={`/product/${product.slug}`}
+                className="group product-card block bg-bg-subtle border border-border overflow-hidden transition-all duration-300 hover:shadow-md"
+              >
+                <div className="aspect-[3/4] w-full bg-bg-subtle overflow-hidden relative">
+                  <img
+                    src={product.product_images[0]?.url || linenShirt}
+                    alt={product.name}
+                    className="card-img w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                  />
+                  <button
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleWishlist(product.id); }}
+                    aria-label="Toggle Wishlist"
+                    className={`wishlist-btn absolute top-3 right-3 p-2 bg-bg/90 border border-border/80 rounded-full shadow-xs z-10 transition-transform ${heartId === product.id ? 'anim-heart-pop' : ''}`}
+                  >
+                    <Heart size={14} className={isWishlisted(product.id) ? 'fill-sale stroke-sale' : 'stroke-text-primary'} />
+                  </button>
+                </div>
+                <div className="p-3.5 space-y-1">
+                  <p className="text-[9px] uppercase tracking-widest text-text-secondary font-bold">Zenphire</p>
+                  <h3 className="text-xs font-medium text-text-primary group-hover:text-accent-gold transition-colors duration-200 truncate">
+                    {product.name}
+                  </h3>
+                  <p className="text-xs font-semibold text-text-primary">
+                    ₹{Number(product.base_price || 0).toFixed(2)}
+                  </p>
+                </div>
+              </Link>
+            ))}
+          </div>
         )}
       </section>
 
@@ -425,7 +382,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
           <div className="space-y-5 anim-fade-up">
             <p className="text-[10px] uppercase tracking-[0.25em] subheading-primary font-bold">The Edit</p>
-            <h2 className="heading-primary text-4xl md:text-6xl font-pinyon normal-case leading-normal tracking-wide">
+            <h2 className="heading-primary text-4xl md:text-6xl font-kugile normal-case leading-normal tracking-wide">
               Honest Materials,<br />Artisan Craft
             </h2>
             <p className="text-sm text-text-secondary leading-relaxed max-w-md">
@@ -439,7 +396,7 @@ export default function Home() {
               Discover Collection <ArrowRight size={13} />
             </Link>
           </div>
-          <div className="overflow-hidden border border-border group w-full flex justify-center bg-[#F4F4F4]">
+          <div className="overflow-hidden border border-border group w-full flex justify-center bg-bg-subtle">
             <img
               src={editorialImage}
               alt="Artisan detail"
@@ -456,7 +413,7 @@ export default function Home() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center mb-10">
             <div>
               <p className="text-[10px] uppercase tracking-[0.25em] subheading-primary font-bold">Customer Favorites</p>
-              <h2 className="heading-primary text-2xl md:text-3xl font-heading font-medium mt-1 inline-block">Best Sellers</h2>
+              <h2 className="heading-primary text-2xl md:text-3xl font-mending font-medium mt-1 inline-block">Best Sellers</h2>
             </div>
 
             {/* Scroll Navigation Arrows */}
@@ -562,5 +519,11 @@ export default function Home() {
         </section>
       )}
     </div>
+  );
+}
+          </div >
+        </section >
+      )}
+    </div >
   );
 }

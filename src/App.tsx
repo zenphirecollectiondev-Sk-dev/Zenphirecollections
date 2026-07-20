@@ -62,7 +62,7 @@ function AppContent() {
   const wishlistCount = wishlistIds.length;
 
   const location = useLocation();
-  
+
   // Scope: Customer-facing pages only. Avoid admin portal and logins.
   const isCustomerPage = !location.pathname.startsWith('/admin') && !['/login', '/signup', '/forgot-password'].includes(location.pathname);
 
@@ -109,7 +109,6 @@ function AppContent() {
               </nav>
             )}
           </div>
-          {isCustomerPage && <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-accent-line" />}
 
           {/* Center Logo */}
           <div className="absolute left-1/2 transform -translate-x-1/2">
@@ -368,38 +367,39 @@ function AppContent() {
         </Routes>
       </main>
 
-      {/* Footer */}
-      <footer className="relative ambient-green-gradient border-t border-white/10 py-12 px-4 mt-auto text-white/70 shadow-[0_-8px_30px_rgba(0,0,0,0.15)]">
-        {isCustomerPage && <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-accent-line" />}
-        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div>
-            <h3 className="font-heading font-bold uppercase tracking-wider text-sm mb-4 text-accent-gold">Zenphire Collections</h3>
-            <p className="text-white/70 text-sm max-w-xs leading-relaxed">
-              Premium modern apparel. Redefining minimal fashion for the everyday wardrobe.
+      {/* Footer (Customer Pages Only) */}
+      {isCustomerPage && (
+        <footer className="relative ambient-green-gradient border-t border-white/10 py-12 px-4 mt-auto text-white/70 shadow-[0_-8px_30px_rgba(0,0,0,0.15)]">
+          <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div>
+              <h3 className="font-heading font-normal uppercase tracking-wider text-sm mb-4 text-accent-gold">Zenphire Collections</h3>
+              <p className="text-white/70 text-sm max-w-xs leading-relaxed">
+                Premium modern apparel. Redefining minimal fashion for the everyday wardrobe.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-heading font-normal uppercase tracking-wider text-sm mb-4 text-accent-gold">Customer Care</h3>
+              <ul className="space-y-2 text-sm text-white/70">
+                <li><Link to="/shop" className="hover:text-accent-gold transition-colors">Help & FAQ</Link></li>
+                <li><Link to="/shop" className="hover:text-accent-gold transition-colors">Shipping & Returns</Link></li>
+                <li><Link to="/shop" className="hover:text-accent-gold transition-colors">Size Guide</Link></li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="font-heading font-normal uppercase tracking-wider text-sm mb-4 text-accent-gold">Legal</h3>
+              <ul className="space-y-2 text-sm text-white/70">
+                <li><Link to="/shop" className="hover:text-accent-gold transition-colors">Privacy Policy</Link></li>
+                <li><Link to="/shop" className="hover:text-accent-gold transition-colors">Terms of Service</Link></li>
+              </ul>
+            </div>
+          </div>
+          <div className="max-w-7xl mx-auto mt-8 pt-8 border-t border-white/10 flex justify-center items-center">
+            <p className="text-xs text-white/50 text-center">
+              &copy; {new Date().getFullYear()} Zenphire Collections. All rights reserved.
             </p>
           </div>
-          <div>
-            <h3 className="font-heading font-bold uppercase tracking-wider text-sm mb-4 text-accent-gold">Customer Care</h3>
-            <ul className="space-y-2 text-sm text-white/70">
-              <li><Link to="/shop" className="hover:text-accent-gold transition-colors">Help & FAQ</Link></li>
-              <li><Link to="/shop" className="hover:text-accent-gold transition-colors">Shipping & Returns</Link></li>
-              <li><Link to="/shop" className="hover:text-accent-gold transition-colors">Size Guide</Link></li>
-            </ul>
-          </div>
-          <div>
-            <h3 className="font-heading font-bold uppercase tracking-wider text-sm mb-4 text-accent-gold">Legal</h3>
-            <ul className="space-y-2 text-sm text-white/70">
-              <li><Link to="/shop" className="hover:text-accent-gold transition-colors">Privacy Policy</Link></li>
-              <li><Link to="/shop" className="hover:text-accent-gold transition-colors">Terms of Service</Link></li>
-            </ul>
-          </div>
-        </div>
-        <div className="max-w-7xl mx-auto mt-8 pt-8 border-t border-white/10 flex justify-center items-center">
-          <p className="text-xs text-white/50 text-center">
-            &copy; {new Date().getFullYear()} Zenphire Collections. All rights reserved.
-          </p>
-        </div>
-      </footer>
+        </footer>
+      )}
       <SearchOverlay isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
       <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
     </div>

@@ -1,16 +1,16 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Package, 
-  AlertTriangle, 
-  Plus, 
-  Trash2, 
-  Edit2, 
-  Check, 
-  RefreshCw, 
-  X, 
-  Search, 
+import {
+  Package,
+  AlertTriangle,
+  Plus,
+  Trash2,
+  Edit2,
+  Check,
+  RefreshCw,
+  X,
+  Search,
   Activity,
   DollarSign,
   Loader2,
@@ -102,7 +102,7 @@ export default function Admin() {
   // Modals & Forms toggles
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  
+
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
 
@@ -123,7 +123,7 @@ export default function Admin() {
   const [selectedParentCatId, setSelectedParentCatId] = useState<string>('');
   const [selectedGender, setSelectedGender] = useState<'Male' | 'Female' | 'Unisex' | ''>('');
   const [newParentCatName, setNewParentCatName] = useState<string>('');
-  
+
   // New Variant inputs inside form
   const [varSize, setVarSize] = useState('M');
   const [varColor, setVarColor] = useState('White');
@@ -179,16 +179,24 @@ export default function Admin() {
   const [menImageUrl, setMenImageUrl] = useState('');
   const [womenImageUrl, setWomenImageUrl] = useState('');
   const [unisexImageUrl, setUnisexImageUrl] = useState('');
+  const [shirtImageUrl, setShirtImageUrl] = useState('');
+  const [tshirtImageUrl, setTshirtImageUrl] = useState('');
+  const [coordsImageUrl, setCoordsImageUrl] = useState('');
+  const [pantsImageUrl, setPantsImageUrl] = useState('');
   const [isSavingHomepage, setIsSavingHomepage] = useState(false);
   const [isUploadingHero, setIsUploadingHero] = useState(false);
   const [isUploadingTheEdit, setIsUploadingTheEdit] = useState(false);
   const [isUploadingMen, setIsUploadingMen] = useState(false);
   const [isUploadingWomen, setIsUploadingWomen] = useState(false);
   const [isUploadingUnisex, setIsUploadingUnisex] = useState(false);
+  const [isUploadingShirt, setIsUploadingShirt] = useState(false);
+  const [isUploadingTshirt, setIsUploadingTshirt] = useState(false);
+  const [isUploadingCoords, setIsUploadingCoords] = useState(false);
+  const [isUploadingPants, setIsUploadingPants] = useState(false);
 
   const [heroDragActive, setHeroDragActive] = useState(false);
   const [theEditDragActive, setTheEditDragActive] = useState(false);
-  
+
   const heroContainerRef = useRef<HTMLDivElement>(null);
   const editContainerRef = useRef<HTMLDivElement>(null);
 
@@ -266,11 +274,11 @@ export default function Admin() {
     const titleHtml = builderTitle.trim()
       ? `  <caption class="text-xs font-bold text-text-primary mb-2.5 text-left uppercase tracking-widest">${builderTitle.trim()}</caption>\n`
       : '';
-      
+
     const headersHtml = activeCols
       .map(c => `<th class="py-2.5">${c}</th>`)
       .join('\n      ');
-      
+
     const rowsHtml = builderRows.map(r => {
       const tds = activeCols.map((col, idx) => {
         const isBrand = idx === 0;
@@ -401,6 +409,10 @@ ${titleHtml}  <thead>
           setMenImageUrl(hpData.men_collection_image_url || '');
           setWomenImageUrl(hpData.women_collection_image_url || '');
           setUnisexImageUrl(hpData.unisex_collection_image_url || '');
+          setShirtImageUrl(hpData.shirt_category_image_url || '');
+          setTshirtImageUrl(hpData.tshirt_category_image_url || '');
+          setCoordsImageUrl(hpData.coords_category_image_url || '');
+          setPantsImageUrl(hpData.pants_category_image_url || '');
         }
       } catch (hErr) {
         console.warn('homepage_config table fetch failed or not yet created. Using defaults.', hErr);
@@ -469,7 +481,7 @@ ${titleHtml}  <thead>
         .eq('id', selectedOrder.id);
 
       if (error) throw error;
-      
+
       triggerNotification('Order updated successfully.');
       setIsOrderModalOpen(false);
       fetchData(); // Refresh the list
@@ -564,7 +576,7 @@ ${titleHtml}  <thead>
   // Find product search matches for Best Sellers
   const bestSellersMatches = useMemo(() => {
     if (!bestSellersSearch.trim()) return [];
-    return products.filter(p => 
+    return products.filter(p =>
       p.name.toLowerCase().includes(bestSellersSearch.toLowerCase()) &&
       !bestSellersIds.includes(p.id)
     );
@@ -573,7 +585,7 @@ ${titleHtml}  <thead>
   // Find product search matches for New Arrivals
   const newArrivalsMatches = useMemo(() => {
     if (!newArrivalsSearch.trim()) return [];
-    return products.filter(p => 
+    return products.filter(p =>
       p.name.toLowerCase().includes(newArrivalsSearch.toLowerCase()) &&
       !newArrivalsIds.includes(p.id)
     );
@@ -582,7 +594,7 @@ ${titleHtml}  <thead>
   // Handle local image upload to Supabase Storage with Base64 fallback
   const handleImageUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
-    type: 'hero' | 'edit' | 'men' | 'women' | 'unisex' | 'category'
+    type: 'hero' | 'edit' | 'men' | 'women' | 'unisex' | 'category' | 'shirt' | 'tshirt' | 'coords' | 'pants'
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -592,13 +604,17 @@ ${titleHtml}  <thead>
       return;
     }
 
-    const setLoader = 
-      type === 'hero' ? setIsUploadingHero : 
-      type === 'edit' ? setIsUploadingTheEdit :
-      type === 'men' ? setIsUploadingMen :
-      type === 'women' ? setIsUploadingWomen :
-      type === 'unisex' ? setIsUploadingUnisex :
-      setIsUploadingCategory;
+    const setLoader =
+      type === 'hero' ? setIsUploadingHero :
+        type === 'edit' ? setIsUploadingTheEdit :
+          type === 'men' ? setIsUploadingMen :
+            type === 'women' ? setIsUploadingWomen :
+              type === 'unisex' ? setIsUploadingUnisex :
+                type === 'shirt' ? setIsUploadingShirt :
+                  type === 'tshirt' ? setIsUploadingTshirt :
+                    type === 'coords' ? setIsUploadingCoords :
+                      type === 'pants' ? setIsUploadingPants :
+                        setIsUploadingCategory;
     setLoader(true);
 
     const assignUrl = (url: string) => {
@@ -607,15 +623,23 @@ ${titleHtml}  <thead>
       else if (type === 'men') setMenImageUrl(url);
       else if (type === 'women') setWomenImageUrl(url);
       else if (type === 'unisex') setUnisexImageUrl(url);
+      else if (type === 'shirt') setShirtImageUrl(url);
+      else if (type === 'tshirt') setTshirtImageUrl(url);
+      else if (type === 'coords') setCoordsImageUrl(url);
+      else if (type === 'pants') setPantsImageUrl(url);
       else if (type === 'category') setCatImageUrl(url);
     };
 
-    const readableName = 
+    const readableName =
       type === 'hero' ? 'Hero' :
-      type === 'edit' ? 'The Edit' :
-      type === 'men' ? 'Men Collection' :
-      type === 'women' ? 'Women Collection' :
-      type === 'unisex' ? 'Unisex Collection' : 'Category';
+        type === 'edit' ? 'The Edit' :
+          type === 'men' ? 'Men Collection' :
+            type === 'women' ? 'Women Collection' :
+              type === 'unisex' ? 'Unisex Collection' :
+                type === 'shirt' ? 'Shirt Category' :
+                  type === 'tshirt' ? 'T-Shirt Category' :
+                    type === 'coords' ? 'Co-ords Category' :
+                      type === 'pants' ? 'Pants Category' : 'Category';
 
     try {
       const fileExt = file.name.split('.').pop();
@@ -713,6 +737,10 @@ ${titleHtml}  <thead>
           men_collection_image_url: menImageUrl.trim() || null,
           women_collection_image_url: womenImageUrl.trim() || null,
           unisex_collection_image_url: unisexImageUrl.trim() || null,
+          shirt_category_image_url: shirtImageUrl.trim() || null,
+          tshirt_category_image_url: tshirtImageUrl.trim() || null,
+          coords_category_image_url: coordsImageUrl.trim() || null,
+          pants_category_image_url: pantsImageUrl.trim() || null,
           updated_at: new Date().toISOString()
         });
       if (error) throw error;
@@ -758,7 +786,7 @@ ${titleHtml}  <thead>
     setProdImages(prod.product_images || []);
     setProdVariants(prod.product_variants || []);
     setNewImageUrl('');
-    
+
     // Wizard setup: resolve main & sub-category from prod.category_id
     const productCategoryObj = categories.find(c => c.id === prod.category_id);
     if (productCategoryObj) {
@@ -791,7 +819,7 @@ ${titleHtml}  <thead>
     setProdImages([]);
     setProdVariants([]);
     setNewImageUrl('');
-    
+
     // Wizard resets
     setWizardStep(1);
     setSelectedParentCatId('');
@@ -892,7 +920,7 @@ ${titleHtml}  <thead>
           if (selectedGender) {
             const childSlug = `${parentCatObj.slug}-${selectedGender.toLowerCase()}`;
             const existingChild = categories.find(c => c.slug === childSlug && c.parent_category_id === parentCatObj.id);
-            
+
             if (existingChild) {
               finalCategoryId = existingChild.id;
             } else {
@@ -934,7 +962,7 @@ ${titleHtml}  <thead>
           .update(payload)
           .eq('id', productId);
         if (error) throw error;
-        
+
         // 2. Remove all existing variants & images, then re-insert to simplify sync
         await supabase.from('product_images').delete().eq('product_id', productId);
         await supabase.from('product_variants').delete().eq('product_id', productId);
@@ -1080,14 +1108,14 @@ ${titleHtml}  <thead>
         .update({ stock_qty: val })
         .eq('id', variantId);
       if (error) throw error;
-      
+
       triggerNotification('Stock level updated successfully');
-      
+
       // Update local state locally to avoid full fetch
       setProducts(prevProducts => {
         return prevProducts.map(p => ({
           ...p,
-          product_variants: p.product_variants.map(v => 
+          product_variants: p.product_variants.map(v =>
             v.id === variantId ? { ...v, stock_qty: val } : v
           )
         }));
@@ -1109,16 +1137,16 @@ ${titleHtml}  <thead>
   // Filtered Products
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
-      const matchSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          p.slug.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          p.product_variants.some(v => v.sku.toLowerCase().includes(searchQuery.toLowerCase()));
+      const matchSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.slug.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.product_variants.some(v => v.sku.toLowerCase().includes(searchQuery.toLowerCase()));
       return matchSearch;
     });
   }, [products, searchQuery]);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-12 md:py-16">
-      
+    <div className="max-w-7xl mx-auto px-4 py-12 md:py-16 font-sans antialiased text-slate-800">
+
       {/* Top Banner Header */}
       <div className="border border-border/80 p-6 md:p-8 bg-white mb-10 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
@@ -1156,7 +1184,7 @@ ${titleHtml}  <thead>
       {/* Notifications banner */}
       <AnimatePresence>
         {successMsg && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
@@ -1167,7 +1195,7 @@ ${titleHtml}  <thead>
           </motion.div>
         )}
         {errorMsg && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
@@ -1215,11 +1243,10 @@ ${titleHtml}  <thead>
             <button
               key={key}
               onClick={() => setActiveTab(key)}
-              className={`py-3.5 px-5 text-xs font-bold tracking-widest uppercase border-b-2 whitespace-nowrap transition-all flex-shrink-0 ${
-                activeTab === key
+              className={`py-3.5 px-5 text-xs font-bold tracking-widest uppercase border-b-2 whitespace-nowrap transition-all flex-shrink-0 ${activeTab === key
                   ? 'border-accent text-text-primary font-black'
                   : 'border-transparent text-text-secondary hover:text-text-primary'
-              }`}
+                }`}
             >
               {label}
             </button>
@@ -1229,19 +1256,19 @@ ${titleHtml}  <thead>
 
       {/* TABS CONTAINER */}
       <div>
-        
+
         {/* TAB 1: OVERVIEW STATISTICS */}
         {activeTab === 'overview' && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             className="space-y-8"
           >
             {/* Stat Cards Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              
+
               {/* Stat 1 */}
-              <motion.div 
+              <motion.div
                 whileHover={{ y: -4 }}
                 className="bg-white border border-border/80 p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex items-center justify-between transition-all"
               >
@@ -1259,7 +1286,7 @@ ${titleHtml}  <thead>
               </motion.div>
 
               {/* Stat 2 */}
-              <motion.div 
+              <motion.div
                 whileHover={{ y: -4 }}
                 className="bg-white border border-border/80 p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex items-center justify-between transition-all"
               >
@@ -1277,7 +1304,7 @@ ${titleHtml}  <thead>
               </motion.div>
 
               {/* Stat 3 */}
-              <motion.div 
+              <motion.div
                 whileHover={{ y: -4 }}
                 className="bg-white border border-border/80 p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex items-center justify-between transition-all"
               >
@@ -1295,7 +1322,7 @@ ${titleHtml}  <thead>
               </motion.div>
 
               {/* Stat 4 */}
-              <motion.div 
+              <motion.div
                 whileHover={{ y: -4 }}
                 className="bg-white border border-border/80 p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex items-center justify-between transition-all"
               >
@@ -1315,7 +1342,7 @@ ${titleHtml}  <thead>
 
             {/* Recents grids */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-              
+
               {/* Left Column: Recent orders */}
               <div className="lg:col-span-7 bg-white border border-border/80 p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)]">
                 <h3 className="text-xs font-heading font-black uppercase tracking-wider text-text-primary mb-4 pb-2 border-b border-border">
@@ -1341,13 +1368,12 @@ ${titleHtml}  <thead>
                             <td className="py-3 text-text-secondary">{new Date(o.created_at).toLocaleDateString()}</td>
                             <td className="py-3 text-right font-semibold text-text-primary">₹{Number(o.total).toLocaleString()}</td>
                             <td className="py-3 pl-6">
-                              <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 border ${
-                                o.status === 'delivered' 
+                              <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 border ${o.status === 'delivered'
                                   ? 'bg-green-50 text-green-700 border-green-200'
                                   : o.status === 'cancelled'
-                                  ? 'bg-red-50 text-sale border-red-200'
-                                  : 'bg-yellow-50 text-yellow-700 border-yellow-200'
-                              }`}>
+                                    ? 'bg-red-50 text-sale border-red-200'
+                                    : 'bg-yellow-50 text-yellow-700 border-yellow-200'
+                                }`}>
                                 {o.status}
                               </span>
                             </td>
@@ -1368,7 +1394,7 @@ ${titleHtml}  <thead>
                   <p className="text-xs text-text-secondary py-6 text-center">No inventory variants loaded.</p>
                 ) : (
                   <div className="space-y-3.5 max-h-[300px] overflow-y-auto pr-1">
-                    {products.flatMap(p => 
+                    {products.flatMap(p =>
                       p.product_variants
                         .filter(v => v.stock_qty < 10)
                         .map(v => (
@@ -1398,7 +1424,7 @@ ${titleHtml}  <thead>
 
         {/* TAB 2: PRODUCT CATALOG */}
         {activeTab === 'products' && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             className="space-y-6"
@@ -1455,7 +1481,7 @@ ${titleHtml}  <thead>
                       {filteredProducts.map((p: Product) => {
                         const totalStock = p.product_variants.reduce((sum: number, v: ProductVariant) => sum + v.stock_qty, 0);
                         const categoryName = categories.find(c => c.id === p.category_id)?.name || 'Unassigned';
-                        
+
                         return (
                           <tr key={p.id} className="hover:bg-bg-subtle">
                             <td className="py-4 pl-6">
@@ -1477,11 +1503,10 @@ ${titleHtml}  <thead>
                               </span>
                             </td>
                             <td className="py-4">
-                              <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 border ${
-                                p.is_active 
-                                  ? 'bg-green-50 text-green-700 border-green-200' 
+                              <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 border ${p.is_active
+                                  ? 'bg-green-50 text-green-700 border-green-200'
                                   : 'bg-red-50 text-sale border-red-200'
-                              }`}>
+                                }`}>
                                 {p.is_active ? 'Active' : 'Draft'}
                               </span>
                             </td>
@@ -1514,7 +1539,7 @@ ${titleHtml}  <thead>
 
         {/* TAB 3: CATEGORIES & SIZING */}
         {activeTab === 'categories' && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             className="grid grid-cols-1 lg:grid-cols-12 gap-8"
@@ -1627,7 +1652,7 @@ ${titleHtml}  <thead>
 
         {/* TAB 4: INVENTORY STOCK LEDGER */}
         {activeTab === 'inventory' && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             className="space-y-6"
@@ -1658,20 +1683,20 @@ ${titleHtml}  <thead>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {products.flatMap(p => 
+                    {products.flatMap(p =>
                       p.product_variants
                         .filter(v => {
-                          const matchSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                                              v.sku.toLowerCase().includes(searchQuery.toLowerCase());
+                          const matchSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            v.sku.toLowerCase().includes(searchQuery.toLowerCase());
                           return matchSearch;
                         })
                         .map(v => {
-                          const currentVal = inlineEditStock[v.id || ''] !== undefined 
-                            ? inlineEditStock[v.id || ''] 
+                          const currentVal = inlineEditStock[v.id || ''] !== undefined
+                            ? inlineEditStock[v.id || '']
                             : v.stock_qty;
                           const isSaving = savingStockIds[v.id || ''];
                           const hasChanged = inlineEditStock[v.id || ''] !== undefined && inlineEditStock[v.id || ''] !== v.stock_qty;
-                          
+
                           return (
                             <tr key={v.id} className="hover:bg-bg-subtle">
                               <td className="py-4 pl-6">
@@ -1691,9 +1716,9 @@ ${titleHtml}  <thead>
                                     value={currentVal}
                                     onChange={(e) => {
                                       const n = parseInt(e.target.value);
-                                      setInlineEditStock(prev => ({ 
-                                        ...prev, 
-                                        [v.id || '']: isNaN(n) ? 0 : n 
+                                      setInlineEditStock(prev => ({
+                                        ...prev,
+                                        [v.id || '']: isNaN(n) ? 0 : n
                                       }));
                                     }}
                                     className="w-20 px-2 py-1 border border-border text-center text-xs focus:outline-none focus:border-accent"
@@ -1744,7 +1769,7 @@ ${titleHtml}  <thead>
 
         {/* TAB 5: CUSTOMER ORDERS */}
         {activeTab === 'orders' && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             className="space-y-6"
@@ -1803,17 +1828,16 @@ ${titleHtml}  <thead>
                             ₹{Number(o.total || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                           </td>
                           <td className="py-4 pl-8">
-                            <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 border ${
-                              o.status === 'delivered' 
+                            <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 border ${o.status === 'delivered'
                                 ? 'bg-green-50 text-green-700 border-green-200'
                                 : o.status === 'cancelled'
-                                ? 'bg-red-50 text-sale border-red-200'
-                                : o.status === 'shipped'
-                                ? 'bg-blue-50 text-blue-700 border-blue-200'
-                                : o.status === 'processing'
-                                ? 'bg-purple-50 text-purple-700 border-purple-200'
-                                : 'bg-yellow-50 text-yellow-700 border-yellow-200'
-                            }`}>
+                                  ? 'bg-red-50 text-sale border-red-200'
+                                  : o.status === 'shipped'
+                                    ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                    : o.status === 'processing'
+                                      ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                      : 'bg-yellow-50 text-yellow-700 border-yellow-200'
+                              }`}>
                               {o.status}
                             </span>
                           </td>
@@ -1848,7 +1872,7 @@ ${titleHtml}  <thead>
 
         {/* TAB 6: MANAGE COUPONS */}
         {activeTab === 'coupons' && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             className="grid grid-cols-1 lg:grid-cols-12 gap-8"
@@ -1904,11 +1928,10 @@ ${titleHtml}  <thead>
                             <td className="py-3 text-[10px] text-text-secondary">₹{Number(c.min_order_value || 0).toFixed(2)}</td>
                             <td className="py-3 text-[10px] text-text-secondary font-mono">{new Date(c.expiry).toLocaleDateString()}</td>
                             <td className="py-3 text-[10px]">
-                              <span className={`px-2 py-0.5 border text-[8px] font-black uppercase tracking-widest ${
-                                isExpired 
-                                  ? 'bg-red-50 text-sale border-red-200' 
+                              <span className={`px-2 py-0.5 border text-[8px] font-black uppercase tracking-widest ${isExpired
+                                  ? 'bg-red-50 text-sale border-red-200'
                                   : 'bg-green-50 text-green-700 border-green-200'
-                              }`}>
+                                }`}>
                                 {isExpired ? 'Expired' : 'Active'}
                               </span>
                             </td>
@@ -1979,7 +2002,7 @@ ${titleHtml}  <thead>
 
         {/* TAB 7: COURIER PARTNERS */}
         {activeTab === 'couriers' && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             className="grid grid-cols-1 lg:grid-cols-12 gap-8"
@@ -2079,7 +2102,7 @@ ${titleHtml}  <thead>
 
         {/* TAB 8: HOMEPAGE SETTINGS */}
         {activeTab === 'homepage' && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             className="grid grid-cols-1 lg:grid-cols-12 gap-8"
@@ -2134,7 +2157,7 @@ ${titleHtml}  <thead>
                     <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider block">
                       Crop Adjustment (Click & Drag Image to adjust positioning)
                     </span>
-                    <div 
+                    <div
                       ref={heroContainerRef}
                       onMouseDown={() => setHeroDragActive(true)}
                       onMouseMove={handleHeroDrag}
@@ -2145,9 +2168,9 @@ ${titleHtml}  <thead>
                     >
                       {heroImageUrl ? (
                         <>
-                          <img 
-                            src={heroImageUrl} 
-                            alt="Hero Preview" 
+                          <img
+                            src={heroImageUrl}
+                            alt="Hero Preview"
                             className="w-full h-full object-cover pointer-events-none"
                             style={{ objectPosition: heroImagePosition }}
                           />
@@ -2209,7 +2232,7 @@ ${titleHtml}  <thead>
                     <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider block">
                       Crop Adjustment (Click & Drag Image to adjust positioning)
                     </span>
-                    <div 
+                    <div
                       ref={editContainerRef}
                       onMouseDown={() => setTheEditDragActive(true)}
                       onMouseMove={handleEditDrag}
@@ -2220,9 +2243,9 @@ ${titleHtml}  <thead>
                     >
                       {theEditImageUrl ? (
                         <>
-                          <img 
-                            src={theEditImageUrl} 
-                            alt="The Edit Preview" 
+                          <img
+                            src={theEditImageUrl}
+                            alt="The Edit Preview"
                             className="w-full h-full object-cover pointer-events-none"
                             style={{ objectPosition: theEditImagePosition }}
                           />
@@ -2358,6 +2381,162 @@ ${titleHtml}  <thead>
                     ) : (
                       <div className="aspect-[4/5] border border-border bg-bg-subtle flex items-center justify-center text-[10px] text-text-secondary/70 italic font-semibold rounded-none">
                         No Unisex mockup loaded
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Category Showcase Images (Shirts, T-Shirts, Co-ords, Pants) */}
+              <div className="border-t border-border pt-6 space-y-6">
+                <h3 className="text-xs font-sans font-bold uppercase tracking-wider text-text-primary">
+                  Shop By Category Banner Images (Shirts, T-Shirts, Co-ords, Pants)
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+                  {/* Shirts Image */}
+                  <div className="space-y-3">
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
+                      Shirts Category Image
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      disabled={isUploadingShirt}
+                      onChange={(e) => handleImageUpload(e, 'shirt')}
+                      className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent file:mr-2 file:py-1 file:px-2 file:border-0 file:text-[9px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
+                    />
+                    {isUploadingShirt && (
+                      <span className="text-[9px] text-text-secondary mt-1 block font-bold animate-pulse">
+                        Uploading...
+                      </span>
+                    )}
+                    {shirtImageUrl ? (
+                      <div className="space-y-2">
+                        <div className="aspect-[3/4] bg-bg-subtle relative overflow-hidden border border-border">
+                          <img src={shirtImageUrl} alt="Shirts Preview" className="w-full h-full object-cover" />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShirtImageUrl('')}
+                          className="text-[10px] text-sale font-bold hover:underline cursor-pointer flex items-center gap-1"
+                        >
+                          <X size={10} className="stroke-[2]" /> Clear Image
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="aspect-[3/4] border border-border bg-bg-subtle flex items-center justify-center text-[10px] text-text-secondary/70 italic font-semibold rounded-none">
+                        No Shirts image
+                      </div>
+                    )}
+                  </div>
+
+                  {/* T-Shirts Image */}
+                  <div className="space-y-3">
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
+                      T-Shirts Category Image
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      disabled={isUploadingTshirt}
+                      onChange={(e) => handleImageUpload(e, 'tshirt')}
+                      className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent file:mr-2 file:py-1 file:px-2 file:border-0 file:text-[9px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
+                    />
+                    {isUploadingTshirt && (
+                      <span className="text-[9px] text-text-secondary mt-1 block font-bold animate-pulse">
+                        Uploading...
+                      </span>
+                    )}
+                    {tshirtImageUrl ? (
+                      <div className="space-y-2">
+                        <div className="aspect-[3/4] bg-bg-subtle relative overflow-hidden border border-border">
+                          <img src={tshirtImageUrl} alt="T-Shirts Preview" className="w-full h-full object-cover" />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setTshirtImageUrl('')}
+                          className="text-[10px] text-sale font-bold hover:underline cursor-pointer flex items-center gap-1"
+                        >
+                          <X size={10} className="stroke-[2]" /> Clear Image
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="aspect-[3/4] border border-border bg-bg-subtle flex items-center justify-center text-[10px] text-text-secondary/70 italic font-semibold rounded-none">
+                        No T-Shirts image
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Co-ords Image */}
+                  <div className="space-y-3">
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
+                      Co-ords Category Image
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      disabled={isUploadingCoords}
+                      onChange={(e) => handleImageUpload(e, 'coords')}
+                      className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent file:mr-2 file:py-1 file:px-2 file:border-0 file:text-[9px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
+                    />
+                    {isUploadingCoords && (
+                      <span className="text-[9px] text-text-secondary mt-1 block font-bold animate-pulse">
+                        Uploading...
+                      </span>
+                    )}
+                    {coordsImageUrl ? (
+                      <div className="space-y-2">
+                        <div className="aspect-[3/4] bg-bg-subtle relative overflow-hidden border border-border">
+                          <img src={coordsImageUrl} alt="Co-ords Preview" className="w-full h-full object-cover" />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setCoordsImageUrl('')}
+                          className="text-[10px] text-sale font-bold hover:underline cursor-pointer flex items-center gap-1"
+                        >
+                          <X size={10} className="stroke-[2]" /> Clear Image
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="aspect-[3/4] border border-border bg-bg-subtle flex items-center justify-center text-[10px] text-text-secondary/70 italic font-semibold rounded-none">
+                        No Co-ords image
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Pants Image */}
+                  <div className="space-y-3">
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
+                      Pants Category Image
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      disabled={isUploadingPants}
+                      onChange={(e) => handleImageUpload(e, 'pants')}
+                      className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent file:mr-2 file:py-1 file:px-2 file:border-0 file:text-[9px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
+                    />
+                    {isUploadingPants && (
+                      <span className="text-[9px] text-text-secondary mt-1 block font-bold animate-pulse">
+                        Uploading...
+                      </span>
+                    )}
+                    {pantsImageUrl ? (
+                      <div className="space-y-2">
+                        <div className="aspect-[3/4] bg-bg-subtle relative overflow-hidden border border-border">
+                          <img src={pantsImageUrl} alt="Pants Preview" className="w-full h-full object-cover" />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setPantsImageUrl('')}
+                          className="text-[10px] text-sale font-bold hover:underline cursor-pointer flex items-center gap-1"
+                        >
+                          <X size={10} className="stroke-[2]" /> Clear Image
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="aspect-[3/4] border border-border bg-bg-subtle flex items-center justify-center text-[10px] text-text-secondary/70 italic font-semibold rounded-none">
+                        No Pants image
                       </div>
                     )}
                   </div>
@@ -2616,7 +2795,7 @@ ${titleHtml}  <thead>
         {isProductModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             {/* Backdrop */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -2625,13 +2804,13 @@ ${titleHtml}  <thead>
             />
 
             {/* Modal box */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 15 }}
               className="relative w-full max-w-4xl bg-white border border-border p-6 md:p-8 shadow-2xl z-10 flex flex-col max-h-[90vh] overflow-y-auto"
             >
-              
+
               <div className="flex justify-between items-center border-b border-border pb-4 mb-6">
                 <div>
                   <span className="text-[9px] uppercase tracking-widest text-text-secondary font-black bg-bg-subtle px-2 py-0.5 border border-border">
@@ -2690,11 +2869,10 @@ ${titleHtml}  <thead>
                             setNewParentCatName('');
                             setWizardStep(2);
                           }}
-                          className={`p-6 border text-center font-bold uppercase tracking-wider text-[11px] transition-all flex flex-col justify-center items-center h-28 rounded-none ${
-                            selectedParentCatId === c.id
+                          className={`p-6 border text-center font-bold uppercase tracking-wider text-[11px] transition-all flex flex-col justify-center items-center h-28 rounded-none ${selectedParentCatId === c.id
                               ? 'bg-accent border-accent text-white shadow-md'
                               : 'bg-white border-border text-text-primary hover:border-accent'
-                          }`}
+                            }`}
                         >
                           <Package size={18} className="mb-2" />
                           {c.name}
@@ -2756,11 +2934,10 @@ ${titleHtml}  <thead>
                             setSelectedGender(gender as any);
                             setWizardStep(3);
                           }}
-                          className={`p-6 border text-center font-bold uppercase tracking-wider text-[11px] transition-all flex flex-col justify-center items-center h-28 rounded-none ${
-                            selectedGender === gender
+                          className={`p-6 border text-center font-bold uppercase tracking-wider text-[11px] transition-all flex flex-col justify-center items-center h-28 rounded-none ${selectedGender === gender
                               ? 'bg-accent border-accent text-white shadow-md'
                               : 'bg-white border-border text-text-primary hover:border-accent'
-                          }`}
+                            }`}
                         >
                           <span className="text-lg font-black mb-1">
                             {gender === 'Male' ? '♂' : gender === 'Female' ? '♀' : '⚧'}
@@ -3109,7 +3286,7 @@ ${titleHtml}  <thead>
         {isCategoryModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             {/* Backdrop */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -3118,13 +3295,13 @@ ${titleHtml}  <thead>
             />
 
             {/* Modal box */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 15 }}
               className="relative w-full max-w-lg bg-white border border-border p-6 md:p-8 shadow-2xl z-10 flex flex-col max-h-[90vh] overflow-y-auto"
             >
-              
+
               <div className="flex justify-between items-center border-b border-border pb-4 mb-6">
                 <div>
                   <span className="text-[9px] uppercase tracking-widest text-text-secondary font-black bg-bg-subtle px-2 py-0.5 border border-border">
@@ -3143,7 +3320,7 @@ ${titleHtml}  <thead>
               </div>
 
               <form onSubmit={handleCategorySubmit} className="space-y-4">
-                
+
                 {/* Category Name */}
                 <div>
                   <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
@@ -3277,7 +3454,7 @@ ${titleHtml}  <thead>
         {isSizeBuilderOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             {/* Backdrop */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -3286,7 +3463,7 @@ ${titleHtml}  <thead>
             />
 
             {/* Modal Box */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 15 }}
@@ -3310,10 +3487,10 @@ ${titleHtml}  <thead>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                
+
                 {/* Left Column: Row Builder */}
                 <div className="lg:col-span-7 space-y-6">
-                  
+
                   {/* Table Title Input */}
                   <div>
                     <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
@@ -3392,7 +3569,7 @@ ${titleHtml}  <thead>
                                         const oldName = updatedCols[idx];
                                         updatedCols[idx] = newName;
                                         setBuilderColumns(updatedCols);
-                                        
+
                                         // Update keys in rows
                                         setBuilderRows(builderRows.map(r => {
                                           const copy = { ...r };
@@ -3447,9 +3624,8 @@ ${titleHtml}  <thead>
                                       setBuilderRows(updated);
                                     }}
                                     placeholder={colIdx === 0 ? "e.g. M" : "in"}
-                                    className={`px-2 py-1 border border-border bg-white text-xs focus:outline-none focus:border-accent ${
-                                      colIdx === 0 ? 'w-16 text-center font-bold' : 'w-full max-w-[80px]'
-                                    }`}
+                                    className={`px-2 py-1 border border-border bg-white text-xs focus:outline-none focus:border-accent ${colIdx === 0 ? 'w-16 text-center font-bold' : 'w-full max-w-[80px]'
+                                      }`}
                                   />
                                 </td>
                               ))}
@@ -3540,7 +3716,7 @@ ${titleHtml}  <thead>
         {isOrderModalOpen && selectedOrder && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             {/* Backdrop */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -3549,7 +3725,7 @@ ${titleHtml}  <thead>
             />
 
             {/* Modal Container */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 15 }}
@@ -3690,7 +3866,7 @@ ${titleHtml}  <thead>
                       Fulfillment Controls
                     </h4>
 
-                     {/* Status selection */}
+                    {/* Status selection */}
                     <div>
                       <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
                         Order Status
@@ -3771,14 +3947,14 @@ ${titleHtml}  <thead>
       <AnimatePresence>
         {isCouponModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsCouponModalOpen(false)}
               className="fixed inset-0 bg-black/60 backdrop-blur-xs"
             />
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 15 }}
@@ -3903,14 +4079,14 @@ ${titleHtml}  <thead>
       <AnimatePresence>
         {isCourierModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsCourierModalOpen(false)}
               className="fixed inset-0 bg-black/60 backdrop-blur-xs"
             />
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 15 }}
