@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { SlidersHorizontal, X, ChevronDown, Heart, Loader2, ShoppingBag, ArrowRight } from 'lucide-react';
 import { useWishlistStore } from '../store/useWishlistStore';
-import { getActiveProducts, getCategories } from '../lib/supabase';
+import { getActiveProducts, getCategories, supabase } from '../lib/supabase';
 import linenShirt from '../assets/product_linen_shirt.png';
 
 export default function Shop() {
@@ -11,17 +11,24 @@ export default function Shop() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeCategory = searchParams.get('category') || 'all';
   const activeGender = searchParams.get('gender') || 'all';
+  const activeOccasion = searchParams.get('occasion') || 'all';
 
   const [dbProducts, setDbProducts] = useState<any[]>([]);
   const [dbCategories, setDbCategories] = useState<any[]>([]);
+  const [occasionProducts, setOccasionProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadData() {
       try {
-        const [prodData, catData] = await Promise.all([getActiveProducts(), getCategories()]);
+        const [prodData, catData, occData] = await Promise.all([
+          getActiveProducts(),
+          getCategories(),
+          supabase.from('occasion_products' as any).select('*')
+        ]);
         setDbProducts(prodData || []);
         setDbCategories(catData || []);
+        setOccasionProducts(occData.data || []);
       } catch (err) {
         console.warn('Shop load error:', err);
       } finally {
@@ -54,6 +61,7 @@ export default function Shop() {
   const resetFilters = () => {
     searchParams.delete('category');
     searchParams.delete('gender');
+    searchParams.delete('occasion');
     setSearchParams(searchParams);
     setSelectedSizes([]);
     setMaxPrice(15000);
@@ -67,8 +75,28 @@ export default function Shop() {
 
   const filteredProducts = useMemo(() => {
     let result = [...products];
+
+    // Filter by occasion if active
+    if (activeOccasion !== 'all') {
+      const occProductIds = occasionProducts
+        .filter((op) => op.occasion.toLowerCase() === activeOccasion.toLowerCase())
+        .map((op) => op.product_id);
+      result = result.filter((p) => occProductIds.includes(p.id));
+    }
+
     if (activeCategory !== 'all') {
-      const categoryObj = categories.find((c) => c.slug === activeCategory);
+      // Find category slug, with flexible fallbacks for specific category names
+      let categoryObj = categories.find((c) => c.slug === activeCategory);
+      if (!categoryObj) {
+        if (activeCategory === 'trousers') {
+          categoryObj = categories.find((c) => c.slug === 'pants');
+        } else if (activeCategory === 'crop-tops') {
+          categoryObj = categories.find((c) => c.slug === 'crop-top');
+        } else if (activeCategory === 'tshirt-and-tops' || activeCategory === 'tshirt' || activeCategory === 'tshirts') {
+          categoryObj = categories.find((c) => c.slug === 't-shirts');
+        }
+      }
+
       if (categoryObj) {
         result = result.filter((p) => {
           if (p.category_id === categoryObj.id) return true;
@@ -112,9 +140,10 @@ export default function Shop() {
         <div>
           <p className="text-[10px] uppercase tracking-[0.25em] text-accent-gold font-bold">Zenphire Catalog</p>
           <h1 className="text-3xl font-heading font-medium uppercase mt-1">
-            {activeCategory !== 'all' ? `${activeCategory} Collection`
-              : activeGender !== 'all' ? `${activeGender}'s Collection`
-                : 'Shop All'}
+            {activeOccasion !== 'all' ? `${activeOccasion.replace('-', ' ')} Collection`
+              : activeCategory !== 'all' ? `${activeCategory} Collection`
+                : activeGender !== 'all' ? `${activeGender}'s Collection`
+                  : 'Shop All'}
           </h1>
         </div>
         <p className="text-xs text-text-secondary">{filteredProducts.length} results</p>

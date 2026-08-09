@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation, NavLink } from 'react-router-dom';
-import { ShoppingBag, Heart, User, Search, Shield, LogOut, Menu, X } from 'lucide-react';
+import { ShoppingBag, Heart, User, Search, Shield, LogOut, Menu, X, ChevronDown } from 'lucide-react';
 import { useAuthStore } from './store/useAuthStore';
 import { useCartStore } from './store/useCartStore';
 import { useWishlistStore } from './store/useWishlistStore';
@@ -54,6 +54,19 @@ function AppContent() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    occasions: false,
+    women: false,
+    men: false,
+    unisex: false
+  });
+
+  const toggleSection = (section: string) => {
+    setOpenSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
 
   const cartItems = useCartStore((state) => state.items);
   const cartCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
@@ -185,6 +198,14 @@ function AppContent() {
           {/* Right Icons (Mobile) */}
           <div className="flex md:hidden items-center gap-2">
             <button
+              onClick={() => setIsSearchOpen(true)}
+              aria-label="Search"
+              className={`btn-icon p-2 rounded-full transition-colors duration-200 ${isCustomerPage ? 'text-accent-gold hover:bg-white/10' : 'text-text-primary hover:bg-bg-subtle'}`}
+            >
+              <Search size={19} className="stroke-[1.5]" />
+            </button>
+
+            <button
               onClick={() => setIsCartOpen(true)}
               aria-label="Cart"
               className={`btn-icon p-2 rounded-full relative transition-colors duration-200 ${isCustomerPage ? 'text-accent-gold hover:bg-white/10' : 'text-text-primary hover:bg-bg-subtle'}`}
@@ -221,9 +242,9 @@ function AppContent() {
               transition={{ type: 'tween', duration: 0.3 }}
               className="fixed inset-y-0 left-0 w-80 max-w-[85vw] bg-white border-r border-border p-6 shadow-2xl flex flex-col justify-between"
             >
-              <div className="space-y-8">
+              <div className="flex flex-col h-full overflow-hidden space-y-6">
                 {/* Header */}
-                <div className="flex justify-between items-center pb-4 border-b border-border">
+                <div className="flex justify-between items-center pb-4 border-b border-border flex-shrink-0">
                   <span className="text-lg font-heading font-normal tracking-[0.2em] uppercase text-accent-gold">
                     Zenphire
                   </span>
@@ -235,57 +256,219 @@ function AppContent() {
                   </button>
                 </div>
 
-                {/* Navigation Links */}
-                <nav className="flex flex-col gap-6 text-sm font-heading font-medium uppercase tracking-wider text-accent-gold/85">
-                  <Link
-                    to="/shop"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className="hover:text-accent-gold transition-colors flex items-center gap-2"
-                  >
-                    Shop Collection
-                  </Link>
-
-                  <button
-                    onClick={() => {
-                      setIsMobileMenuOpen(false);
-                      setIsSearchOpen(true);
-                    }}
-                    className="text-left hover:text-accent-gold transition-colors flex items-center gap-2 font-heading font-medium uppercase tracking-wider"
-                  >
-                    Search
-                  </button>
-
-                  <Link
-                    to="/wishlist"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className="hover:text-accent-gold transition-colors flex items-center justify-between"
-                  >
-                    <span>Wishlist</span>
-                    {wishlistCount > 0 && (
-                      <span className="bg-accent-gold text-header-base text-[10px] font-bold px-2 py-0.5 rounded-full">
-                        {wishlistCount}
-                      </span>
-                    )}
-                  </Link>
-
-                  <Link
-                    to="/account"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className="hover:text-accent-gold transition-colors"
-                  >
-                    My Account
-                  </Link>
-
-                  {profile?.role === 'admin' && (
+                {/* Navigation Links Area */}
+                <div className="flex-1 overflow-y-auto pr-1 space-y-6 scrollbar-thin">
+                  <nav className="flex flex-col gap-5 text-sm font-heading font-medium uppercase tracking-wider text-accent-gold/85">
                     <Link
-                      to="/admin"
+                      to="/shop"
                       onClick={() => setIsMobileMenuOpen(false)}
-                      className="text-accent-gold flex items-center gap-1.5"
+                      className="hover:text-accent-gold transition-colors flex items-center gap-2 border-b border-border/40 pb-2.5"
                     >
-                      <Shield size={14} /> Admin Console
+                      Shop Collection
                     </Link>
-                  )}
-                </nav>
+
+                    {/* Occasions collapsible dropdown */}
+                    <div className="flex flex-col border-b border-border/40 pb-2.5">
+                      <button
+                        onClick={() => toggleSection('occasions')}
+                        className="flex items-center justify-between text-left hover:text-accent-gold transition-colors font-heading font-medium uppercase tracking-wider w-full py-1 text-accent-gold/85"
+                      >
+                        <span>Occasions</span>
+                        <ChevronDown
+                          size={16}
+                          className={`transition-transform duration-300 ${openSections.occasions ? 'rotate-180 text-accent-gold' : 'text-text-secondary'}`}
+                        />
+                      </button>
+                      <AnimatePresence initial={false}>
+                        {openSections.occasions && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="overflow-hidden flex flex-col gap-3.5 pl-3 pt-3 pb-1"
+                          >
+                            {[
+                              { name: 'Casuals', to: '/shop?occasion=casuals' },
+                              { name: 'Formal', to: '/shop?occasion=formal' },
+                              { name: 'Ethnic', to: '/shop?occasion=ethnic' },
+                              { name: 'Party Wear', to: '/shop?occasion=party-wear' },
+                            ].map((sub) => (
+                              <Link
+                                key={sub.name}
+                                to={sub.to}
+                                onClick={() => setIsMobileMenuOpen(false)}
+                                className="text-[11px] font-sans tracking-widest uppercase font-semibold text-text-secondary hover:text-accent-gold transition-colors duration-200"
+                              >
+                                {sub.name}
+                              </Link>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+
+                    {/* Women collapsible dropdown */}
+                    <div className="flex flex-col border-b border-border/40 pb-2.5">
+                      <button
+                        onClick={() => toggleSection('women')}
+                        className="flex items-center justify-between text-left hover:text-accent-gold transition-colors font-heading font-medium uppercase tracking-wider w-full py-1 text-accent-gold/85"
+                      >
+                        <span>Women</span>
+                        <ChevronDown
+                          size={16}
+                          className={`transition-transform duration-300 ${openSections.women ? 'rotate-180 text-accent-gold' : 'text-text-secondary'}`}
+                        />
+                      </button>
+                      <AnimatePresence initial={false}>
+                        {openSections.women && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="overflow-hidden flex flex-col gap-3.5 pl-3 pt-3 pb-1"
+                          >
+                            {[
+                              { name: 'Dresses', to: '/shop?category=dresses&gender=female' },
+                              { name: 'Co-ords', to: '/shop?category=co-ords&gender=female' },
+                              { name: 'Crop Tops', to: '/shop?category=crop-tops&gender=female' },
+                              { name: 'Trousers', to: '/shop?category=pants&gender=female' },
+                              { name: 'Jackets', to: '/shop?category=jackets&gender=female' },
+                              { name: 'Shirts', to: '/shop?category=shirts&gender=female' },
+                              { name: 'T-Shirt & Tops', to: '/shop?category=t-shirts&gender=female' },
+                            ].map((sub) => (
+                              <Link
+                                key={sub.name}
+                                to={sub.to}
+                                onClick={() => setIsMobileMenuOpen(false)}
+                                className="text-[11px] font-sans tracking-widest uppercase font-semibold text-text-secondary hover:text-accent-gold transition-colors duration-200"
+                              >
+                                {sub.name}
+                              </Link>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+
+                    {/* Men collapsible dropdown */}
+                    <div className="flex flex-col border-b border-border/40 pb-2.5">
+                      <button
+                        onClick={() => toggleSection('men')}
+                        className="flex items-center justify-between text-left hover:text-accent-gold transition-colors font-heading font-medium uppercase tracking-wider w-full py-1 text-accent-gold/85"
+                      >
+                        <span>Men</span>
+                        <ChevronDown
+                          size={16}
+                          className={`transition-transform duration-300 ${openSections.men ? 'rotate-180 text-accent-gold' : 'text-text-secondary'}`}
+                        />
+                      </button>
+                      <AnimatePresence initial={false}>
+                        {openSections.men && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="overflow-hidden flex flex-col gap-3.5 pl-3 pt-3 pb-1"
+                          >
+                            {[
+                              { name: 'Shirts', to: '/shop?category=shirts&gender=male' },
+                              { name: 'T-Shirts', to: '/shop?category=t-shirts&gender=male' },
+                              { name: 'Trousers', to: '/shop?category=pants&gender=male' },
+                              { name: 'Hoodies', to: '/shop?category=hoodies&gender=male' },
+                              { name: 'Sweatshirts', to: '/shop?category=sweatshirts&gender=male' },
+                            ].map((sub) => (
+                              <Link
+                                key={sub.name}
+                                to={sub.to}
+                                onClick={() => setIsMobileMenuOpen(false)}
+                                className="text-[11px] font-sans tracking-widest uppercase font-semibold text-text-secondary hover:text-accent-gold transition-colors duration-200"
+                              >
+                                {sub.name}
+                              </Link>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+
+                    {/* Unisex collapsible dropdown */}
+                    <div className="flex flex-col border-b border-border/40 pb-2.5">
+                      <button
+                        onClick={() => toggleSection('unisex')}
+                        className="flex items-center justify-between text-left hover:text-accent-gold transition-colors font-heading font-medium uppercase tracking-wider w-full py-1 text-accent-gold/85"
+                      >
+                        <span>Unisex</span>
+                        <ChevronDown
+                          size={16}
+                          className={`transition-transform duration-300 ${openSections.unisex ? 'rotate-180 text-accent-gold' : 'text-text-secondary'}`}
+                        />
+                      </button>
+                      <AnimatePresence initial={false}>
+                        {openSections.unisex && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="overflow-hidden flex flex-col gap-3.5 pl-3 pt-3 pb-1"
+                          >
+                            {[
+                              { name: 'Cargo', to: '/shop?category=cargo&gender=unisex' },
+                              { name: 'Jeans', to: '/shop?category=jeans&gender=unisex' },
+                              { name: 'Shirts', to: '/shop?category=shirts&gender=unisex' },
+                              { name: 'T-Shirts', to: '/shop?category=t-shirts&gender=unisex' },
+                              { name: 'Hoodies', to: '/shop?category=hoodies&gender=unisex' },
+                              { name: 'Sweatshirts', to: '/shop?category=sweatshirts&gender=unisex' },
+                            ].map((sub) => (
+                              <Link
+                                key={sub.name}
+                                to={sub.to}
+                                onClick={() => setIsMobileMenuOpen(false)}
+                                className="text-[11px] font-sans tracking-widest uppercase font-semibold text-text-secondary hover:text-accent-gold transition-colors duration-200"
+                              >
+                                {sub.name}
+                              </Link>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+
+                    <Link
+                      to="/wishlist"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="hover:text-accent-gold transition-colors flex items-center justify-between border-b border-border/40 pb-2.5"
+                    >
+                      <span>Wishlist</span>
+                      {wishlistCount > 0 && (
+                        <span className="bg-accent-gold text-header-base text-[10px] font-bold px-2 py-0.5 rounded-full">
+                          {wishlistCount}
+                        </span>
+                      )}
+                    </Link>
+
+                    <Link
+                      to="/account"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="hover:text-accent-gold transition-colors border-b border-border/40 pb-2.5"
+                    >
+                      My Account
+                    </Link>
+
+                    {profile?.role === 'admin' && (
+                      <Link
+                        to="/admin"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="text-accent-gold flex items-center gap-1.5 border-b border-border/40 pb-2.5"
+                      >
+                        <Shield size={14} /> Admin Console
+                      </Link>
+                    )}
+                  </nav>
+                </div>
               </div>
 
               {/* Footer / Sign Out */}

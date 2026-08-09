@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 export interface CartItem {
   id: string;
@@ -20,26 +21,33 @@ interface CartState {
   clearCart: () => void;
 }
 
-export const useCartStore = create<CartState>((set) => ({
-  items: [],
-  addItem: (newItem) => set((state) => {
-    const existingIndex = state.items.findIndex(
-      (item) => item.variantId === newItem.variantId
-    );
-    if (existingIndex > -1) {
-      const updatedItems = [...state.items];
-      updatedItems[existingIndex].quantity += 1;
-      return { items: updatedItems };
+export const useCartStore = create<CartState>()(
+  persist(
+    (set) => ({
+      items: [],
+      addItem: (newItem) => set((state) => {
+        const existingIndex = state.items.findIndex(
+          (item) => item.variantId === newItem.variantId
+        );
+        if (existingIndex > -1) {
+          const updatedItems = [...state.items];
+          updatedItems[existingIndex].quantity += 1;
+          return { items: updatedItems };
+        }
+        return { items: [...state.items, { ...newItem, quantity: 1 }] };
+      }),
+      removeItem: (itemId) => set((state) => ({
+        items: state.items.filter((item) => item.id !== itemId)
+      })),
+      updateQuantity: (itemId, quantity) => set((state) => ({
+        items: state.items.map((item) =>
+          item.id === itemId ? { ...item, quantity: Math.max(1, quantity) } : item
+        )
+      })),
+      clearCart: () => set({ items: [] })
+    }),
+    {
+      name: 'zenphire-cart-storage',
     }
-    return { items: [...state.items, { ...newItem, quantity: 1 }] };
-  }),
-  removeItem: (itemId) => set((state) => ({
-    items: state.items.filter((item) => item.id !== itemId)
-  })),
-  updateQuantity: (itemId, quantity) => set((state) => ({
-    items: state.items.map((item) =>
-      item.id === itemId ? { ...item, quantity: Math.max(1, quantity) } : item
-    )
-  })),
-  clearCart: () => set({ items: [] })
-}));
+  )
+);

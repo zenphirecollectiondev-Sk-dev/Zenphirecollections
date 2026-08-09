@@ -501,3 +501,31 @@ ADD COLUMN IF NOT EXISTS shirt_category_image_url text,
 ADD COLUMN IF NOT EXISTS tshirt_category_image_url text,
 ADD COLUMN IF NOT EXISTS coords_category_image_url text,
 ADD COLUMN IF NOT EXISTS pants_category_image_url text;
+
+
+-- -------------------------------------------------------------
+-- MIGRATION UPGRADES (OCCASIONS PRODUCT MAPPING TABLE)
+-- -------------------------------------------------------------
+
+-- Create join table for occasion-to-product mapping
+CREATE TABLE IF NOT EXISTS public.occasion_products (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  occasion text NOT NULL, -- 'casuals', 'formal', 'ethnic', 'party-wear'
+  product_id uuid REFERENCES public.products(id) ON DELETE CASCADE,
+  created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+  UNIQUE(occasion, product_id)
+);
+
+-- Enable Row Level Security (RLS)
+ALTER TABLE public.occasion_products ENABLE ROW LEVEL SECURITY;
+
+-- Allow public read access
+CREATE POLICY "Allow public read access to occasion_products"
+  ON public.occasion_products FOR SELECT
+  USING (true);
+
+-- Allow admins full access
+CREATE POLICY "Allow admin full access to occasion_products"
+  ON public.occasion_products FOR ALL
+  USING (public.is_admin());
+
