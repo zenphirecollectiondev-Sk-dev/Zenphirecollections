@@ -207,8 +207,8 @@ export default function Admin() {
   // Occasions state variables
   const [occasionProducts, setOccasionProducts] = useState<any[]>([]);
   const [selectedOccasion, setSelectedOccasion] = useState<'casuals' | 'formal' | 'ethnic' | 'party-wear'>('casuals');
-  const [skuInput, setSkuInput] = useState('');
-  const [isAddingSku, setIsAddingSku] = useState(false);
+  const [occasionSearch, setOccasionSearch] = useState('');
+  const [isAddingOccasion, setIsAddingOccasion] = useState(false);
 
   const getCategoryColumns = (category: string) => {
     switch (category) {
@@ -608,6 +608,18 @@ ${titleHtml}  <thead>
       !newArrivalsIds.includes(p.id)
     );
   }, [products, newArrivalsSearch, newArrivalsIds]);
+
+  // Find product search matches for Occasions
+  const occasionMatches = useMemo(() => {
+    if (!occasionSearch.trim()) return [];
+    const alreadyAdded = occasionProducts
+      .filter(op => op.occasion === selectedOccasion)
+      .map(op => op.product_id);
+    return products.filter(p =>
+      p.name.toLowerCase().includes(occasionSearch.toLowerCase()) &&
+      !alreadyAdded.includes(p.id)
+    ).slice(0, 8);
+  }, [products, occasionSearch, selectedOccasion, occasionProducts]);
 
   // Handle local image upload to Supabase Storage with Base64 fallback
   const handleImageUpload = async (
@@ -2834,7 +2846,7 @@ ${titleHtml}  <thead>
                     type="button"
                     onClick={() => {
                       setSelectedOccasion(occ.key as any);
-                      setSkuInput('');
+                      setOccasionSearch('');
                     }}
                     className={`px-5 py-2.5 text-xs font-bold uppercase tracking-wider border transition-all ${
                       selectedOccasion === occ.key
@@ -2847,74 +2859,120 @@ ${titleHtml}  <thead>
                 ))}
               </div>
 
-              {/* Add product by SKU form */}
-              <div className="bg-bg-subtle border border-border p-4.5 space-y-4">
+              {/* Add product by name search */}
+              <div className="bg-bg-subtle border border-border p-4 space-y-3">
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary">
-                  Add Dress / Product to {selectedOccasion === 'party-wear' ? 'Party Wear' : selectedOccasion.charAt(0).toUpperCase() + selectedOccasion.slice(1)} by SKU
+                  Add Product to{' '}
+                  <span className="text-accent">
+                    {selectedOccasion === 'party-wear' ? 'Party Wear' : selectedOccasion.charAt(0).toUpperCase() + selectedOccasion.slice(1)}
+                  </span>
                 </label>
-                <div className="flex gap-2.5 max-w-md">
-                  <input
-                    type="text"
-                    value={skuInput}
-                    onChange={(e) => setSkuInput(e.target.value)}
-                    placeholder="e.g. SHIRT-M-WHITE"
-                    className="flex-grow px-3 py-2 border border-border bg-white text-xs font-semibold focus:outline-none focus:border-accent uppercase tracking-wider"
-                  />
-                  <button
-                    type="button"
-                    disabled={isAddingSku || !skuInput.trim()}
-                    onClick={async () => {
-                      setIsAddingSku(true);
-                      try {
-                        const cleanSku = skuInput.trim().toUpperCase();
-                        // 1. Find product variant with this SKU
-                        const { data: variant, error: varErr } = await supabase
-                          .from('product_variants')
-                          .select('product_id')
-                          .eq('sku', cleanSku)
-                          .maybeSingle();
 
-                        if (varErr) throw varErr;
-                        if (!variant) {
-                          alert(`Product variant with SKU "${cleanSku}" not found in database. Please check the SKU ledger.`);
-                          return;
-                        }
+                {/* Search input */}
+                <div className="relative max-w-md">
+                  <div className="flex items-center gap-2 px-3 py-2 bg-white border border-border focus-within:border-accent transition-colors">
+                    <Search size={13} className="text-text-secondary flex-shrink-0" />
+                    <input
+                      type="text"
+                      value={occasionSearch}
+                      onChange={(e) => setOccasionSearch(e.target.value)}
+                      placeholder="Search product by name..."
+                      className="flex-1 bg-transparent text-xs font-medium text-text-primary focus:outline-none placeholder-text-secondary/50"
+                    />
+                    {occasionSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setOccasionSearch('')}
+                        className="text-text-secondary hover:text-text-primary flex-shrink-0"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
 
-                        // 2. Insert into occasion_products
-                        const { error: insErr } = await supabase
-                          .from('occasion_products' as any)
-                          .insert({
-                            occasion: selectedOccasion,
-                            product_id: variant.product_id
-                          });
-
-                        if (insErr) {
-                          if (insErr.code === '23505') {
-                            alert('This product is already added to this occasion.');
-                          } else {
-                            throw insErr;
-                          }
-                        } else {
-                          triggerNotification('Product added successfully!');
-                          setSkuInput('');
-                          // Refresh fetchData
-                          fetchData();
-                        }
-                      } catch (err: any) {
-                        console.error('Error adding occasion product:', err);
-                        alert(err.message || 'Error occurred while adding product.');
-                      } finally {
-                        setIsAddingSku(false);
-                      }
-                    }}
-                    className="bg-accent text-white px-6 py-2 text-xs font-bold uppercase tracking-widest hover:bg-accent-hover transition-colors flex items-center justify-center gap-1.5 shadow-sm disabled:opacity-50"
-                  >
-                    {isAddingSku ? <Loader2 size={12} className="animate-spin" /> : null}
-                    Add Product
-                  </button>
+                  {/* Dropdown results */}
+                  {occasionSearch.trim() && (
+                    <div className="absolute top-full left-0 right-0 z-20 bg-white border border-border border-t-0 shadow-lg max-h-64 overflow-y-auto">
+                      {occasionMatches.length === 0 ? (
+                        <div className="px-4 py-6 text-center text-[11px] text-text-secondary italic">
+                          No products found for &ldquo;{occasionSearch}&rdquo;
+                        </div>
+                      ) : (
+                        occasionMatches.map((p) => {
+                          const mainImage = p.product_images?.[0]?.url;
+                          const catName = categories.find(c => c.id === p.category_id)?.name || '';
+                          return (
+                            <button
+                              key={p.id}
+                              type="button"
+                              disabled={isAddingOccasion}
+                              onClick={async () => {
+                                setIsAddingOccasion(true);
+                                try {
+                                  const { error: insErr } = await supabase
+                                    .from('occasion_products' as any)
+                                    .insert({
+                                      occasion: selectedOccasion,
+                                      product_id: p.id
+                                    });
+                                  if (insErr) {
+                                    if (insErr.code === '23505') {
+                                      triggerNotification('This product is already in this occasion.', true);
+                                    } else {
+                                      throw insErr;
+                                    }
+                                  } else {
+                                    triggerNotification(`"${p.name}" added to ${selectedOccasion}!`);
+                                    setOccasionSearch('');
+                                    fetchData();
+                                  }
+                                } catch (err: any) {
+                                  console.error('Error adding occasion product:', err);
+                                  triggerNotification(err.message || 'Error adding product.', true);
+                                } finally {
+                                  setIsAddingOccasion(false);
+                                }
+                              }}
+                              className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-bg-subtle transition-colors text-left border-b border-border/50 last:border-0 disabled:opacity-50"
+                            >
+                              {/* Thumbnail */}
+                              {mainImage ? (
+                                <img
+                                  src={mainImage}
+                                  alt={p.name}
+                                  className="w-8 h-10 object-cover border border-border flex-shrink-0 bg-bg-subtle"
+                                />
+                              ) : (
+                                <div className="w-8 h-10 border border-border flex-shrink-0 bg-bg-subtle flex items-center justify-center">
+                                  <Package size={10} className="text-text-secondary" />
+                                </div>
+                              )}
+                              {/* Info */}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[11px] font-bold text-text-primary truncate uppercase tracking-wide">{p.name}</p>
+                                <p className="text-[9px] text-text-secondary mt-0.5">
+                                  {catName && <span className="mr-1.5">{catName}</span>}
+                                  <span className="font-mono">₹{Number(p.base_price).toLocaleString('en-IN')}</span>
+                                </p>
+                              </div>
+                              {/* Add indicator */}
+                              <div className="flex-shrink-0">
+                                {isAddingOccasion ? (
+                                  <Loader2 size={12} className="animate-spin text-accent" />
+                                ) : (
+                                  <Plus size={14} className="text-accent" />
+                                )}
+                              </div>
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
                 </div>
-                <p className="text-[9px] text-text-secondary font-semibold">
-                  Note: Enter the exact SKU of any variant of the product. The main product will be associated with the selected occasion.
+
+                <p className="text-[9px] text-text-secondary">
+                  Type a product name above — matching products appear instantly. Click any result to add it to this occasion.
                 </p>
               </div>
 
@@ -3013,12 +3071,12 @@ ${titleHtml}  <thead>
               </h3>
               <div className="space-y-3.5 text-xs text-text-secondary leading-relaxed">
                 <div className="bg-bg-subtle p-3.5 border-l-2 border-accent">
-                  <strong className="text-text-primary block mb-1">SKU Entry</strong>
-                  Enter the unique SKU of any size/color variant of a product (e.g. `SHIRT-M-WHITE`). The system will automatically map the main product.
+                  <strong className="text-text-primary block mb-1">Name Search</strong>
+                  Type any part of the product name in the search box. Matching products appear instantly in a dropdown — click to add.
                 </div>
                 <div className="bg-bg-subtle p-3.5 border-l-2 border-accent">
-                  <strong className="text-text-primary block mb-1">Clean UI Details</strong>
-                  The list shows the product image, category, base price, and lists all variants with their stock numbers.
+                  <strong className="text-text-primary block mb-1">Already Added</strong>
+                  Products already in the selected occasion are automatically hidden from search results to prevent duplicates.
                 </div>
                 <div className="bg-bg-subtle p-3.5 border-l-2 border-accent">
                   <strong className="text-text-primary block mb-1">Storefront Sync</strong>
