@@ -140,9 +140,10 @@ export default function Shop() {
         <div>
           <p className="text-[10px] uppercase tracking-[0.25em] text-accent-gold font-bold">Zenphire Catalog</p>
           <h1 className="text-3xl font-heading font-medium uppercase mt-1">
-            {activeOccasion !== 'all' ? `${activeOccasion.replace('-', ' ')} Collection`
-              : activeCategory !== 'all' ? `${activeCategory} Collection`
-                : activeGender !== 'all' ? `${activeGender}'s Collection`
+            {activeOccasion !== 'all' ? activeOccasion.replace('-', ' ')
+              : activeCategory !== 'all' ? activeCategory
+                : activeGender !== 'all'
+                  ? ({ male: 'Men', female: 'Women', unisex: 'Unisex' }[activeGender] ?? activeGender)
                   : 'Shop All'}
           </h1>
         </div>
@@ -150,48 +151,59 @@ export default function Shop() {
       </div>
 
       {/* Control Bar */}
-      <div className="flex justify-between items-center mb-8 border border-border p-3.5 md:p-3 bg-bg-subtle">
-        {/* Mobile filter trigger */}
+      <div className="flex justify-between items-center mb-8 border border-border px-3 py-2.5 bg-bg-subtle gap-2">
+        {/* Filter icon button (mobile → opens sheet, desktop → shows reset if active) */}
         <button
           onClick={() => setIsMobileFilterOpen(true)}
-          className="btn flex items-center gap-2 text-xs uppercase tracking-wider font-semibold text-text-primary md:hidden"
+          title="Filters"
+          className="relative btn-icon w-8 h-8 flex items-center justify-center rounded hover:bg-border transition-colors text-text-secondary hover:text-text-primary md:hidden"
         >
-          <SlidersHorizontal size={14} />
-          Filters
+          <SlidersHorizontal size={15} />
           {(selectedSizes.length > 0 || activeCategory !== 'all') && (
-            <span className="bg-accent text-white text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full">
+            <span className="absolute -top-1 -right-1 bg-accent text-white text-[8px] font-bold w-3.5 h-3.5 flex items-center justify-center rounded-full leading-none">
               {selectedSizes.length + (activeCategory !== 'all' ? 1 : 0)}
             </span>
           )}
         </button>
 
-        {/* Desktop filter status */}
-        <div className="hidden md:flex items-center gap-2">
-          <span className="text-[10px] uppercase tracking-wider text-text-secondary">Filters:</span>
+        {/* Desktop: filter reset icon (only when filters active) */}
+        <div className="hidden md:flex items-center">
           {(selectedSizes.length > 0 || activeCategory !== 'all' || maxPrice < 15000) ? (
-            <button onClick={resetFilters} className="btn text-[10px] uppercase tracking-wider text-sale font-bold flex items-center gap-1">
-              Reset <X size={11} />
+            <button
+              onClick={resetFilters}
+              title="Reset filters"
+              className="relative btn-icon w-8 h-8 flex items-center justify-center rounded hover:bg-border transition-colors text-sale"
+            >
+              <SlidersHorizontal size={15} />
+              <span className="absolute -top-1 -right-1 bg-sale text-white text-[8px] font-bold w-3.5 h-3.5 flex items-center justify-center rounded-full leading-none">
+                <X size={8} strokeWidth={3} />
+              </span>
             </button>
           ) : (
-            <span className="text-[10px] text-text-secondary italic">None active</span>
+            <div
+              title="No filters active"
+              className="w-8 h-8 flex items-center justify-center rounded text-text-secondary/40"
+            >
+              <SlidersHorizontal size={15} />
+            </div>
           )}
         </div>
 
-        {/* Sort */}
-        <div className="flex items-center gap-2 ml-auto">
-          <label htmlFor="sortBy" className="text-[10px] uppercase tracking-wider text-text-secondary hidden sm:inline">Sort:</label>
+        {/* Sort — icon + native select, label hidden */}
+        <div className="flex items-center gap-1.5 ml-auto">
           <div className="relative">
             <select
               id="sortBy"
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="appearance-none bg-white border border-border text-[10px] uppercase tracking-wider font-semibold py-2 pl-3 pr-8 focus:outline-none focus:border-accent cursor-pointer transition-colors duration-150"
+              title="Sort"
+              className="appearance-none bg-transparent border-none text-[10px] uppercase tracking-wider font-semibold py-1.5 pl-0 pr-6 focus:outline-none cursor-pointer text-text-secondary hover:text-text-primary transition-colors duration-150"
             >
               <option value="newest">New Arrivals</option>
-              <option value="price-asc">Price: Low → High</option>
-              <option value="price-desc">Price: High → Low</option>
+              <option value="price-asc">Price ↑</option>
+              <option value="price-desc">Price ↓</option>
             </select>
-            <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-text-secondary" />
+            <ChevronDown size={11} className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none text-text-secondary" />
           </div>
         </div>
       </div>
