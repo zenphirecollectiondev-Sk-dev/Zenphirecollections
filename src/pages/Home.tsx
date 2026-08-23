@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
-import { ArrowRight, Heart, Loader2 } from 'lucide-react';
+import { ArrowRight, Heart } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import heroBanner from '../assets/hero_banner.png';
 import { useWishlistStore } from '../store/useWishlistStore';
@@ -87,32 +87,51 @@ export default function Home() {
   }, [homepageConfig]);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function load() {
       try {
-        const [prodData, catData] = await Promise.all([getActiveProducts(), getCategories()]);
-        setProducts(prodData || []);
-        setCategories((catData || []).filter((c: any) => !c.parent_category_id));
+        const [prodResult, catResult, hpResult] = await Promise.allSettled([
+          getActiveProducts(),
+          getCategories(),
+          supabase.from('homepage_config' as any).select('*').eq('id', 'global').maybeSingle()
+        ]);
 
-        // Fetch homepage config gracefully
-        try {
-          const { data, error } = await supabase
-            .from('homepage_config' as any)
-            .select('*')
-            .eq('id', 'global')
-            .maybeSingle();
-          if (!error && data) {
-            setHomepageConfig(data);
-          }
-        } catch (dbErr) {
-          console.warn('homepage_config table loading failed. Using fallback catalog query defaults.', dbErr);
+        if (cancelled) {
+          return;
+        }
+
+        const nextProducts = prodResult.status === 'fulfilled' ? (prodResult.value || []) : [];
+        const nextCategories = catResult.status === 'fulfilled'
+          ? (catResult.value || []).filter((c: any) => !c.parent_category_id)
+          : [];
+        const nextHomepageConfig = hpResult.status === 'fulfilled' && !hpResult.value.error && hpResult.value.data
+          ? hpResult.value.data
+          : null;
+
+        if (nextProducts.length > 0) {
+          setProducts(nextProducts);
+        }
+        if (nextCategories.length > 0) {
+          setCategories(nextCategories);
+        }
+        if (nextHomepageConfig) {
+          setHomepageConfig(nextHomepageConfig);
         }
       } catch (err) {
         console.warn('Home load error:', err);
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     }
+
     load();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleWishlist = (id: string) => {
@@ -145,17 +164,6 @@ export default function Home() {
     homepageConfig?.the_edit_image_url || products[0]?.product_images[0]?.url || linenShirt,
     [products, homepageConfig]
   );
-
-  if (loading) {
-    return (
-      <div className="min-h-[70vh] flex flex-col items-center justify-center">
-        <Loader2 size={28} className="animate-spin text-text-secondary mb-3" />
-        <p className="text-[10px] uppercase tracking-widest text-text-secondary font-bold anim-fade-in">
-          Loading Collections
-        </p>
-      </div>
-    );
-  }
 
   return (
     <div className="bg-bg min-h-screen overflow-x-hidden">
@@ -272,8 +280,8 @@ export default function Home() {
               const isActive = activeCategoryIndex === idx;
               const catName = cat.name.toLowerCase();
               const customCatImage =
-                (catName.includes('shirt') && !catName.includes('t-shirt') && !catName.includes('tshirt') ? homepageConfig?.shirt_category_image_url : null) ||
-                (catName.includes('t-shirt') || catName.includes('tshirt') || catName.includes('t shirt') ? homepageConfig?.tshirt_category_image_url : null) ||
+                (catName.includes('t-shirt') || catName.includes('tshirt') || catName.includes('t shirt') || catName.includes('t shirts') ? homepageConfig?.tshirt_category_image_url : null) ||
+                (catName.includes('shirt') && !catName.includes('t-shirt') && !catName.includes('tshirt') && !catName.includes('t shirt') && !catName.includes('t shirts') ? homepageConfig?.shirt_category_image_url : null) ||
                 (catName.includes('coord') || catName.includes('co-ord') || catName.includes('co ord') ? homepageConfig?.coords_category_image_url : null) ||
                 (catName.includes('pant') || catName.includes('trouser') ? homepageConfig?.pants_category_image_url : null);
 
@@ -336,7 +344,20 @@ export default function Home() {
           </Link>
         </div>
 
-        {newArrivals.length === 0 ? (
+        {loading && products.length === 0 ? (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+            {Array.from({ length: 8 }).map((_, index) => (
+              <div key={index} className="bg-bg-subtle border border-border overflow-hidden animate-pulse">
+                <div className="aspect-[3/4] w-full bg-black/5" />
+                <div className="p-3.5 space-y-2">
+                  <div className="h-2.5 w-16 bg-black/10" />
+                  <div className="h-3 w-3/4 bg-black/10" />
+                  <div className="h-3 w-1/3 bg-black/10" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : newArrivals.length === 0 ? (
           <div className="text-center py-14 bg-bg-subtle border border-border">
             <p className="text-xs uppercase tracking-widest text-text-secondary font-bold">No new products available.</p>
           </div>
@@ -418,20 +439,24 @@ export default function Home() {
 
             {/* Scroll Navigation Arrows */}
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => scrollBestSellers('left')}
-                className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-text-secondary hover:text-accent-gold hover:border-accent-gold transition-colors duration-300 focus:outline-none cursor-pointer hidden md:flex"
-                aria-label="Scroll left"
-              >
-                &larr;
-              </button>
-              <button
-                onClick={() => scrollBestSellers('right')}
-                className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-text-secondary hover:text-accent-gold hover:border-accent-gold transition-colors duration-300 focus:outline-none cursor-pointer hidden md:flex"
-                aria-label="Scroll right"
-              >
-                &rarr;
-              </button>
+              <div className="hidden md:block">
+                <button
+                  onClick={() => scrollBestSellers('left')}
+                  className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-text-secondary hover:text-accent-gold hover:border-accent-gold transition-colors duration-300 focus:outline-none cursor-pointer"
+                  aria-label="Scroll left"
+                >
+                  &larr;
+                </button>
+              </div>
+              <div className="hidden md:block">
+                <button
+                  onClick={() => scrollBestSellers('right')}
+                  className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-text-secondary hover:text-accent-gold hover:border-accent-gold transition-colors duration-300 focus:outline-none cursor-pointer"
+                  aria-label="Scroll right"
+                >
+                  &rarr;
+                </button>
+              </div>
               <Link to="/shop" className="nav-link text-xs font-semibold uppercase tracking-widest text-accent-gold hover:opacity-80 font-heading inline-flex items-center gap-1.5 whitespace-nowrap ml-4">
                 Shop All <ArrowRight size={12} />
               </Link>
