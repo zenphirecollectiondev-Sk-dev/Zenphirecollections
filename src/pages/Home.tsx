@@ -1,19 +1,9 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
-import { ArrowRight, Heart } from 'lucide-react';
+import { ArrowRight, Heart, Image } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import heroBanner from '../assets/hero_banner.png';
 import { useWishlistStore } from '../store/useWishlistStore';
 import { getActiveProducts, getCategories, supabase } from '../lib/supabase';
-
-import linenShirt from '../assets/product_linen_shirt.png';
-import minimalJacket from '../assets/product_minimal_jacket.png';
-import categoryFemale from '../assets/category_female_fashion.png';
-import productPants from '../assets/product_pants.png';
-import productCoords from '../assets/product_coords.png';
-import productTshirt from '../assets/product_tshirt.png';
-
-// Image pool cycled per category index
-const CATEGORY_IMAGES = [linenShirt, productPants, productTshirt, productCoords];
+import { dataCache } from '../lib/dataCache';
 
 export default function Home() {
   const { toggleWishlist, isWishlisted } = useWishlistStore();
@@ -26,7 +16,7 @@ export default function Home() {
   const [activeCategoryIndex, setActiveCategoryIndex] = useState(0);
   const categoryScrollRef = useRef<HTMLDivElement>(null);
 
-  // Reorder categories as requested: Shirts -> Pants -> T-shirts -> Co-ords / Accessories
+  // Reorder categories: Shirts -> Pants -> T-shirts -> Co-ords / Accessories
   const sortedCategories = useMemo(() => {
     return [...categories].sort((a, b) => {
       const aName = a.name.toLowerCase();
@@ -78,17 +68,39 @@ export default function Home() {
     }
   };
 
+  // Only render gender collections that have a real image URL configured in homepage_config
   const genderCollections = useMemo(() => {
-    return [
-      { id: 'men', name: 'Men', image: homepageConfig?.men_collection_image_url || linenShirt, link: '/shop?gender=male' },
-      { id: 'women', name: 'Women', image: homepageConfig?.women_collection_image_url || categoryFemale, link: '/shop?gender=female' },
-      { id: 'unisex', name: 'Unisex', image: homepageConfig?.unisex_collection_image_url || minimalJacket, link: '/shop?gender=unisex' },
+    const all = [
+      { id: 'men', name: 'Men', image: homepageConfig?.men_collection_image_url, link: '/shop?gender=male' },
+      { id: 'women', name: 'Women', image: homepageConfig?.women_collection_image_url, link: '/shop?gender=female' },
+      { id: 'unisex', name: 'Unisex', image: homepageConfig?.unisex_collection_image_url, link: '/shop?gender=unisex' },
     ];
+    // Filter to only show cards that have an image configured by the admin
+    return all.filter(col => !!col.image);
   }, [homepageConfig]);
 
   useEffect(() => {
     let cancelled = false;
 
+    // ── Step 1: Serve from cache immediately (zero loading flash on return visits) ──
+    const cachedProds = dataCache.get<any[]>('products');
+    const cachedCats  = dataCache.get<any[]>('categories');
+    const cachedHp    = dataCache.get<any>('homepage_config');
+
+    if (cachedProds && cachedProds.length > 0) setProducts(cachedProds);
+    if (cachedCats) setCategories(cachedCats.filter((c: any) => !c.parent_category_id));
+    if (cachedHp !== undefined) setHomepageConfig(cachedHp);
+
+    // If we have products from cache, show them immediately — no loading state
+    if (cachedProds && cachedProds.length > 0) {
+      setLoading(false);
+      // If cache is still fresh, skip the network round-trip entirely
+      if (!dataCache.isStale('products') && !dataCache.isStale('categories')) {
+        return () => { cancelled = true; };
+      }
+    }
+
+    // ── Step 2: Fetch (first visit) or silent background revalidation (stale) ──
     async function load() {
       try {
         const [prodResult, catResult, hpResult] = await Promise.allSettled([
@@ -97,41 +109,34 @@ export default function Home() {
           supabase.from('homepage_config' as any).select('*').eq('id', 'global').maybeSingle()
         ]);
 
-        if (cancelled) {
-          return;
-        }
+        if (cancelled) return;
 
-        const nextProducts = prodResult.status === 'fulfilled' ? (prodResult.value || []) : [];
-        const nextCategories = catResult.status === 'fulfilled'
-          ? (catResult.value || []).filter((c: any) => !c.parent_category_id)
-          : [];
-        const nextHomepageConfig = hpResult.status === 'fulfilled' && !hpResult.value.error && hpResult.value.data
-          ? hpResult.value.data
-          : null;
-
-        if (nextProducts.length > 0) {
-          setProducts(nextProducts);
+        if (prodResult.status === 'fulfilled' && prodResult.value?.length > 0) {
+          const prods = prodResult.value;
+          dataCache.set('products', prods);
+          setProducts(prods);
+          // Pre-populate per-slug caches so ProductDetail renders instantly on click
+          prods.forEach((p: any) => dataCache.set(`product:${p.slug}`, p));
         }
-        if (nextCategories.length > 0) {
-          setCategories(nextCategories);
+        if (catResult.status === 'fulfilled' && catResult.value) {
+          dataCache.set('categories', catResult.value);
+          setCategories(catResult.value.filter((c: any) => !c.parent_category_id));
         }
-        if (nextHomepageConfig) {
-          setHomepageConfig(nextHomepageConfig);
-        }
+        const hpData =
+          hpResult.status === 'fulfilled' && !hpResult.value?.error
+            ? (hpResult.value?.data ?? null)
+            : null;
+        dataCache.set('homepage_config', hpData);
+        if (hpData) setHomepageConfig(hpData);
       } catch (err) {
         console.warn('Home load error:', err);
       } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+        if (!cancelled) setLoading(false);
       }
     }
 
     load();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   const handleWishlist = (id: string) => {
@@ -160,21 +165,18 @@ export default function Home() {
     return products.slice(0, 4);
   }, [products, homepageConfig]);
 
+  // Editorial image: only use admin-configured URLs, no local asset fallbacks
   const editorialImage = useMemo(() =>
-    homepageConfig?.the_edit_image_url || products[0]?.product_images[0]?.url || linenShirt,
-    [products, homepageConfig]
+    homepageConfig?.the_edit_image_url || null,
+    [homepageConfig]
   );
 
   return (
     <div className="bg-bg min-h-screen overflow-x-hidden">
 
-      {/* ── 1. HERO (EDITORIAL OVERLAY ON MOBILE / SPLIT ON DESKTOP) ── */}
+      {/* ── 1. HERO ── */}
       <section className="relative bg-bg-subtle h-[75vh] md:h-[80vh] flex flex-col md:flex-row items-stretch overflow-hidden border-b border-border">
 
-        {/* Left Content Column
-            Mobile: Absolute overlay aligned to the bottom (last 25-30%)
-            Desktop: Side-by-side flex column
-        */}
         <div className="absolute inset-0 md:relative md:w-1/2 flex flex-col justify-end md:justify-center px-6 pb-12 pt-16 md:px-16 lg:px-24 bg-transparent md:bg-bg-subtle z-20">
           <div className="max-w-md space-y-4 md:space-y-8 hero-content text-left">
 
@@ -199,18 +201,18 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Right Image Column (Visual Showcase)
-            Mobile: Absolute full background
-            Desktop: Side-by-side flex column
-        */}
         <div className="absolute inset-0 md:relative md:w-1/2 group flex justify-center overflow-hidden z-0 self-stretch">
-          <img
-            src={homepageConfig?.hero_image_url || heroBanner}
-            alt="Zenphire Editorial Showcase"
-            className="w-full h-full object-cover transition-transform duration-[2000ms] ease-out group-hover:scale-105"
-            style={{ objectPosition: homepageConfig?.hero_image_position || 'center' }}
-          />
-          {/* Curved radial vignette overlay on mobile bottom section (last 35% height), sweeping curve with soft polished edges */}
+          {homepageConfig?.hero_image_url ? (
+            <img
+              src={homepageConfig.hero_image_url}
+              alt="Zenphire Editorial Showcase"
+              className="w-full h-full object-cover transition-transform duration-[2000ms] ease-out group-hover:scale-105"
+              style={{ objectPosition: homepageConfig?.hero_image_position || 'center' }}
+            />
+          ) : (
+            /* Placeholder while homepage_config loads or if no hero image is set in admin */
+            <div className="w-full h-full bg-gradient-to-br from-[#001510] via-[#063A2C] to-[#00221A]" />
+          )}
           <div
             className="absolute bottom-0 left-0 right-0 h-[40%] md:hidden pointer-events-none z-10"
             style={{
@@ -221,45 +223,60 @@ export default function Home() {
       </section>
 
       {/* ── 2. GENDER COLLECTIONS ── */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 anim-fade-up">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <p className="text-[10px] uppercase tracking-[0.25em] subheading-primary font-bold">Curated Wardrobe</p>
-            <h2 className="heading-primary text-2xl md:text-3xl font-mending font-medium mt-1 inline-block">Gender Collections</h2>
-          </div>
-          <Link to="/shop" className="nav-link text-xs font-semibold uppercase tracking-widest text-accent-gold hover:opacity-80 font-heading inline-flex items-center gap-1.5 whitespace-nowrap ml-4">
-            View All <ArrowRight size={12} />
-          </Link>
-        </div>
-
-        <div className="flex gap-4 md:gap-6 overflow-x-auto pb-5 custom-scrollbar snap-x snap-mandatory">
-          {genderCollections.map((col) => (
-            <Link
-              key={col.id}
-              to={col.link}
-              onClick={() => window.scrollTo({ top: 0, behavior: 'instant' })}
-              className="flex-shrink-0 w-64 md:w-80 snap-start group product-card block"
-            >
-              <div className="relative w-full bg-bg-subtle overflow-hidden border border-border">
-                <img src={col.image} alt={col.name} className="card-img w-full h-auto block" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
-                <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-accent-line scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
-                <div className="absolute bottom-5 left-5 text-white">
-                  <p className="text-base font-heading font-bold tracking-widest uppercase">{col.name}</p>
-                  <p className="card-overlay text-[10px] tracking-wider opacity-80 uppercase inline-flex items-center gap-1 mt-0.5">
-                    Explore <ArrowRight size={9} />
-                  </p>
-                </div>
-              </div>
+      {/* Only rendered once homepage_config is loaded and has actual image URLs configured */}
+      {!loading && genderCollections.length > 0 && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 anim-fade-up">
+          <div className="flex justify-between items-center mb-8">
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.25em] subheading-primary font-bold">Curated Wardrobe</p>
+              <h2 className="heading-primary text-2xl md:text-3xl font-mending font-medium mt-1 inline-block">Gender Collections</h2>
+            </div>
+            <Link to="/shop" className="nav-link text-xs font-semibold uppercase tracking-widest text-accent-gold hover:opacity-80 font-heading inline-flex items-center gap-1.5 whitespace-nowrap ml-4">
+              View All <ArrowRight size={12} />
             </Link>
-          ))}
-        </div>
-      </section>
+          </div>
 
-      {/* ── 3. SHOP BY CATEGORY (The "Overlap Stack" Slider) ── */}
+          <div className="flex gap-4 md:gap-6 overflow-x-auto pb-5 custom-scrollbar snap-x snap-mandatory">
+            {genderCollections.map((col) => (
+              <Link
+                key={col.id}
+                to={col.link}
+                onClick={() => window.scrollTo({ top: 0, behavior: 'instant' })}
+                className="flex-shrink-0 w-64 md:w-80 snap-start group product-card block"
+              >
+                <div className="relative w-full bg-bg-subtle overflow-hidden border border-border">
+                  <img src={col.image} alt={col.name} className="card-img w-full h-auto block" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+                  <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-accent-line scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
+                  <div className="absolute bottom-5 left-5 text-white">
+                    <p className="text-base font-heading font-bold tracking-widest uppercase">{col.name}</p>
+                    <p className="card-overlay text-[10px] tracking-wider opacity-80 uppercase inline-flex items-center gap-1 mt-0.5">
+                      Explore <ArrowRight size={9} />
+                    </p>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Skeleton for Gender Collections while loading */}
+      {loading && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <div className="flex gap-4 md:gap-6 overflow-x-hidden pb-5">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex-shrink-0 w-64 md:w-80 bg-bg-subtle border border-border animate-pulse">
+                <div className="aspect-[3/4] w-full bg-black/5" />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ── 3. SHOP BY CATEGORY ── */}
       {sortedCategories.length > 0 && (
         <section className="max-w-7xl mx-auto py-16 border-t border-border anim-fade-up">
-          {/* Section Header */}
           <div className="px-4 sm:px-6 lg:px-8 mb-10 text-center md:text-left">
             <span className="text-[10px] uppercase tracking-[0.3em] text-accent-gold font-bold block mb-1">
               COLLECTIONS
@@ -269,7 +286,6 @@ export default function Home() {
             </h2>
           </div>
 
-          {/* Overlapping Flex Container */}
           <div
             ref={categoryScrollRef}
             onScroll={handleCategoryScroll}
@@ -285,6 +301,9 @@ export default function Home() {
                 (catName.includes('coord') || catName.includes('co-ord') || catName.includes('co ord') ? homepageConfig?.coords_category_image_url : null) ||
                 (catName.includes('pant') || catName.includes('trouser') ? homepageConfig?.pants_category_image_url : null);
 
+              // The real image: DB image_url first, then admin config match, then null
+              const catImageSrc = cat.image_url || customCatImage || null;
+
               return (
                 <Link
                   key={cat.id}
@@ -296,17 +315,25 @@ export default function Home() {
                     zIndex: isActive ? 10 : 1,
                   }}
                 >
-                  {/* Image wrapper - strict architectural border and 3:4 aspect */}
                   <div className="aspect-[3/4] w-full bg-bg-subtle overflow-hidden border border-border rounded-none relative">
-                    <img
-                      src={cat.image_url || customCatImage || CATEGORY_IMAGES[idx % CATEGORY_IMAGES.length]}
-                      alt={cat.name}
-                      className="card-img w-full h-full object-cover object-top transition-transform duration-700 ease-out group-hover:scale-105"
-                    />
+                    {catImageSrc ? (
+                      <img
+                        src={catImageSrc}
+                        alt={cat.name}
+                        className="card-img w-full h-full object-cover object-top transition-transform duration-700 ease-out group-hover:scale-105"
+                      />
+                    ) : (
+                      /* No-image placeholder — shown when admin hasn't set a category image yet */
+                      <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-bg-subtle">
+                        <Image size={28} className="text-text-secondary/30" />
+                        <span className="text-[9px] uppercase tracking-widest text-text-secondary/40 font-bold">
+                          {cat.name}
+                        </span>
+                      </div>
+                    )}
                     <div className="absolute inset-0 bg-black/5 opacity-20 transition-opacity duration-300 group-hover:opacity-0" />
                   </div>
 
-                  {/* Category Label below the image */}
                   <div className="mt-4 text-center">
                     <h3 className="text-xs uppercase tracking-widest font-medium text-neutral-800 transition-colors duration-300 group-hover:text-accent-gold">
                       {cat.name}
@@ -315,17 +342,12 @@ export default function Home() {
                 </Link>
               );
             })}
-            {/* End spacing block for horizontal scroll alignment */}
             <div className="flex-shrink-0 w-[10vw]" />
           </div>
         </section>
       )}
 
-      {/* ── 4. NEW ARRIVALS ──
-           Mobile: uniform 2-col grid (same aspect, consistent).
-           Desktop: editorial magazine — hero left (tall) + 3 compact right.
-      */}
-      {/* ── 4. NEW ARRIVALS — Clean, Intuitive 4-Column Showcase Grid ── */}
+      {/* ── 4. NEW ARRIVALS ── */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 border-t border-border anim-fade-up">
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-4">
           <div>
@@ -370,11 +392,17 @@ export default function Home() {
                 className="group product-card block bg-bg-subtle border border-border overflow-hidden transition-all duration-300 hover:shadow-md"
               >
                 <div className="aspect-[3/4] w-full bg-bg-subtle overflow-hidden relative">
-                  <img
-                    src={product.product_images[0]?.url || linenShirt}
-                    alt={product.name}
-                    className="card-img w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
-                  />
+                  {product.product_images?.[0]?.url ? (
+                    <img
+                      src={product.product_images[0].url}
+                      alt={product.name}
+                      className="card-img w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-bg-subtle">
+                      <Image size={24} className="text-text-secondary/20" />
+                    </div>
+                  )}
                   <button
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleWishlist(product.id); }}
                     aria-label="Toggle Wishlist"
@@ -399,34 +427,37 @@ export default function Home() {
       </section>
 
       {/* ── 5. EDITORIAL BANNER ── */}
-      <section className="bg-bg-subtle border-y border-border py-20 my-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-          <div className="space-y-5 anim-fade-up">
-            <p className="text-[10px] uppercase tracking-[0.25em] subheading-primary font-bold">The Edit</p>
-            <h2 className="heading-primary text-4xl md:text-6xl font-kugile normal-case leading-normal tracking-wide">
-              Honest Materials,<br />Artisan Craft
-            </h2>
-            <p className="text-sm text-text-secondary leading-relaxed max-w-md">
-              We design under the principle of reduction — removing embellishment to highlight the raw beauty of organic linen, long-staple cotton, and natural wool.
-            </p>
-            <Link
-              to="/shop"
-              onClick={() => window.scrollTo({ top: 0, behavior: 'instant' })}
-              className="btn btn-primary inline-flex items-center gap-2 px-7 py-3 text-xs font-bold uppercase tracking-widest"
-            >
-              Discover Collection <ArrowRight size={13} />
-            </Link>
+      {/* Only rendered when admin has configured an editorial image */}
+      {editorialImage && (
+        <section className="bg-bg-subtle border-y border-border py-20 my-12">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+            <div className="space-y-5 anim-fade-up">
+              <p className="text-[10px] uppercase tracking-[0.25em] subheading-primary font-bold">The Edit</p>
+              <h2 className="heading-primary text-4xl md:text-6xl font-kugile normal-case leading-normal tracking-wide">
+                Honest Materials,<br />Artisan Craft
+              </h2>
+              <p className="text-sm text-text-secondary leading-relaxed max-w-md">
+                We design under the principle of reduction — removing embellishment to highlight the raw beauty of organic linen, long-staple cotton, and natural wool.
+              </p>
+              <Link
+                to="/shop"
+                onClick={() => window.scrollTo({ top: 0, behavior: 'instant' })}
+                className="btn btn-primary inline-flex items-center gap-2 px-7 py-3 text-xs font-bold uppercase tracking-widest"
+              >
+                Discover Collection <ArrowRight size={13} />
+              </Link>
+            </div>
+            <div className="overflow-hidden border border-border group w-full flex justify-center bg-bg-subtle">
+              <img
+                src={editorialImage}
+                alt="Artisan detail"
+                className="w-full h-auto max-h-[75vh] object-cover transition-transform duration-[600ms] ease-[cubic-bezier(0.4,0,0.2,1)] group-hover:scale-[1.04]"
+                style={{ objectPosition: homepageConfig?.the_edit_image_position || 'center' }}
+              />
+            </div>
           </div>
-          <div className="overflow-hidden border border-border group w-full flex justify-center bg-bg-subtle">
-            <img
-              src={editorialImage}
-              alt="Artisan detail"
-              className="w-full h-auto max-h-[75vh] object-cover transition-transform duration-[600ms] ease-[cubic-bezier(0.4,0,0.2,1)] group-hover:scale-[1.04]"
-              style={{ objectPosition: homepageConfig?.the_edit_image_position || 'center' }}
-            />
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* ── 6. BEST SELLERS ── */}
       {bestSellers.length > 0 && (
@@ -437,7 +468,6 @@ export default function Home() {
               <h2 className="heading-primary text-2xl md:text-3xl font-mending font-medium mt-1 inline-block">Best Sellers</h2>
             </div>
 
-            {/* Scroll Navigation Arrows */}
             <div className="flex items-center gap-2">
               <div className="hidden md:block">
                 <button
@@ -463,15 +493,13 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Scroll rail wrapper — vignette fade on the right edge hints at scrollability */}
           <div className="relative">
-            {/* Right vignette */}
             <div
               className="pointer-events-none absolute top-0 right-0 bottom-0 w-12 md:w-20 z-10"
               style={{ background: 'linear-gradient(to left, rgba(0,0,0,0.18) 0%, transparent 100%)' }}
             />
 
-            {/* ── MOBILE: 2-column grid ── */}
+            {/* MOBILE: 2-column grid */}
             <div className="grid grid-cols-2 gap-x-4 gap-y-6 md:hidden px-4">
               {bestSellers.map((product: any) => (
                 <Link
@@ -480,11 +508,17 @@ export default function Home() {
                   className="group product-card block w-full"
                 >
                   <div className="w-full bg-bg-subtle overflow-hidden border border-border relative">
-                    <img
-                      src={product.product_images[0]?.url || linenShirt}
-                      alt={product.name}
-                      className="card-img w-full h-auto block relative z-10"
-                    />
+                    {product.product_images?.[0]?.url ? (
+                      <img
+                        src={product.product_images[0].url}
+                        alt={product.name}
+                        className="card-img w-full h-auto block relative z-10"
+                      />
+                    ) : (
+                      <div className="aspect-[3/4] w-full flex items-center justify-center bg-bg-subtle">
+                        <Image size={20} className="text-text-secondary/20" />
+                      </div>
+                    )}
                     <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-accent-line scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
                     <button
                       onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleWishlist(product.id); }}
@@ -503,7 +537,7 @@ export default function Home() {
               ))}
             </div>
 
-            {/* ── DESKTOP: horizontal scroll ── */}
+            {/* DESKTOP: horizontal scroll */}
             <div
               ref={bestSellersScrollRef}
               className="hidden md:flex overflow-x-auto custom-scrollbar gap-0 pl-4 sm:pl-6 lg:pl-8 pb-5 scroll-smooth"
@@ -516,11 +550,17 @@ export default function Home() {
                   style={{ width: 'clamp(200px, 26vw, 300px)' }}
                 >
                   <div className="w-full bg-bg-subtle overflow-hidden border border-border relative">
-                    <img
-                      src={product.product_images[0]?.url || linenShirt}
-                      alt={product.name}
-                      className="card-img w-full h-auto block relative z-10"
-                    />
+                    {product.product_images?.[0]?.url ? (
+                      <img
+                        src={product.product_images[0].url}
+                        alt={product.name}
+                        className="card-img w-full h-auto block relative z-10"
+                      />
+                    ) : (
+                      <div className="aspect-[3/4] w-full flex items-center justify-center bg-bg-subtle">
+                        <Image size={20} className="text-text-secondary/20" />
+                      </div>
+                    )}
                     <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-accent-line scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
                     <button
                       onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleWishlist(product.id); }}
@@ -537,7 +577,6 @@ export default function Home() {
                   </div>
                 </Link>
               ))}
-              {/* Right padding sentinel — sits behind the vignette */}
               <div className="flex-shrink-0 w-20 md:w-32" />
             </div>
           </div>

@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Search, ArrowRight, Sparkles } from 'lucide-react';
+import { X, Search, ArrowRight, Sparkles, Image } from 'lucide-react';
 import { getActiveProducts } from '../lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
-import linenShirt from '../assets/product_linen_shirt.png';
+import { dataCache } from '../lib/dataCache';
 
 interface SearchOverlayProps {
   isOpen: boolean;
@@ -28,11 +28,18 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
     return () => { document.body.style.overflow = prev; };
   }, [isOpen]);
 
-  // Load live active products once
+  // Load products for search — use cache first for instant results
   useEffect(() => {
+    const cached = dataCache.get<any[]>('products');
+    if (cached && cached.length > 0) {
+      setDbProducts(cached);
+      // Still revalidate in background if stale
+      if (!dataCache.isStale('products')) return;
+    }
     async function loadSearchProducts() {
       try {
         const data = await getActiveProducts();
+        dataCache.set('products', data || []);
         setDbProducts(data || []);
       } catch (err) {
         console.warn('Could not load products for search overlay:', err);
@@ -260,11 +267,17 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                           className="flex-shrink-0 w-12 h-16 overflow-hidden rounded-md"
                           style={{ border: '1px solid rgba(184,151,90,0.15)' }}
                         >
-                          <img
-                            src={product.product_images?.[0]?.url || linenShirt}
-                            alt={product.name}
-                            className="w-full h-full object-cover object-center"
-                          />
+                          {product.product_images?.[0]?.url ? (
+                            <img
+                              src={product.product_images[0].url}
+                              alt={product.name}
+                              className="w-full h-full object-cover object-center"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                              <Image size={14} style={{ color: 'rgba(184,151,90,0.3)' }} />
+                            </div>
+                          )}
                         </div>
 
                         {/* Info */}

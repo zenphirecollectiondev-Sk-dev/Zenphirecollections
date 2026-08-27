@@ -1,11 +1,11 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Heart, ShoppingBag, ChevronRight, ChevronLeft, Check, AlertCircle, X, Loader2, ZoomIn } from 'lucide-react';
+import { Heart, ShoppingBag, ChevronRight, ChevronLeft, Check, AlertCircle, X, ZoomIn, Image } from 'lucide-react';
 import { useCartStore } from '../store/useCartStore';
 import { useWishlistStore } from '../store/useWishlistStore';
 import { getProductDetails, supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
-import linenShirt from '../assets/product_linen_shirt.png';
+import { dataCache } from '../lib/dataCache';
 
 export default function ProductDetail() {
   const { toggleWishlist, isWishlisted } = useWishlistStore();
@@ -22,10 +22,35 @@ export default function ProductDetail() {
   useEffect(() => {
     async function loadProduct() {
       if (!id) return;
-      setLoading(true);
+
+      // ── Cache hit: render instantly (pre-populated by Home/Shop listing fetch) ──
+      const cached = dataCache.get<any>(`product:${id}`);
+      if (cached) {
+        setDbProduct(cached);
+        setLoading(false);
+        // Still load category size guide in background (lightweight)
+        if (cached.category_id) {
+          (async () => {
+            try {
+              const { data: catData } = await supabase
+                .from('categories')
+                .select('size_guide_html')
+                .eq('id', cached.category_id)
+                .maybeSingle();
+              if (catData) setCategorySizeGuide(catData.size_guide_html);
+            } catch { /* non-critical */ }
+          })();
+        }
+        // Skip network if fresh
+        if (!dataCache.isStale(`product:${id}`)) return;
+      }
+
+      // ── Fetch (first direct URL access or stale revalidation) ──
+      if (!cached) setLoading(true);
       try {
         const data = await getProductDetails(id, true);
         if (data) {
+          dataCache.set(`product:${id}`, data);
           setDbProduct(data);
           if (data.category_id) {
             const { data: catData } = await supabase
@@ -89,6 +114,13 @@ export default function ProductDetail() {
     loadRecommendations();
   }, [dbProduct]);
 
+  const isPants = useMemo(() => {
+    if (!product) return false;
+    const nameLower = product.name?.toLowerCase() || '';
+    const slugLower = product.slug?.toLowerCase() || '';
+    return nameLower.includes('pant') || nameLower.includes('trouser') || nameLower.includes('jeans') || slugLower.includes('pant') || slugLower.includes('trouser') || slugLower.includes('jeans');
+  }, [product]);
+
   const [selectedSize, setSelectedSize] = useState<string>('');
   const [selectedColor, setSelectedColor] = useState<string>('');
   const [activeImageIdx, setActiveImageIdx] = useState<number>(0);
@@ -120,11 +152,54 @@ export default function ProductDetail() {
     setIsLightboxOpen(true);
   };
 
-  if (loading) {
+  if (loading && !product) {
     return (
-      <div className="min-h-[70vh] flex flex-col items-center justify-center">
-        <Loader2 size={28} className="animate-spin text-text-secondary mb-3" />
-        <p className="text-[10px] uppercase tracking-widest text-text-secondary font-bold anim-fade-in">Loading</p>
+      <div className="bg-bg min-h-screen overflow-x-hidden">
+        {/* Breadcrumb skeleton */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-2">
+          <div className="flex items-center gap-2">
+            {[40, 8, 40, 8, 120].map((w, i) => (
+              <div key={i} className={`h-2.5 bg-bg-subtle animate-pulse rounded`} style={{ width: w }} />
+            ))}
+          </div>
+        </div>
+        {/* Main 2-column skeleton — matches exact layout of the real page */}
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-16 pb-16">
+          {/* Left: image + thumbnails */}
+          <div className="space-y-3">
+            <div className="w-full aspect-[3/4] bg-bg-subtle border border-border animate-pulse" />
+            <div className="flex gap-2">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="w-[68px] aspect-[2/3] bg-bg-subtle border border-border animate-pulse flex-shrink-0" />
+              ))}
+            </div>
+          </div>
+          {/* Right: product info */}
+          <div className="space-y-5 pt-2">
+            <div className="space-y-3">
+              <div className="h-2.5 w-16 bg-bg-subtle animate-pulse rounded" />
+              <div className="h-9 w-4/5 bg-bg-subtle animate-pulse rounded" />
+              <div className="h-6 w-28 bg-bg-subtle animate-pulse rounded" />
+            </div>
+            <div className="space-y-2 border-b border-border pb-5">
+              <div className="h-3 w-full bg-bg-subtle animate-pulse rounded" />
+              <div className="h-3 w-full bg-bg-subtle animate-pulse rounded" />
+              <div className="h-3 w-2/3 bg-bg-subtle animate-pulse rounded" />
+            </div>
+            <div className="space-y-3">
+              <div className="h-2.5 w-20 bg-bg-subtle animate-pulse rounded" />
+              <div className="flex gap-2">
+                {['S', 'M', 'L', 'XL'].map((s) => (
+                  <div key={s} className="w-12 h-12 bg-bg-subtle border border-border animate-pulse" />
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-3 pt-4">
+              <div className="flex-1 h-14 bg-bg-subtle animate-pulse" />
+              <div className="w-14 h-14 bg-bg-subtle border border-border animate-pulse" />
+            </div>
+          </div>
+        </section>
       </div>
     );
   }
@@ -159,7 +234,7 @@ export default function ProductDetail() {
         size: selectedVariant.size,
         color: selectedVariant.color,
         price: product.base_price,
-        image: product.product_images[0]?.url || linenShirt,
+        image: product.product_images[0]?.url || '',
       });
       setIsAdded(true);
       setViewBag(false);
@@ -199,11 +274,17 @@ export default function ProductDetail() {
             role="button"
             aria-label="Enlarge image"
           >
-            <img
-              src={product.product_images[activeImageIdx]?.url || linenShirt}
-              alt={product.name}
-              className="w-full h-auto block relative z-10 transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] group-hover:scale-[1.03]"
-            />
+            {product.product_images[activeImageIdx]?.url ? (
+              <img
+                src={product.product_images[activeImageIdx].url}
+                alt={product.name}
+                className="w-full h-auto block relative z-10 transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] group-hover:scale-[1.03]"
+              />
+            ) : (
+              <div className="aspect-[3/4] w-full flex items-center justify-center bg-bg-subtle">
+                <Image size={36} className="text-text-secondary/20" />
+              </div>
+            )}
             {/* Zoom hint */}
             <div className="absolute bottom-3 right-3 bg-white/80 border border-border/60 p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-150">
               <ZoomIn size={14} className="text-text-secondary" />
@@ -272,7 +353,7 @@ export default function ProductDetail() {
                 </button>
               </div>
               <div className="flex gap-2">
-                {['S', 'M', 'L', 'XL'].map((size) => {
+                {(isPants ? ['28', '30', '32', '34', '36', '38'] : ['S', 'M', 'L', 'XL']).map((size) => {
                   const variant = availableVariantsForColor.find((v: any) => v.size === size);
                   const available = variant ? variant.stock_qty > 0 : false;
                   return (
@@ -361,11 +442,17 @@ export default function ProductDetail() {
                 className="group product-card block"
               >
                 <div className="w-full bg-bg-subtle overflow-hidden border border-border relative mb-3">
-                  <img
-                    src={rec.product_images?.[0]?.url || linenShirt}
-                    alt={rec.name}
-                    className="card-img w-full h-auto block relative z-10"
-                  />
+                  {rec.product_images?.[0]?.url ? (
+                    <img
+                      src={rec.product_images[0].url}
+                      alt={rec.name}
+                      className="card-img w-full h-auto block relative z-10"
+                    />
+                  ) : (
+                    <div className="aspect-[3/4] w-full flex items-center justify-center bg-bg-subtle">
+                      <Image size={24} className="text-text-secondary/20" />
+                    </div>
+                  )}
                   <button
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleWishlist(rec.id); }}
                     aria-label="Toggle Wishlist"
@@ -471,18 +558,24 @@ export default function ProductDetail() {
             )}
 
             {/* ── Main image ── */}
-            <motion.img
-              key={lightboxIdx}
-              initial={{ opacity: 0, scale: 0.97 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.97 }}
-              transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-              src={product.product_images[lightboxIdx]?.url || linenShirt}
-              alt={`${product.name} — view ${lightboxIdx + 1}`}
-              className="max-h-[88vh] max-w-[85vw] md:max-w-[55vw] object-contain select-none"
-              onClick={(e) => e.stopPropagation()}
-              draggable={false}
-            />
+            {product.product_images[lightboxIdx]?.url ? (
+              <motion.img
+                key={lightboxIdx}
+                initial={{ opacity: 0, scale: 0.97 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.97 }}
+                transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+                src={product.product_images[lightboxIdx].url}
+                alt={`${product.name} — view ${lightboxIdx + 1}`}
+                className="max-h-[88vh] max-w-[85vw] md:max-w-[55vw] object-contain select-none"
+                onClick={(e) => e.stopPropagation()}
+                draggable={false}
+              />
+            ) : (
+              <div className="w-48 h-64 flex items-center justify-center">
+                <Image size={40} className="text-white/20" />
+              </div>
+            )}
 
             {/* ── Next arrow (multi-image only) ── */}
             {product.product_images.length > 1 && (

@@ -84,6 +84,7 @@ export default function Admin() {
 
   // Loading states
   const [loadingData, setLoadingData] = useState(true);
+  const [isSavingProduct, setIsSavingProduct] = useState(false);
 
   // Stats
   const [revenue, setRevenue] = useState(0);
@@ -115,7 +116,6 @@ export default function Admin() {
   const [prodSizeGuideType, setProdSizeGuideType] = useState('category');
   const [prodCustomSizeGuide, setProdCustomSizeGuide] = useState('');
   const [prodImages, setProdImages] = useState<ProductImage[]>([]);
-  const [newImageUrl, setNewImageUrl] = useState('');
   const [prodVariants, setProdVariants] = useState<ProductVariant[]>([]);
 
   // Product creation wizard states
@@ -128,7 +128,6 @@ export default function Admin() {
   const [varSize, setVarSize] = useState('M');
   const [varColor, setVarColor] = useState('White');
   const [varStock, setVarStock] = useState('20');
-  const [varSku, setVarSku] = useState('');
 
   // Category Form State
   const [catName, setCatName] = useState('');
@@ -137,6 +136,7 @@ export default function Admin() {
   const [catSizeGuide, setCatSizeGuide] = useState('');
   const [catImageUrl, setCatImageUrl] = useState('');
   const [isUploadingCategory, setIsUploadingCategory] = useState(false);
+  const [isUploadingProductImage, setIsUploadingProductImage] = useState(false);
 
   // Inventory inline edit state
   const [inlineEditStock, setInlineEditStock] = useState<Record<string, number>>({});
@@ -324,18 +324,40 @@ ${titleHtml}  <thead>
       if (catErr) throw catErr;
       setCategories(catData || []);
 
-      // 2. Fetch Products
+      // 2. Fetch Products, variants and images as SEPARATE queries so a timeout
+      //    on product_images doesn't bring down the entire data load.
       const { data: prodData, error: prodErr } = await supabase
         .from('products')
-        .select(`
-          *,
-          product_images (*),
-          product_variants (*)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
       if (prodErr) throw prodErr;
-      setProducts((prodData || []) as any[]);
-      setProductsCount(prodData?.length || 0);
+
+      // Fetch variants (fast, no lock)
+      const { data: variantsData } = await supabase
+        .from('product_variants')
+        .select('*');
+
+      // Fetch images independently — if this times out, we still show products + variants
+      let imagesData: any[] = [];
+      try {
+        const { data: imgData, error: imgErr } = await supabase
+          .from('product_images')
+          .select('*')
+          .order('sort_order', { ascending: true });
+        if (!imgErr) imagesData = imgData || [];
+        else console.warn('product_images fetch failed (non-critical):', imgErr.message);
+      } catch (imgEx: any) {
+        console.warn('product_images timed out (non-critical):', imgEx.message);
+      }
+
+      // Stitch together in memory
+      const stitchedProducts = (prodData || []).map((p: any) => ({
+        ...p,
+        product_images: imagesData.filter((img: any) => img.product_id === p.id),
+        product_variants: (variantsData || []).filter((v: any) => v.product_id === p.id)
+      }));
+      setProducts(stitchedProducts as any[]);
+      setProductsCount(stitchedProducts.length);
 
       // 3. Fetch Orders
       const { data: orderData, error: orderErr } = await supabase
@@ -708,6 +730,218 @@ ${titleHtml}  <thead>
     }
   };
 
+  const handleProductImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    for (let i = 0; i < files.length; i++) {
+      if (files[i].size > 5 * 1024 * 1024) {
+        alert(`Image "${files[i].name}" is too large. Please select images under 5MB.`);
+        return;
+      }
+    }
+
+    setIsUploadingProductImage(true);
+
+    try {
+      const uploadedImages: ProductImage[] = [];
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const fileExt = file.name.split('.').pop();
+        const fileName = `product-${Date.now()}-${i}.${fileExt}`;
+        const filePath = `products/${fileName}`;
+
+        let publicUrl = '';
+        try {
+          const { error: uploadError } = await supabase.storage
+            .from('product-images')
+            .upload(filePath, file, {
+              cacheControl: '3600',
+              upsert: true
+            });
+
+          if (!uploadError) {
+            const { data } = supabase.storage
+              .from('product-images')
+              .getPublicUrl(filePath);
+            publicUrl = data.publicUrl;
+          } else {
+            const { error: uploadError2 } = await supabase.storage
+              .from('homepage-assets')
+              .upload(filePath, file, {
+                cacheControl: '3600',
+                upsert: true
+              });
+            if (uploadError2) throw uploadError2;
+            const { data } = supabase.storage
+              .from('homepage-assets')
+              .getPublicUrl(filePath);
+            publicUrl = data.publicUrl;
+          }
+        } catch (storageErr) {
+          console.warn('Storage bucket upload failed, using Data URL fallback.', storageErr);
+          const base64 = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (uploadEvent) => resolve(uploadEvent.target?.result as string);
+            reader.readAsDataURL(file);
+          });
+          uploadedImages.push({
+            url: base64,
+            sort_order: prodImages.length + uploadedImages.length
+          });
+          continue;
+        }
+
+        if (publicUrl) {
+          uploadedImages.push({
+            url: publicUrl,
+            sort_order: prodImages.length + uploadedImages.length
+          });
+        }
+      }
+
+      if (uploadedImages.length > 0) {
+        setProdImages((prev) => [...prev, ...uploadedImages]);
+        triggerNotification(`${uploadedImages.length} image(s) uploaded successfully!`);
+      }
+    } catch (err: any) {
+      console.error('Error uploading product images:', err);
+      triggerNotification(err.message || 'Error uploading product images', true);
+    } finally {
+      setIsUploadingProductImage(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleMoveImage = (index: number, direction: 'left' | 'right') => {
+    const nextImages = [...prodImages];
+    const targetIndex = direction === 'left' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= nextImages.length) return;
+
+    const temp = nextImages[index];
+    nextImages[index] = nextImages[targetIndex];
+    nextImages[targetIndex] = temp;
+
+    const reordered = nextImages.map((img, idx) => ({
+      ...img,
+      sort_order: idx
+    }));
+
+    setProdImages(reordered);
+  };
+
+  const getCategoryCode = (categoryName: string): string => {
+    const name = categoryName.trim().toUpperCase();
+    if (name.includes('SHIRT') || name.includes('TOP')) return 'SHR';
+    if (name.includes('PANT') || name.includes('TROUSER') || name.includes('JEAN')) return 'PAN';
+    if (name.includes('CO-ORD') || name.includes('COORD')) return 'CRD';
+    if (name.includes('T-SHIRT') || name.includes('TSHIRT')) return 'TEE';
+    if (name.includes('JACKET') || name.includes('COAT') || name.includes('OUTER')) return 'JKT';
+    return name.replace(/[^A-Z]/g, '').slice(0, 3).padEnd(3, 'X');
+  };
+
+  const getNextDresscode = (categoryCode: string): string => {
+    const codes = new Set<number>();
+    products.forEach(p => {
+      p.product_variants?.forEach(v => {
+        if (v.sku) {
+          const parts = v.sku.split('-');
+          if (parts.length >= 4 && parts[1] === categoryCode) {
+            const num = parseInt(parts[2], 10);
+            if (!isNaN(num)) {
+              codes.add(num);
+            }
+          }
+        }
+      });
+    });
+    
+    prodVariants.forEach(v => {
+      if (v.sku) {
+        const parts = v.sku.split('-');
+        if (parts.length >= 4 && parts[1] === categoryCode) {
+          const num = parseInt(parts[2], 10);
+          if (!isNaN(num)) {
+            codes.add(num);
+          }
+        }
+      }
+    });
+
+    let nextNum = 1;
+    while (codes.has(nextNum)) {
+      nextNum++;
+    }
+    return String(nextNum).padStart(3, '0');
+  };
+
+  const isPantsProduct = useMemo(() => {
+    const nameLower = prodName?.toLowerCase() || '';
+    const slugLower = prodSlug?.toLowerCase() || '';
+    if (nameLower.includes('pant') || nameLower.includes('trouser') || nameLower.includes('jeans') || slugLower.includes('pant') || slugLower.includes('trouser') || slugLower.includes('jeans')) {
+      return true;
+    }
+    if (selectedParentCatId) {
+      const parentCat = categories.find(c => c.id === selectedParentCatId);
+      const parentNameLower = parentCat?.name?.toLowerCase() || '';
+      const parentSlugLower = parentCat?.slug?.toLowerCase() || '';
+      if (parentNameLower.includes('pant') || parentNameLower.includes('trouser') || parentNameLower.includes('jeans') || parentSlugLower.includes('pant') || parentSlugLower.includes('trouser') || parentSlugLower.includes('jeans')) {
+        return true;
+      }
+    }
+    if (newParentCatName) {
+      const newNameLower = newParentCatName.toLowerCase();
+      if (newNameLower.includes('pant') || newNameLower.includes('trouser') || newNameLower.includes('jeans')) {
+        return true;
+      }
+    }
+    return false;
+  }, [prodName, prodSlug, selectedParentCatId, newParentCatName, categories]);
+
+  const computedDresscode = useMemo(() => {
+    for (const v of prodVariants) {
+      if (v.sku) {
+        const parts = v.sku.split('-');
+        if (parts.length >= 4) {
+          return parts[2];
+        }
+      }
+    }
+    if (editingProduct && editingProduct.product_variants) {
+      for (const v of editingProduct.product_variants) {
+        if (v.sku) {
+          const parts = v.sku.split('-');
+          if (parts.length >= 4) {
+            return parts[2];
+          }
+        }
+      }
+    }
+    const catNameStr = newParentCatName.trim() || categories.find(c => c.id === selectedParentCatId)?.name || '';
+    const catCode = getCategoryCode(catNameStr);
+    return getNextDresscode(catCode);
+  }, [prodVariants, editingProduct, newParentCatName, selectedParentCatId, categories, products]);
+
+  const computedSku = useMemo(() => {
+    const catNameStr = newParentCatName.trim() || categories.find(c => c.id === selectedParentCatId)?.name || '';
+    const catCode = getCategoryCode(catNameStr);
+    return `ZP-${catCode}-${computedDresscode}-${varSize}`;
+  }, [selectedParentCatId, newParentCatName, categories, computedDresscode, varSize]);
+
+  // Adjust default variant size when category switches between pants and other clothing
+  useEffect(() => {
+    if (isPantsProduct) {
+      if (!['28', '30', '32', '34', '36', '38'].includes(varSize)) {
+        setVarSize('30');
+      }
+    } else {
+      if (!['S', 'M', 'L', 'XL'].includes(varSize)) {
+        setVarSize('M');
+      }
+    }
+  }, [isPantsProduct, varSize]);
+
   const handleHeroDrag = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!heroDragActive || !heroContainerRef.current) return;
     const rect = heroContainerRef.current.getBoundingClientRect();
@@ -815,7 +1049,6 @@ ${titleHtml}  <thead>
     setProdCustomSizeGuide(prod.custom_size_guide_html || '');
     setProdImages(prod.product_images || []);
     setProdVariants(prod.product_variants || []);
-    setNewImageUrl('');
 
     // Wizard setup: resolve main & sub-category from prod.category_id
     const productCategoryObj = categories.find(c => c.id === prod.category_id);
@@ -848,7 +1081,6 @@ ${titleHtml}  <thead>
     setProdCustomSizeGuide('');
     setProdImages([]);
     setProdVariants([]);
-    setNewImageUrl('');
 
     // Wizard resets
     setWizardStep(1);
@@ -858,16 +1090,7 @@ ${titleHtml}  <thead>
     setIsProductModalOpen(true);
   };
 
-  // Add image to list inside modal
-  const handleAddImage = () => {
-    if (!newImageUrl.trim()) return;
-    const newImage: ProductImage = {
-      url: newImageUrl.trim(),
-      sort_order: prodImages.length
-    };
-    setProdImages([...prodImages, newImage]);
-    setNewImageUrl('');
-  };
+
 
   // Delete image from list inside modal
   const handleDeleteImage = (index: number) => {
@@ -878,18 +1101,22 @@ ${titleHtml}  <thead>
   // Add variant inside modal
   const handleAddVariant = () => {
     const qty = parseInt(varStock);
-    if (!varSku.trim()) {
-      alert('SKU is required to add variant');
+    const targetSku = computedSku.trim();
+    if (!targetSku) {
+      alert('SKU generation failed. Please specify category details.');
+      return;
+    }
+    if (prodVariants.some(v => v.sku === targetSku)) {
+      alert(`Variant SKU "${targetSku}" already exists in the ledger.`);
       return;
     }
     const newVar: ProductVariant = {
       size: varSize,
       color: varColor,
       stock_qty: isNaN(qty) ? 0 : qty,
-      sku: varSku.trim()
+      sku: targetSku
     };
     setProdVariants([...prodVariants, newVar]);
-    setVarSku('');
   };
 
   // Delete variant from list inside modal
@@ -905,7 +1132,9 @@ ${titleHtml}  <thead>
       triggerNotification('Product Name and Price are required', true);
       return;
     }
+    if (isSavingProduct) return; // Prevent double-submit
 
+    setIsSavingProduct(true);
     try {
       let finalCategoryId: string | null = null;
 
@@ -986,39 +1215,52 @@ ${titleHtml}  <thead>
 
       if (editingProduct) {
         productId = editingProduct.id;
-        // 1. Update Product details
-        const { error } = await supabase
+        // 1. Update Product core details
+        const { error: updateErr } = await supabase
           .from('products')
           .update(payload)
           .eq('id', productId);
-        if (error) throw error;
+        if (updateErr) throw new Error(`Failed to update product: ${updateErr.message}`);
 
-        // 2. Remove all existing variants & images, then re-insert to simplify sync
-        await supabase.from('product_images').delete().eq('product_id', productId);
-        await supabase.from('product_variants').delete().eq('product_id', productId);
+        // 2. Delete existing images (with error check)
+        const { error: delImgErr } = await supabase
+          .from('product_images')
+          .delete()
+          .eq('product_id', productId);
+        if (delImgErr) throw new Error(`Failed to clear old images: ${delImgErr.message}`);
+
+        // 3. Delete existing variants (with error check)
+        const { error: delVarErr } = await supabase
+          .from('product_variants')
+          .delete()
+          .eq('product_id', productId);
+        if (delVarErr) throw new Error(`Failed to clear old variants: ${delVarErr.message}`);
       } else {
-        // 1. Insert new Product
-        const { data, error } = await supabase
+        // Insert new Product
+        const { data, error: insertErr } = await supabase
           .from('products')
           .insert(payload)
           .select()
           .single();
-        if (error) throw error;
+        if (insertErr) throw new Error(`Failed to create product: ${insertErr.message}`);
         productId = data.id;
       }
 
-      // 2. Insert Images
+      // 4. Insert Images (non-critical — warn but don't fail)
       if (prodImages.length > 0) {
-        const imagesInsert = prodImages.map((img) => ({
+        const imagesInsert = prodImages.map((img, idx) => ({
           product_id: productId,
           url: img.url,
-          sort_order: img.sort_order
+          sort_order: idx
         }));
-        const { error } = await supabase.from('product_images').insert(imagesInsert);
-        if (error) throw error;
+        const { error: imgInsertErr } = await supabase.from('product_images').insert(imagesInsert);
+        if (imgInsertErr) {
+          console.warn('Images could not be saved (non-critical):', imgInsertErr.message);
+          triggerNotification(`Product saved, but images failed to save: ${imgInsertErr.message}`, true);
+        }
       }
 
-      // 3. Insert Variants
+      // 5. Insert Variants
       if (prodVariants.length > 0) {
         const variantsInsert = prodVariants.map((v) => ({
           product_id: productId,
@@ -1027,16 +1269,18 @@ ${titleHtml}  <thead>
           stock_qty: v.stock_qty,
           sku: v.sku
         }));
-        const { error } = await supabase.from('product_variants').insert(variantsInsert);
-        if (error) throw error;
+        const { error: varInsertErr } = await supabase.from('product_variants').insert(variantsInsert);
+        if (varInsertErr) throw new Error(`Failed to save variants: ${varInsertErr.message}`);
       }
 
       setIsProductModalOpen(false);
-      triggerNotification(`Product "${prodName}" saved successfully`);
-      fetchData();
+      triggerNotification(`✅ Product "${prodName}" saved successfully!`);
+      fetchData(); // Refresh using split-query approach (resilient)
     } catch (err: any) {
       console.error('Error saving product:', err);
       triggerNotification(err.message || 'Error occurred while saving product', true);
+    } finally {
+      setIsSavingProduct(false);
     }
   };
 
@@ -3369,21 +3613,23 @@ ${titleHtml}  <thead>
                         </p>
                       </div>
 
-                      <div className="flex gap-2">
+                      <div className="space-y-2">
                         <input
-                          type="text"
-                          placeholder="Paste Image URL..."
-                          value={newImageUrl}
-                          onChange={(e) => setNewImageUrl(e.target.value)}
-                          className="flex-1 px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent"
+                          type="file"
+                          multiple
+                          accept="image/*"
+                          disabled={isUploadingProductImage}
+                          onChange={handleProductImageUpload}
+                          className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent file:mr-4 file:py-1 file:px-2 file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
                         />
-                        <button
-                          type="button"
-                          onClick={handleAddImage}
-                          className="bg-accent text-white px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-accent-hover transition-colors"
-                        >
-                          Add Image
-                        </button>
+                        {isUploadingProductImage && (
+                          <span className="text-[9px] text-text-secondary mt-1 block font-bold animate-pulse">
+                            Uploading image files...
+                          </span>
+                        )}
+                        <span className="text-[9px] text-text-secondary mt-1 block font-semibold">
+                          Upload high-resolution photography. Choose multiple files to upload at once. File is uploaded full size without crop.
+                        </span>
                       </div>
 
                       {prodImages.length === 0 ? (
@@ -3392,17 +3638,40 @@ ${titleHtml}  <thead>
                         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
                           {prodImages.map((img, idx) => (
                             <div key={idx} className="relative aspect-[2/3] bg-white border border-border overflow-hidden group">
-                              <img src={img.url} alt="product swatch" className="w-full h-full object-cover" />
+                              <img src={img.url} alt="product swatch" className="w-full h-full object-contain bg-bg-subtle" />
                               <button
                                 type="button"
                                 onClick={() => handleDeleteImage(idx)}
-                                className="absolute top-2 right-2 p-1.5 bg-black/60 text-white hover:bg-sale transition-colors shadow-sm"
+                                className="absolute top-2 right-2 p-1.5 bg-black/60 text-white hover:bg-sale transition-colors shadow-sm z-10"
+                                title="Delete Image"
                               >
                                 <Trash2 size={12} />
                               </button>
-                              <span className="absolute bottom-2 left-2 bg-black/60 text-white font-mono text-[8px] px-1 py-0.25">
-                                Idx: {idx}
-                              </span>
+                              
+                              {/* Reorder controls overlay on hover */}
+                              <div className="absolute inset-x-0 bottom-0 bg-black/70 p-1 flex justify-between items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  type="button"
+                                  disabled={idx === 0}
+                                  onClick={() => handleMoveImage(idx, 'left')}
+                                  className="text-white hover:text-accent disabled:opacity-30 text-[10px] font-bold p-1 cursor-pointer"
+                                  title="Move Left"
+                                >
+                                  ◀
+                                </button>
+                                <span className="text-[9px] font-mono text-white/90">
+                                  Pos: {idx + 1}
+                                </span>
+                                <button
+                                  type="button"
+                                  disabled={idx === prodImages.length - 1}
+                                  onClick={() => handleMoveImage(idx, 'right')}
+                                  className="text-white hover:text-accent disabled:opacity-30 text-[10px] font-bold p-1 cursor-pointer"
+                                  title="Move Right"
+                                >
+                                  ▶
+                                </button>
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -3470,10 +3739,23 @@ ${titleHtml}  <thead>
                             onChange={(e) => setVarSize(e.target.value)}
                             className="w-full px-2 py-1.5 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent"
                           >
-                            <option value="S">S</option>
-                            <option value="M">M</option>
-                            <option value="L">L</option>
-                            <option value="XL">XL</option>
+                            {isPantsProduct ? (
+                              <>
+                                <option value="28">28</option>
+                                <option value="30">30</option>
+                                <option value="32">32</option>
+                                <option value="34">34</option>
+                                <option value="36">36</option>
+                                <option value="38">38</option>
+                              </>
+                            ) : (
+                              <>
+                                <option value="S">S</option>
+                                <option value="M">M</option>
+                                <option value="L">L</option>
+                                <option value="XL">XL</option>
+                              </>
+                            )}
                           </select>
                         </div>
                         <div>
@@ -3502,15 +3784,15 @@ ${titleHtml}  <thead>
                           />
                         </div>
                         <div>
-                          <label className="block text-[9px] font-bold uppercase tracking-wide text-text-secondary mb-1">
-                            Variant SKU
+                          <label className="block text-[9px] font-bold uppercase tracking-wide text-text-secondary mb-1 text-accent font-bold">
+                            Automated SKU (Auto)
                           </label>
                           <input
                             type="text"
-                            value={varSku}
-                            onChange={(e) => setVarSku(e.target.value)}
-                            className="w-full px-2 py-1 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent font-mono"
-                            placeholder="ZP-SHRT-W-M"
+                            readOnly
+                            disabled
+                            value={computedSku}
+                            className="w-full px-2 py-1 border border-border bg-bg-subtle text-text-secondary text-xs font-mono font-bold select-all"
                           />
                         </div>
                       </div>
@@ -3566,9 +3848,17 @@ ${titleHtml}  <thead>
                       </button>
                       <button
                         type="submit"
-                        className="px-6 py-3 bg-accent text-white text-xs font-bold uppercase tracking-widest hover:bg-accent-hover transition-colors shadow-sm"
+                        disabled={isSavingProduct}
+                        className="px-6 py-3 bg-accent text-white text-xs font-bold uppercase tracking-widest hover:bg-accent-hover transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
                       >
-                        Save Catalog Product
+                        {isSavingProduct ? (
+                          <>
+                            <Loader2 size={13} className="animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          editingProduct ? 'Update Product' : 'Save Catalog Product'
+                        )}
                       </button>
                     </div>
                   </div>

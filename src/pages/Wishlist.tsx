@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Heart, Trash2, ArrowRight, Loader2 } from 'lucide-react';
+import { Heart, Trash2, ArrowRight, Loader2, Image } from 'lucide-react';
 import { useWishlistStore } from '../store/useWishlistStore';
 import { getProductsByIds } from '../lib/supabase';
-import linenShirt from '../assets/product_linen_shirt.png';
 
 export default function Wishlist() {
   const { productIds, toggleWishlist } = useWishlistStore();
@@ -72,11 +71,17 @@ export default function Wishlist() {
             <div key={product.id} className="group product-card relative">
               <div className="w-full bg-bg-subtle overflow-hidden border border-border relative mb-3">
                 <Link to={`/product/${product.slug}`}>
-                  <img
-                    src={product.product_images && product.product_images[0]?.url || linenShirt}
-                    alt={product.name}
-                    className="card-img w-full h-auto block relative z-10"
-                  />
+                  {product.product_images?.[0]?.url ? (
+                    <img
+                      src={product.product_images[0].url}
+                      alt={product.name}
+                      className="card-img w-full h-auto block relative z-10"
+                    />
+                  ) : (
+                    <div className="aspect-[3/4] w-full flex items-center justify-center bg-bg-subtle">
+                      <Image size={24} className="text-text-secondary/20" />
+                    </div>
+                  )}
                 </Link>
                 <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-accent-line scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
                 <button

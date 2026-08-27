@@ -25,7 +25,9 @@ export interface ProductWithDetails extends ProductRow {
 // -------------------------------------------------------------
 
 /**
- * Fetch all active products with their variants and images
+ * Fetch all active products with their variants and images in a single query.
+ * Uses embedded joins (same pattern as getProductsByIds) so images and variants
+ * are always returned together — no secondary IN-query that can silently fail.
  */
 export async function getActiveProducts(): Promise<ProductWithDetails[]> {
   const { data, error } = await supabase
@@ -35,29 +37,29 @@ export async function getActiveProducts(): Promise<ProductWithDetails[]> {
       product_images (*),
       product_variants (*)
     `)
-    .eq('is_active', true);
+    .eq('is_active', true)
+    .order('created_at', { ascending: false });
 
   if (error) {
     console.error('Error fetching active products:', error);
     throw error;
   }
 
-  return (data || []) as ProductWithDetails[];
+  // Ensure product_images are sorted by sort_order client-side
+  return (data || []).map((p) => ({
+    ...p,
+    product_images: [...(p.product_images || [])].sort((a: any, b: any) => a.sort_order - b.sort_order),
+  })) as ProductWithDetails[];
 }
 
 /**
- * Fetch a single product with variants and images by its slug or ID
+ * Fetch a single product with variants and images by its slug or ID.
+ * Uses separate queries so a product_images timeout doesn't block the product detail page.
  */
 export async function getProductDetails(identifier: string, isSlug = true): Promise<ProductWithDetails | null> {
-  const query = supabase
-    .from('products')
-    .select(`
-      *,
-      product_images (*),
-      product_variants (*)
-    `);
-
-  const { data, error } = await (isSlug 
+  // 1. Fetch the product core
+  const query = supabase.from('products').select('*');
+  const { data: product, error } = await (isSlug
     ? query.eq('slug', identifier).maybeSingle()
     : query.eq('id', identifier).maybeSingle());
 
@@ -65,8 +67,22 @@ export async function getProductDetails(identifier: string, isSlug = true): Prom
     console.error('Error fetching product details:', error);
     throw error;
   }
+  if (!product) return null;
 
-  return data as ProductWithDetails | null;
+  // 2. Fetch variants and images in parallel (images are non-critical)
+  const [variantsResult, imagesResult] = await Promise.allSettled([
+    supabase.from('product_variants').select('*').eq('product_id', product.id),
+    supabase.from('product_images').select('*').eq('product_id', product.id).order('sort_order', { ascending: true })
+  ]);
+
+  const variants = variantsResult.status === 'fulfilled' ? (variantsResult.value.data || []) : [];
+  const images = imagesResult.status === 'fulfilled' ? (imagesResult.value.data || []) : [];
+
+  return {
+    ...product,
+    product_variants: variants,
+    product_images: images,
+  } as ProductWithDetails;
 }
 
 /**
