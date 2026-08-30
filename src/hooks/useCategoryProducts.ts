@@ -129,7 +129,7 @@ export function useCategoryProducts({
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10_000),
   });
 
-  // Slow-network detection — only fires on a genuine fresh fetch
+  // Slow-network detection - only fires on a genuine fresh fetch
   const isPendingFresh = query.isFetching && !query.isPlaceholderData;
 
   useEffect(() => {

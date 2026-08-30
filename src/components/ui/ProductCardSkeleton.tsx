@@ -14,7 +14,7 @@ export function ProductCardSkeleton({ count = 1 }: Props) {
     <>
       {Array.from({ length: count }).map((_, i) => (
         <div key={i} className="animate-pulse" aria-hidden="true">
-          {/* Image placeholder — matches aspect-[3/4] of real card */}
+          {/* Image placeholder â€” matches aspect-[3/4] of real card */}
           <div className="aspect-[3/4] w-full bg-zinc-100 border border-zinc-200 mb-3 rounded-sm" />
           {/* Text placeholders */}
           <div className="space-y-2">
