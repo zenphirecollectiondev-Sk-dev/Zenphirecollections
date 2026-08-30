@@ -167,38 +167,60 @@ export default function Shop() {
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
   const [page, setPage] = useState(0);
 
-  // -- Categories (lightweight � fetched once, cached) -----------------------
-  const [dbCategories, setDbCategories] = useState<any[]>([]);
+  // -- Categories (lightweight — fetched once, cached) -----------------------
+  // ⚠️ CRITICAL: lazy initializer reads from dataCache synchronously on first render.
+  // This ensures activeCategoryId is non-null from frame 0 when the cache is warm
+  // (e.g. user came from Home page). Without this, categories=[] on first render
+  // resolves every slug to null — causing the hook to fetch ALL products, then
+  // show "no products found" when filtered client-side by the selected category.
+  const [dbCategories, setDbCategories] = useState<any[]>(
+    () => dataCache.get<any[]>('categories') ?? []
+  );
+
+  // Track whether categories have been loaded (either from cache or network)
+  // so we don't resolve activeCategoryId before we have the data.
+  const [categoriesReady, setCategoriesReady] = useState(
+    () => (dataCache.get<any[]>('categories') ?? []).length > 0
+  );
 
   useEffect(() => {
     const cached = dataCache.get<any[]>("categories");
-    if (cached) setDbCategories(cached);
+    if (cached && cached.length > 0) {
+      setDbCategories(cached);
+      setCategoriesReady(true);
+    }
     if (cached && !dataCache.isStale("categories")) return;
     getCategories().then((cats) => {
       dataCache.set("categories", cats || []);
       setDbCategories(cats || []);
+      setCategoriesReady(true);
     });
   }, []);
 
   const categories = useMemo(() => dbCategories, [dbCategories]);
 
   // -- Resolve active category ID for the hook -------------------------------
+  // If categories haven't loaded yet and a specific category is requested,
+  // return a sentinel string (not null) so the hook stays in "loading" state
+  // rather than fetching all products with no filter.
   const activeCategoryId = useMemo(() => {
     if (activeCategory === "all") return null;
-    let cat = categories.find((c) => c.slug === activeCategory);
+    // Categories not yet loaded: return sentinel to keep hook in pending state
+    if (!categoriesReady) return "__loading__";
+    let cat = categories.find((c: any) => c.slug === activeCategory);
     if (!cat) {
       // Slug aliases
-      if (activeCategory === "trousers") cat = categories.find((c) => c.slug === "pants");
-      else if (activeCategory === "crop-tops") cat = categories.find((c) => c.slug === "crop-top");
+      if (activeCategory === "trousers") cat = categories.find((c: any) => c.slug === "pants");
+      else if (activeCategory === "crop-tops") cat = categories.find((c: any) => c.slug === "crop-top");
       else if (
         activeCategory === "tshirt-and-tops" ||
         activeCategory === "tshirt" ||
         activeCategory === "tshirts"
       )
-        cat = categories.find((c) => c.slug === "t-shirts");
+        cat = categories.find((c: any) => c.slug === "t-shirts");
     }
     return cat?.id ?? null;
-  }, [activeCategory, categories]);
+  }, [activeCategory, categories, categoriesReady]);
 
   // Reset to page 0 whenever the category filter changes
   useEffect(() => {

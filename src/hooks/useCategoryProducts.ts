@@ -105,7 +105,8 @@ function toGridProduct(raw: RawProduct): GridProduct {
 // --- Hook ---------------------------------------------------------------------
 
 interface UseCategoryProductsOptions {
-  /** The Supabase category ID to filter on, or null for "all" */
+  /** The Supabase category ID to filter on, null for "all",
+   *  or the sentinel "__loading__" to pause the query until categories resolve. */
   categoryId: string | null;
   page: number;
 }
@@ -117,13 +118,25 @@ export function useCategoryProducts({
   const [isSlow, setIsSlow] = useState(false);
   const slowTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // "__loading__" sentinel: categories not yet resolved — pause query
+  const isAwaitingCategories = categoryId === "__loading__";
+  // The real ID to pass to Supabase (null = fetch all)
+  const resolvedCategoryId = isAwaitingCategories ? null : categoryId;
+
   const query = useQuery<GridProduct[], Error>({
-    queryKey: ["category-products", categoryId ?? "all", page],
+    queryKey: ["category-products", resolvedCategoryId ?? "all", page],
     queryFn: async () => {
-      const raw = await fetchCategoryProducts(page, categoryId);
+      const raw = await fetchCategoryProducts(page, resolvedCategoryId);
       return raw.map(toGridProduct);
     },
-    staleTime: 5 * 60 * 1000,
+    // Disable the query entirely while categories are still loading
+    enabled: !isAwaitingCategories,
+    // staleTime=0 for category-filtered queries: always re-fetch when the user
+    // picks a category so we never serve a stale "all products" result for a
+    // category-specific URL. For "all" (null categoryId) keep 5-min cache.
+    staleTime: resolvedCategoryId ? 0 : 5 * 60 * 1000,
+    // Don't keep old category data in memory after navigating away
+    gcTime: resolvedCategoryId ? 30 * 1000 : 5 * 60 * 1000,
     placeholderData: keepPreviousData,
     retry: 2,
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10_000),
@@ -149,6 +162,11 @@ export function useCategoryProducts({
   }, [isPendingFresh]);
 
   // -- State machine ---------------------------------------
+  // While waiting for categories to resolve, show loading skeleton
+  if (isAwaitingCategories) {
+    return { status: "loading" };
+  }
+
   if (query.isError) {
     return { status: "error", error: query.error, retry: () => query.refetch() };
   }

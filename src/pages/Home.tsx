@@ -9,9 +9,20 @@ export default function Home() {
   const { toggleWishlist, isWishlisted } = useWishlistStore();
   const [products, setProducts] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  // configLoading gates the hero + category skeleton (resolves fast ~2-4s)
+  const [configLoading, setConfigLoading] = useState(
+    () => !dataCache.get('homepage_config') && !dataCache.get('categories')
+  );
+  // productsLoading gates the new-arrivals / best-sellers sections
+  const [productsLoading, setProductsLoading] = useState(
+    () => !(dataCache.get<any[]>('products')?.length)
+  );
+  // Keep `loading` alias so existing JSX that uses it still works
+  const loading = productsLoading;
   const [heartId, setHeartId] = useState<string | null>(null);
-  const [homepageConfig, setHomepageConfig] = useState<any | null>(null);
+  const [homepageConfig, setHomepageConfig] = useState<any | null>(
+    () => dataCache.get<any>('homepage_config') ?? null
+  );
 
   const [activeCategoryIndex, setActiveCategoryIndex] = useState(0);
   const categoryScrollRef = useRef<HTMLDivElement>(null);
@@ -82,60 +93,73 @@ export default function Home() {
   useEffect(() => {
     let cancelled = false;
 
-    // ── Step 1: Serve from cache immediately (zero loading flash on return visits) ──
+    // ── Step 1: Hydrate from cache synchronously (return visits: zero flash) ──
     const cachedProds = dataCache.get<any[]>('products');
     const cachedCats  = dataCache.get<any[]>('categories');
-    const cachedHp    = dataCache.get<any>('homepage_config');
+    // homepageConfig already initialised from cache in useState lazy init
 
     if (cachedProds && cachedProds.length > 0) setProducts(cachedProds);
     if (cachedCats) setCategories(cachedCats.filter((c: any) => !c.parent_category_id));
-    if (cachedHp !== undefined) setHomepageConfig(cachedHp);
 
-    // If we have products from cache, show them immediately — no loading state
-    if (cachedProds && cachedProds.length > 0) {
-      setLoading(false);
-      // If cache is still fresh, skip the network round-trip entirely
-      if (!dataCache.isStale('products') && !dataCache.isStale('categories')) {
-        return () => { cancelled = true; };
-      }
-    }
-
-    // ── Step 2: Fetch (first visit) or silent background revalidation (stale) ──
-    async function load() {
+    // ── Step 2a: Fast fetch — homepage_config + categories (small tables, ~2-4s) ──
+    // These two resolve quickly and unblock hero image + category cards immediately.
+    async function loadConfig() {
       try {
-        const [prodResult, catResult, hpResult] = await Promise.allSettled([
-          getActiveProducts(),
-          getCategories(),
-          supabase.from('homepage_config' as any).select('*').eq('id', 'global').maybeSingle()
+        const [catResult, hpResult] = await Promise.allSettled([
+          dataCache.isStale('categories') ? getCategories() : Promise.resolve(cachedCats || []),
+          dataCache.isStale('homepage_config')
+            ? supabase.from('homepage_config' as any).select('*').eq('id', 'global').maybeSingle()
+            : Promise.resolve({ data: dataCache.get<any>('homepage_config'), error: null }),
         ]);
 
         if (cancelled) return;
 
-        if (prodResult.status === 'fulfilled' && prodResult.value?.length > 0) {
-          const prods = prodResult.value;
+        if (catResult.status === 'fulfilled' && catResult.value && catResult.value.length > 0) {
+          dataCache.set('categories', catResult.value);
+          setCategories(catResult.value.filter((c: any) => !c.parent_category_id));
+        }
+        const hpData =
+          hpResult.status === 'fulfilled' && !(hpResult.value as any)?.error
+            ? ((hpResult.value as any)?.data ?? null)
+            : null;
+        if (hpData) {
+          dataCache.set('homepage_config', hpData);
+          setHomepageConfig(hpData);
+        }
+      } catch (err) {
+        console.warn('Home config load error:', err);
+      } finally {
+        if (!cancelled) setConfigLoading(false);
+      }
+    }
+
+    // ── Step 2b: Slow fetch — products (heavy join, may take 5-30s on cold start) ──
+    // Runs in parallel with loadConfig but does NOT block the hero or categories.
+    async function loadProducts() {
+      // If cache is fresh, skip network entirely
+      if (cachedProds && cachedProds.length > 0 && !dataCache.isStale('products')) {
+        setProductsLoading(false);
+        return;
+      }
+      try {
+        const prods = await getActiveProducts();
+        if (cancelled) return;
+        if (prods?.length > 0) {
           dataCache.set('products', prods);
           setProducts(prods);
           // Pre-populate per-slug caches so ProductDetail renders instantly on click
           prods.forEach((p: any) => dataCache.set(`product:${p.slug}`, p));
         }
-        if (catResult.status === 'fulfilled' && catResult.value) {
-          dataCache.set('categories', catResult.value);
-          setCategories(catResult.value.filter((c: any) => !c.parent_category_id));
-        }
-        const hpData =
-          hpResult.status === 'fulfilled' && !hpResult.value?.error
-            ? (hpResult.value?.data ?? null)
-            : null;
-        dataCache.set('homepage_config', hpData);
-        if (hpData) setHomepageConfig(hpData);
       } catch (err) {
-        console.warn('Home load error:', err);
+        console.warn('Home products load error:', err);
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setProductsLoading(false);
       }
     }
 
-    load();
+    // Fire both in parallel — config finishes first and immediately shows the UI
+    loadConfig();
+    loadProducts();
     return () => { cancelled = true; };
   }, []);
 
@@ -209,8 +233,11 @@ export default function Home() {
               className="w-full h-full object-cover transition-transform duration-[2000ms] ease-out group-hover:scale-105"
               style={{ objectPosition: homepageConfig?.hero_image_position || 'center' }}
             />
+          ) : configLoading ? (
+            /* Shimmer skeleton while config loads — no jarring green flash */
+            <div className="w-full h-full animate-pulse bg-gradient-to-br from-zinc-100 via-zinc-200 to-zinc-100" />
           ) : (
-            /* Placeholder while homepage_config loads or if no hero image is set in admin */
+            /* Config loaded but admin has not set a hero image yet */
             <div className="w-full h-full bg-gradient-to-br from-[#001510] via-[#063A2C] to-[#00221A]" />
           )}
           <div
@@ -223,8 +250,8 @@ export default function Home() {
       </section>
 
       {/* ── 2. GENDER COLLECTIONS ── */}
-      {/* Only rendered once homepage_config is loaded and has actual image URLs configured */}
-      {!loading && genderCollections.length > 0 && (
+      {/* GENDER COLLECTIONS — only rendered once config is loaded and images are configured */}
+      {!configLoading && genderCollections.length > 0 && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 anim-fade-up">
           <div className="flex justify-between items-center mb-8">
             <div>
@@ -261,8 +288,8 @@ export default function Home() {
         </section>
       )}
 
-      {/* Skeleton for Gender Collections while loading */}
-      {loading && (
+      {/* Skeleton for Gender Collections while config loads */}
+      {configLoading && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="flex gap-4 md:gap-6 overflow-x-hidden pb-5">
             {[1, 2, 3].map((i) => (
