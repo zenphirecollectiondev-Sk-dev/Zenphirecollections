@@ -21,3 +21,9 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 )
 
+// Hide the premium global preloader once React has mounted
+setTimeout(() => {
+  if (typeof window !== 'undefined' && (window as any).hideZenphirePreloader) {
+    (window as any).hideZenphirePreloader();
+  }
+}, 300);

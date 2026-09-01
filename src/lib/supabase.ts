@@ -25,41 +25,56 @@ export interface ProductWithDetails extends ProductRow {
 // -------------------------------------------------------------
 
 /**
- * Fetch all active products with their variants and images in a single query.
- * Uses embedded joins (same pattern as getProductsByIds) so images and variants
- * are always returned together — no secondary IN-query that can silently fail.
+ * Fetch active products for the home page listing.
+ * Only selects the 6 fields the home page actually renders — no variants
+ * (never used on home), narrowed image columns (url + sort_order only).
+ * Capped at 100 rows: the home page shows ≤12 products, but 100 gives
+ * the per-slug pre-cache enough breadth for instant ProductDetail renders.
  */
 export async function getActiveProducts(): Promise<ProductWithDetails[]> {
   const { data, error } = await supabase
     .from('products')
     .select(`
-      *,
-      product_images (*),
-      product_variants (*)
+      id,
+      name,
+      slug,
+      base_price,
+      created_at,
+      category_id,
+      product_images ( url, sort_order )
     `)
     .eq('is_active', true)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .limit(100);
 
   if (error) {
     console.error('Error fetching active products:', error);
     throw error;
   }
 
-  // Ensure product_images are sorted by sort_order client-side
+  // Sort images by sort_order client-side, attach empty variants array so
+  // the ProductWithDetails shape is satisfied (home page never reads variants)
   return (data || []).map((p) => ({
     ...p,
-    product_images: [...(p.product_images || [])].sort((a: any, b: any) => a.sort_order - b.sort_order),
-  })) as ProductWithDetails[];
+    product_variants: [],
+    product_images: [...(p.product_images || [])].sort(
+      (a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
+    ),
+  })) as unknown as ProductWithDetails[];
 }
+
 
 /**
  * Fetch a single product with variants and images by its slug or ID.
- * Uses separate queries so a product_images timeout doesn't block the product detail page.
+ * Uses a single PostgREST embedded-join query so product core, variants,
+ * and images all arrive in one HTTP round trip instead of three.
  */
 export async function getProductDetails(identifier: string, isSlug = true): Promise<ProductWithDetails | null> {
-  // 1. Fetch the product core
-  const query = supabase.from('products').select('*');
-  const { data: product, error } = await (isSlug
+  const query = supabase
+    .from('products')
+    .select('*, product_images(*), product_variants(*)');
+
+  const { data, error } = await (isSlug
     ? query.eq('slug', identifier).maybeSingle()
     : query.eq('id', identifier).maybeSingle());
 
@@ -67,23 +82,17 @@ export async function getProductDetails(identifier: string, isSlug = true): Prom
     console.error('Error fetching product details:', error);
     throw error;
   }
-  if (!product) return null;
+  if (!data) return null;
 
-  // 2. Fetch variants and images in parallel (images are non-critical)
-  const [variantsResult, imagesResult] = await Promise.allSettled([
-    supabase.from('product_variants').select('*').eq('product_id', product.id),
-    supabase.from('product_images').select('*').eq('product_id', product.id).order('sort_order', { ascending: true })
-  ]);
-
-  const variants = variantsResult.status === 'fulfilled' ? (variantsResult.value.data || []) : [];
-  const images = imagesResult.status === 'fulfilled' ? (imagesResult.value.data || []) : [];
-
+  // Sort images by sort_order client-side (same as getActiveProducts)
   return {
-    ...product,
-    product_variants: variants,
-    product_images: images,
+    ...data,
+    product_images: [...(data.product_images || [])].sort(
+      (a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
+    ),
   } as ProductWithDetails;
 }
+
 
 /**
  * Fetch all categories

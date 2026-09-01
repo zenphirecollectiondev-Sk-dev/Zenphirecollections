@@ -1,29 +1,17 @@
-import { useEffect, useState, useMemo, useRef } from 'react';
+﻿import { useEffect, useState, useMemo, useRef } from 'react';
 import { ArrowRight, Heart, Image } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useWishlistStore } from '../store/useWishlistStore';
 import { getActiveProducts, getCategories, supabase } from '../lib/supabase';
 import { dataCache } from '../lib/dataCache';
-import { imgHero, imgCard } from '../lib/imgTransform';
 
 export default function Home() {
   const { toggleWishlist, isWishlisted } = useWishlistStore();
   const [products, setProducts] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
-  // configLoading gates the hero + category skeleton (resolves fast ~2-4s)
-  const [configLoading, setConfigLoading] = useState(
-    () => !dataCache.get('homepage_config') && !dataCache.get('categories')
-  );
-  // productsLoading gates the new-arrivals / best-sellers sections
-  const [productsLoading, setProductsLoading] = useState(
-    () => !(dataCache.get<any[]>('products')?.length)
-  );
-  // Keep `loading` alias so existing JSX that uses it still works
-  const loading = productsLoading;
+  const [loading, setLoading] = useState(true);
   const [heartId, setHeartId] = useState<string | null>(null);
-  const [homepageConfig, setHomepageConfig] = useState<any | null>(
-    () => dataCache.get<any>('homepage_config') ?? null
-  );
+  const [homepageConfig, setHomepageConfig] = useState<any | null>(null);
 
   const [activeCategoryIndex, setActiveCategoryIndex] = useState(0);
   const categoryScrollRef = useRef<HTMLDivElement>(null);
@@ -94,73 +82,60 @@ export default function Home() {
   useEffect(() => {
     let cancelled = false;
 
-    // ── Step 1: Hydrate from cache synchronously (return visits: zero flash) ──
+    // â”€â”€ Step 1: Serve from cache immediately (zero loading flash on return visits) â”€â”€
     const cachedProds = dataCache.get<any[]>('products');
     const cachedCats  = dataCache.get<any[]>('categories');
-    // homepageConfig already initialised from cache in useState lazy init
+    const cachedHp    = dataCache.get<any>('homepage_config');
 
     if (cachedProds && cachedProds.length > 0) setProducts(cachedProds);
     if (cachedCats) setCategories(cachedCats.filter((c: any) => !c.parent_category_id));
+    if (cachedHp !== undefined) setHomepageConfig(cachedHp);
 
-    // ── Step 2a: Fast fetch — homepage_config + categories (small tables, ~2-4s) ──
-    // These two resolve quickly and unblock hero image + category cards immediately.
-    async function loadConfig() {
+    // If we have products from cache, show them immediately â€” no loading state
+    if (cachedProds && cachedProds.length > 0) {
+      setLoading(false);
+      // If cache is still fresh, skip the network round-trip entirely
+      if (!dataCache.isStale('products') && !dataCache.isStale('categories')) {
+        return () => { cancelled = true; };
+      }
+    }
+
+    // â”€â”€ Step 2: Fetch (first visit) or silent background revalidation (stale) â”€â”€
+    async function load() {
       try {
-        const [catResult, hpResult] = await Promise.allSettled([
-          dataCache.isStale('categories') ? getCategories() : Promise.resolve(cachedCats || []),
-          dataCache.isStale('homepage_config')
-            ? supabase.from('homepage_config' as any).select('*').eq('id', 'global').maybeSingle()
-            : Promise.resolve({ data: dataCache.get<any>('homepage_config'), error: null }),
+        const [prodResult, catResult, hpResult] = await Promise.allSettled([
+          getActiveProducts(),
+          getCategories(),
+          supabase.from('homepage_config' as any).select('*').eq('id', 'global').maybeSingle()
         ]);
 
         if (cancelled) return;
 
-        if (catResult.status === 'fulfilled' && catResult.value && catResult.value.length > 0) {
-          dataCache.set('categories', catResult.value);
-          setCategories(catResult.value.filter((c: any) => !c.parent_category_id));
-        }
-        const hpData =
-          hpResult.status === 'fulfilled' && !(hpResult.value as any)?.error
-            ? ((hpResult.value as any)?.data ?? null)
-            : null;
-        if (hpData) {
-          dataCache.set('homepage_config', hpData);
-          setHomepageConfig(hpData);
-        }
-      } catch (err) {
-        console.warn('Home config load error:', err);
-      } finally {
-        if (!cancelled) setConfigLoading(false);
-      }
-    }
-
-    // ── Step 2b: Slow fetch — products (heavy join, may take 5-30s on cold start) ──
-    // Runs in parallel with loadConfig but does NOT block the hero or categories.
-    async function loadProducts() {
-      // If cache is fresh, skip network entirely
-      if (cachedProds && cachedProds.length > 0 && !dataCache.isStale('products')) {
-        setProductsLoading(false);
-        return;
-      }
-      try {
-        const prods = await getActiveProducts();
-        if (cancelled) return;
-        if (prods?.length > 0) {
+        if (prodResult.status === 'fulfilled' && prodResult.value?.length > 0) {
+          const prods = prodResult.value;
           dataCache.set('products', prods);
           setProducts(prods);
           // Pre-populate per-slug caches so ProductDetail renders instantly on click
           prods.forEach((p: any) => dataCache.set(`product:${p.slug}`, p));
         }
+        if (catResult.status === 'fulfilled' && catResult.value) {
+          dataCache.set('categories', catResult.value);
+          setCategories(catResult.value.filter((c: any) => !c.parent_category_id));
+        }
+        const hpData =
+          hpResult.status === 'fulfilled' && !hpResult.value?.error
+            ? (hpResult.value?.data ?? null)
+            : null;
+        dataCache.set('homepage_config', hpData);
+        if (hpData) setHomepageConfig(hpData);
       } catch (err) {
-        console.warn('Home products load error:', err);
+        console.warn('Home load error:', err);
       } finally {
-        if (!cancelled) setProductsLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
 
-    // Fire both in parallel — config finishes first and immediately shows the UI
-    loadConfig();
-    loadProducts();
+    load();
     return () => { cancelled = true; };
   }, []);
 
@@ -199,7 +174,7 @@ export default function Home() {
   return (
     <div className="bg-bg min-h-screen overflow-x-hidden">
 
-      {/* ── 1. HERO ── */}
+      {/* â”€â”€ 1. HERO â”€â”€ */}
       <section className="relative bg-bg-subtle h-[75vh] md:h-[80vh] flex flex-col md:flex-row items-stretch overflow-hidden border-b border-border">
 
         <div className="absolute inset-0 md:relative md:w-1/2 flex flex-col justify-end md:justify-center px-6 pb-12 pt-16 md:px-16 lg:px-24 bg-transparent md:bg-bg-subtle z-20">
@@ -229,19 +204,13 @@ export default function Home() {
         <div className="absolute inset-0 md:relative md:w-1/2 group flex justify-center overflow-hidden z-0 self-stretch">
           {homepageConfig?.hero_image_url ? (
             <img
-              src={imgHero(homepageConfig.hero_image_url)}
+              src={homepageConfig.hero_image_url}
               alt="Zenphire Editorial Showcase"
-              fetchPriority="high"
-              loading="eager"
-              decoding="async"
               className="w-full h-full object-cover transition-transform duration-[2000ms] ease-out group-hover:scale-105"
               style={{ objectPosition: homepageConfig?.hero_image_position || 'center' }}
             />
-          ) : configLoading ? (
-            /* Shimmer skeleton while config loads — no jarring green flash */
-            <div className="w-full h-full animate-pulse bg-gradient-to-br from-zinc-100 via-zinc-200 to-zinc-100" />
           ) : (
-            /* Config loaded but admin has not set a hero image yet */
+            /* Placeholder while homepage_config loads or if no hero image is set in admin */
             <div className="w-full h-full bg-gradient-to-br from-[#001510] via-[#063A2C] to-[#00221A]" />
           )}
           <div
@@ -253,9 +222,9 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── 2. GENDER COLLECTIONS ── */}
-      {/* GENDER COLLECTIONS — only rendered once config is loaded and images are configured */}
-      {!configLoading && genderCollections.length > 0 && (
+      {/* â”€â”€ 2. GENDER COLLECTIONS â”€â”€ */}
+      {/* Only rendered once homepage_config is loaded and has actual image URLs configured */}
+      {!loading && genderCollections.length > 0 && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 anim-fade-up">
           <div className="flex justify-between items-center mb-8">
             <div>
@@ -276,7 +245,7 @@ export default function Home() {
                 className="flex-shrink-0 w-64 md:w-80 snap-start group product-card block"
               >
                 <div className="relative w-full bg-bg-subtle overflow-hidden border border-border">
-                  <img src={imgCard(col.image)} alt={col.name} loading="lazy" decoding="async" className="card-img w-full h-auto block" />
+                  <img src={col.image} alt={col.name} className="card-img w-full h-auto block" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
                   <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-accent-line scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
                   <div className="absolute bottom-5 left-5 text-white">
@@ -292,8 +261,8 @@ export default function Home() {
         </section>
       )}
 
-      {/* Skeleton for Gender Collections while config loads */}
-      {configLoading && (
+      {/* Skeleton for Gender Collections while loading */}
+      {loading && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="flex gap-4 md:gap-6 overflow-x-hidden pb-5">
             {[1, 2, 3].map((i) => (
@@ -305,7 +274,7 @@ export default function Home() {
         </section>
       )}
 
-      {/* ── 3. SHOP BY CATEGORY ── */}
+      {/* â”€â”€ 3. SHOP BY CATEGORY â”€â”€ */}
       {sortedCategories.length > 0 && (
         <section className="max-w-7xl mx-auto py-16 border-t border-border anim-fade-up">
           <div className="px-4 sm:px-6 lg:px-8 mb-10 text-center md:text-left">
@@ -349,14 +318,12 @@ export default function Home() {
                   <div className="aspect-[3/4] w-full bg-bg-subtle overflow-hidden border border-border rounded-none relative">
                     {catImageSrc ? (
                       <img
-                        src={imgCard(catImageSrc)}
+                        src={catImageSrc}
                         alt={cat.name}
-                        loading="lazy"
-                        decoding="async"
                         className="card-img w-full h-full object-cover object-top transition-transform duration-700 ease-out group-hover:scale-105"
                       />
                     ) : (
-                      /* No-image placeholder — shown when admin hasn't set a category image yet */
+                      /* No-image placeholder â€” shown when admin hasn't set a category image yet */
                       <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-bg-subtle">
                         <Image size={28} className="text-text-secondary/30" />
                         <span className="text-[9px] uppercase tracking-widest text-text-secondary/40 font-bold">
@@ -380,7 +347,7 @@ export default function Home() {
         </section>
       )}
 
-      {/* ── 4. NEW ARRIVALS ── */}
+      {/* â”€â”€ 4. NEW ARRIVALS â”€â”€ */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 border-t border-border anim-fade-up">
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-4">
           <div>
@@ -427,10 +394,8 @@ export default function Home() {
                 <div className="aspect-[3/4] w-full bg-bg-subtle overflow-hidden relative">
                   {product.product_images?.[0]?.url ? (
                     <img
-                      src={imgCard(product.product_images[0].url)}
+                      src={product.product_images[0].url}
                       alt={product.name}
-                      loading="lazy"
-                      decoding="async"
                       className="card-img w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
                     />
                   ) : (
@@ -452,7 +417,7 @@ export default function Home() {
                     {product.name}
                   </h3>
                   <p className="text-xs font-semibold text-text-primary">
-                    ₹{Number(product.base_price || 0).toFixed(2)}
+                    â‚¹{Number(product.base_price || 0).toFixed(2)}
                   </p>
                 </div>
               </Link>
@@ -461,7 +426,7 @@ export default function Home() {
         )}
       </section>
 
-      {/* ── 5. EDITORIAL BANNER ── */}
+      {/* â”€â”€ 5. EDITORIAL BANNER â”€â”€ */}
       {/* Only rendered when admin has configured an editorial image */}
       {editorialImage && (
         <section className="bg-bg-subtle border-y border-border py-20 my-12">
@@ -472,7 +437,7 @@ export default function Home() {
                 Honest Materials,<br />Artisan Craft
               </h2>
               <p className="text-sm text-text-secondary leading-relaxed max-w-md">
-                We design under the principle of reduction — removing embellishment to highlight the raw beauty of organic linen, long-staple cotton, and natural wool.
+                We design under the principle of reduction â€” removing embellishment to highlight the raw beauty of organic linen, long-staple cotton, and natural wool.
               </p>
               <Link
                 to="/shop"
@@ -484,10 +449,8 @@ export default function Home() {
             </div>
             <div className="overflow-hidden border border-border group w-full flex justify-center bg-bg-subtle">
               <img
-                src={imgHero(editorialImage)}
+                src={editorialImage}
                 alt="Artisan detail"
-                loading="lazy"
-                decoding="async"
                 className="w-full h-auto max-h-[75vh] object-cover transition-transform duration-[600ms] ease-[cubic-bezier(0.4,0,0.2,1)] group-hover:scale-[1.04]"
                 style={{ objectPosition: homepageConfig?.the_edit_image_position || 'center' }}
               />
@@ -496,7 +459,7 @@ export default function Home() {
         </section>
       )}
 
-      {/* ── 6. BEST SELLERS ── */}
+      {/* â”€â”€ 6. BEST SELLERS â”€â”€ */}
       {bestSellers.length > 0 && (
         <section className="py-14 mb-12 border-t border-border anim-fade-up">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center mb-10">
@@ -547,10 +510,8 @@ export default function Home() {
                   <div className="w-full bg-bg-subtle overflow-hidden border border-border relative">
                     {product.product_images?.[0]?.url ? (
                       <img
-                        src={imgCard(product.product_images[0].url)}
+                        src={product.product_images[0].url}
                         alt={product.name}
-                        loading="lazy"
-                        decoding="async"
                         className="card-img w-full h-auto block relative z-10"
                       />
                     ) : (
@@ -570,7 +531,7 @@ export default function Home() {
                   <div className="mt-2.5 space-y-0.5">
                     <p className="text-[9px] uppercase tracking-widest text-text-secondary font-bold">Zenphire</p>
                     <h3 className="text-sm font-medium text-text-primary group-hover:underline underline-offset-2 truncate">{product.name}</h3>
-                    <p className="text-sm font-semibold text-text-primary">₹{Number(product.base_price || 0).toFixed(2)}</p>
+                    <p className="text-sm font-semibold text-text-primary">â‚¹{Number(product.base_price || 0).toFixed(2)}</p>
                   </div>
                 </Link>
               ))}
@@ -591,10 +552,8 @@ export default function Home() {
                   <div className="w-full bg-bg-subtle overflow-hidden border border-border relative">
                     {product.product_images?.[0]?.url ? (
                       <img
-                        src={imgCard(product.product_images[0].url)}
+                        src={product.product_images[0].url}
                         alt={product.name}
-                        loading="lazy"
-                        decoding="async"
                         className="card-img w-full h-auto block relative z-10"
                       />
                     ) : (
@@ -614,7 +573,7 @@ export default function Home() {
                   <div className="mt-2.5 space-y-0.5">
                     <p className="text-[9px] uppercase tracking-widest text-text-secondary font-bold">Zenphire</p>
                     <h3 className="text-sm font-medium text-text-primary group-hover:underline underline-offset-2 truncate">{product.name}</h3>
-                    <p className="text-sm font-semibold text-text-primary">₹{Number(product.base_price || 0).toFixed(2)}</p>
+                    <p className="text-sm font-semibold text-text-primary">â‚¹{Number(product.base_price || 0).toFixed(2)}</p>
                   </div>
                 </Link>
               ))}
@@ -626,3 +585,4 @@ export default function Home() {
     </div>
   );
 }
+

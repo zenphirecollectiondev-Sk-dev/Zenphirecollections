@@ -6,6 +6,7 @@ import { useWishlistStore } from '../store/useWishlistStore';
 import { getProductDetails, supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import { dataCache } from '../lib/dataCache';
+import { imgHero, imgCard, imgThumb } from '../lib/imgTransform';
 
 export default function ProductDetail() {
   const { toggleWishlist, isWishlisted } = useWishlistStore();
@@ -20,56 +21,93 @@ export default function ProductDetail() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function loadProduct() {
       if (!id) return;
 
       // ── Cache hit: render instantly (pre-populated by Home/Shop listing fetch) ──
       const cached = dataCache.get<any>(`product:${id}`);
       if (cached) {
-        setDbProduct(cached);
-        setLoading(false);
-        // Still load category size guide in background (lightweight)
-        if (cached.category_id) {
-          (async () => {
-            try {
-              const { data: catData } = await supabase
+        if (!cancelled) {
+          setDbProduct(cached);
+          setLoading(false);
+        }
+        // Fire size guide + recommendations in parallel in the background.
+        // Both are non-blocking — product is already visible.
+        const [sizeGuideRes, recsRes] = await Promise.allSettled([
+          cached.category_id
+            ? supabase
                 .from('categories')
                 .select('size_guide_html')
                 .eq('id', cached.category_id)
-                .maybeSingle();
-              if (catData) setCategorySizeGuide(catData.size_guide_html);
-            } catch { /* non-critical */ }
-          })();
+                .maybeSingle()
+            : Promise.resolve({ data: null }),
+          supabase
+            .from('products')
+            .select('id, name, slug, base_price, product_images(url, sort_order)')
+            .eq('is_active', true)
+            .neq('id', cached.id)
+            .eq('category_id', cached.category_id ?? '')
+            .limit(4),
+        ]);
+        if (cancelled) return;
+        if (sizeGuideRes.status === 'fulfilled') {
+          const catData = (sizeGuideRes.value as any)?.data;
+          if (catData) setCategorySizeGuide(catData.size_guide_html);
         }
-        // Skip network if fresh
+        if (recsRes.status === 'fulfilled') {
+          setRecommendations((recsRes.value as any)?.data || []);
+        }
+        // Skip network product re-fetch if still fresh
         if (!dataCache.isStale(`product:${id}`)) return;
       }
 
       // ── Fetch (first direct URL access or stale revalidation) ──
-      if (!cached) setLoading(true);
+      if (!cached && !cancelled) setLoading(true);
       try {
         const data = await getProductDetails(id, true);
+        if (cancelled) return;
         if (data) {
           dataCache.set(`product:${id}`, data);
           setDbProduct(data);
-          if (data.category_id) {
-            const { data: catData } = await supabase
-              .from('categories')
-              .select('size_guide_html')
-              .eq('id', data.category_id)
-              .maybeSingle();
+
+          // Fire size guide + recommendations in parallel now that we have the product
+          const [sizeGuideRes, recsRes] = await Promise.allSettled([
+            data.category_id
+              ? supabase
+                  .from('categories')
+                  .select('size_guide_html')
+                  .eq('id', data.category_id)
+                  .maybeSingle()
+              : Promise.resolve({ data: null }),
+            supabase
+              .from('products')
+              .select('id, name, slug, base_price, product_images(url, sort_order)')
+              .eq('is_active', true)
+              .neq('id', data.id)
+              .eq('category_id', data.category_id ?? '')
+              .limit(4),
+          ]);
+          if (cancelled) return;
+          if (sizeGuideRes.status === 'fulfilled') {
+            const catData = (sizeGuideRes.value as any)?.data;
             if (catData) setCategorySizeGuide(catData.size_guide_html);
           }
+          if (recsRes.status === 'fulfilled') {
+            setRecommendations((recsRes.value as any)?.data || []);
+          }
         } else {
-          setDbProduct(null);
+          if (!cancelled) setDbProduct(null);
         }
       } catch (err) {
         console.warn('ProductDetail load error:', err);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
     loadProduct();
+    return () => { cancelled = true; };
   }, [id]);
 
   useEffect(() => { window.scrollTo(0, 0); }, [id]);
@@ -93,26 +131,6 @@ export default function ProductDetail() {
     return `<table class="w-full text-left text-xs border-collapse"><thead><tr class="border-b border-border font-bold text-text-primary"><th class="py-2.5">Size</th><th class="py-2.5">Chest (in)</th><th class="py-2.5">Front Length (in)</th><th class="py-2.5">Across Shoulder (in)</th></tr></thead><tbody class="divide-y divide-border text-text-secondary"><tr><td class="py-2.5 font-bold text-text-primary">S</td><td class="py-2.5">38</td><td class="py-2.5">27.5</td><td class="py-2.5">17.5</td></tr><tr><td class="py-2.5 font-bold text-text-primary">M</td><td class="py-2.5">40</td><td class="py-2.5">28.5</td><td class="py-2.5">18.5</td></tr><tr><td class="py-2.5 font-bold text-text-primary">L</td><td class="py-2.5">42</td><td class="py-2.5">29.5</td><td class="py-2.5">19.5</td></tr><tr><td class="py-2.5 font-bold text-text-primary">XL</td><td class="py-2.5">44</td><td class="py-2.5">30.5</td><td class="py-2.5">20.5</td></tr></tbody></table>`;
   }, [product, categorySizeGuide]);
 
-  useEffect(() => {
-    async function loadRecommendations() {
-      if (!dbProduct) { setRecommendations([]); return; }
-      try {
-        let query = supabase
-          .from('products')
-          .select('*, product_images (*), product_variants (*)')
-          .eq('is_active', true)
-          .neq('id', dbProduct.id)
-          .limit(4);
-        if (dbProduct.category_id) query = query.eq('category_id', dbProduct.category_id);
-        const { data, error } = await query;
-        if (error) throw error;
-        setRecommendations(data || []);
-      } catch (err) {
-        console.warn('Recommendations load error:', err);
-      }
-    }
-    loadRecommendations();
-  }, [dbProduct]);
 
   const isPants = useMemo(() => {
     if (!product) return false;
@@ -276,8 +294,11 @@ export default function ProductDetail() {
           >
             {product.product_images[activeImageIdx]?.url ? (
               <img
-                src={product.product_images[activeImageIdx].url}
+                src={imgHero(product.product_images[activeImageIdx].url)}
                 alt={product.name}
+                fetchPriority="high"
+                loading="eager"
+                decoding="async"
                 className="w-full h-auto block relative z-10 transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] group-hover:scale-[1.03]"
               />
             ) : (
@@ -301,7 +322,7 @@ export default function ProductDetail() {
                   className={`size-btn flex-shrink-0 w-[68px] aspect-[2/3] bg-bg-subtle border overflow-hidden ${activeImageIdx === idx ? 'border-accent selected' : 'border-border'
                     }`}
                 >
-                  <img src={img.url} alt="thumbnail" className="w-full h-full object-cover object-center" />
+                  <img src={imgThumb(img.url)} alt="thumbnail" loading="lazy" decoding="async" className="w-full h-full object-cover object-center" />
                 </button>
               ))}
             </div>
@@ -444,8 +465,10 @@ export default function ProductDetail() {
                 <div className="w-full bg-bg-subtle overflow-hidden border border-border relative mb-3">
                   {rec.product_images?.[0]?.url ? (
                     <img
-                      src={rec.product_images[0].url}
+                      src={imgCard(rec.product_images[0].url)}
                       alt={rec.name}
+                      loading="lazy"
+                      decoding="async"
                       className="card-img w-full h-auto block relative z-10"
                     />
                   ) : (
@@ -565,7 +588,7 @@ export default function ProductDetail() {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.97 }}
                 transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-                src={product.product_images[lightboxIdx].url}
+                src={imgHero(product.product_images[lightboxIdx].url)}
                 alt={`${product.name} — view ${lightboxIdx + 1}`}
                 className="max-h-[88vh] max-w-[85vw] md:max-w-[55vw] object-contain select-none"
                 onClick={(e) => e.stopPropagation()}

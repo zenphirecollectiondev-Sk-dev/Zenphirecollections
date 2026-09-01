@@ -60,7 +60,7 @@ interface RawProduct {
 
 async function fetchCategoryProducts(
   page: number,
-  categoryId: string | null,
+  categoryIds: string[] | null,
 ): Promise<RawProduct[]> {
   const from = page * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
@@ -76,8 +76,8 @@ async function fetchCategoryProducts(
     .order("created_at", { ascending: false })
     .range(from, to);
 
-  if (categoryId) {
-    q = q.eq("category_id", categoryId);
+  if (categoryIds && categoryIds.length > 0) {
+    q = q.in("category_id", categoryIds);
   }
 
   const { data, error } = await q;
@@ -105,38 +105,40 @@ function toGridProduct(raw: RawProduct): GridProduct {
 // --- Hook ---------------------------------------------------------------------
 
 interface UseCategoryProductsOptions {
-  /** The Supabase category ID to filter on, null for "all",
-   *  or the sentinel "__loading__" to pause the query until categories resolve. */
-  categoryId: string | null;
+  /** The Supabase category IDs to filter on, null for "all",
+   *  or the sentinel ["__loading__"] to pause the query until categories resolve. */
+  categoryIds: string[] | null;
   page: number;
 }
 
 export function useCategoryProducts({
-  categoryId,
+  categoryIds,
   page,
 }: UseCategoryProductsOptions): CategoryQueryStatus {
   const [isSlow, setIsSlow] = useState(false);
   const slowTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // "__loading__" sentinel: categories not yet resolved — pause query
-  const isAwaitingCategories = categoryId === "__loading__";
-  // The real ID to pass to Supabase (null = fetch all)
-  const resolvedCategoryId = isAwaitingCategories ? null : categoryId;
+  const isAwaitingCategories = categoryIds?.[0] === "__loading__";
+  // The real IDs to pass to Supabase (null = fetch all)
+  const resolvedCategoryIds = isAwaitingCategories ? null : categoryIds;
+
+  const queryKeyStr = resolvedCategoryIds ? resolvedCategoryIds.join(',') : "all";
 
   const query = useQuery<GridProduct[], Error>({
-    queryKey: ["category-products", resolvedCategoryId ?? "all", page],
+    queryKey: ["category-products", queryKeyStr, page],
     queryFn: async () => {
-      const raw = await fetchCategoryProducts(page, resolvedCategoryId);
+      const raw = await fetchCategoryProducts(page, resolvedCategoryIds);
       return raw.map(toGridProduct);
     },
     // Disable the query entirely while categories are still loading
     enabled: !isAwaitingCategories,
     // staleTime=0 for category-filtered queries: always re-fetch when the user
     // picks a category so we never serve a stale "all products" result for a
-    // category-specific URL. For "all" (null categoryId) keep 5-min cache.
-    staleTime: resolvedCategoryId ? 0 : 5 * 60 * 1000,
+    // category-specific URL. For "all" (null categoryIds) keep 5-min cache.
+    staleTime: resolvedCategoryIds ? 0 : 5 * 60 * 1000,
     // Don't keep old category data in memory after navigating away
-    gcTime: resolvedCategoryId ? 30 * 1000 : 5 * 60 * 1000,
+    gcTime: resolvedCategoryIds ? 30 * 1000 : 5 * 60 * 1000,
     placeholderData: keepPreviousData,
     retry: 2,
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10_000),

@@ -12,6 +12,7 @@ import { ProductCardSkeleton } from "../components/ui/ProductCardSkeleton";
 import { EmptyState } from "../components/ui/EmptyState";
 import { ErrorState } from "../components/ui/ErrorState";
 import type { GridProduct } from "../hooks/useCategoryProducts";
+import { imgCard } from "../lib/imgTransform";
 
 // --- Image card with proper loading / error states ---------------------------
 
@@ -199,14 +200,14 @@ export default function Shop() {
 
   const categories = useMemo(() => dbCategories, [dbCategories]);
 
-  // -- Resolve active category ID for the hook -------------------------------
+  // -- Resolve active category IDs for the hook -------------------------------
   // If categories haven't loaded yet and a specific category is requested,
-  // return a sentinel string (not null) so the hook stays in "loading" state
+  // return a sentinel array so the hook stays in "loading" state
   // rather than fetching all products with no filter.
-  const activeCategoryId = useMemo(() => {
+  const activeCategoryIds = useMemo(() => {
     if (activeCategory === "all") return null;
     // Categories not yet loaded: return sentinel to keep hook in pending state
-    if (!categoriesReady) return "__loading__";
+    if (!categoriesReady) return ["__loading__"];
     let cat = categories.find((c: any) => c.slug === activeCategory);
     if (!cat) {
       // Slug aliases
@@ -219,37 +220,43 @@ export default function Shop() {
       )
         cat = categories.find((c: any) => c.slug === "t-shirts");
     }
-    return cat?.id ?? null;
+    
+    if (!cat) return null;
+    
+    // Include the parent category ID itself, plus any sub-categories (e.g., gender variants)
+    const matchingIds = categories
+      .filter((c: any) => c.id === cat.id || c.parent_category_id === cat.id)
+      .map((c: any) => c.id);
+      
+    return matchingIds.length > 0 ? matchingIds : null;
   }, [activeCategory, categories, categoriesReady]);
 
   // Reset to page 0 whenever the category filter changes
   useEffect(() => {
     setPage(0);
-  }, [activeCategoryId]);
+  }, [activeCategoryIds]);
 
   // -- Data from hook (TanStack Query) --------------------------------------
-  const queryState = useCategoryProducts({ categoryId: activeCategoryId, page });
-
-  // -- Client-side sort/filter applied on top of server-paginated data -------
+  const queryState = useCategoryProducts({ categoryIds: activeCategoryIds, page });
   const filteredProducts = useMemo((): GridProduct[] => {
     if (queryState.status !== "success") return [];
     let result = [...queryState.products];
 
-    if (activeGender !== "all") {
-      result = result.filter((p) => {
-        const prodCat = categories.find((c) => c.id === p.category_id);
-        return prodCat?.name?.toLowerCase() === activeGender.toLowerCase();
-      });
-    }
+    // NOTE: The `?gender=` URL param is not filterable here — the categories
+    // table has no gender column, so comparing the param value ("male") against
+    // category.name ("Shirts") always returns false and empties the grid.
+    // Gender filtering requires a schema-level gender attribute on products or
+    // categories. Param is retained in the URL for future use; no filter applied.
+
     result = result.filter((p) => p.base_price <= maxPrice);
     if (selectedSizes.length > 0) {
       // Size filter not applicable at grid level (we only fetch stock_qty).
-      // Keep all products � size filter is advisory only without per-variant sizes fetched.
+      // Keep all products — size filter is advisory only without per-variant sizes fetched.
     }
     if (sortBy === "price-asc") result.sort((a, b) => a.base_price - b.base_price);
     else if (sortBy === "price-desc") result.sort((a, b) => b.base_price - a.base_price);
     return result;
-  }, [queryState, activeGender, maxPrice, sortBy, selectedSizes, categories]);
+  }, [queryState, maxPrice, sortBy, selectedSizes]);
 
   // -- Sane page title -------------------------------------------------------
   const pageTitle =
@@ -505,7 +512,7 @@ export default function Shop() {
                   >
                     <div className="relative mb-3">
                       <ProductImage
-                        src={product.coverImageUrl}
+                        src={imgCard(product.coverImageUrl)}
                         alt={product.name}
                         lazy={idx >= 4}
                       />
