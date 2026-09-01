@@ -1,4 +1,4 @@
-﻿/**
+/**
  * imgTransform
  *
  * Currently disabled because Image Transformation is a Supabase Pro feature.
@@ -12,7 +12,7 @@ export interface ImgTransformOptions {
 
 export function imgTransform(
   url: string | null | undefined,
-  options?: ImgTransformOptions
+  _options?: ImgTransformOptions
 ): string {
   if (!url) return '';
   return url;
