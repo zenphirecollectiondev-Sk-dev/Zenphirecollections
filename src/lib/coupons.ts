@@ -68,7 +68,7 @@ export function validateCoupon(code: string, cartSubtotal: number): ValidationRe
     return {
       isValid: false,
       discountAmount: 0,
-      error: `Minimum order value of $${coupon.minOrderValue.toFixed(2)} is required for this coupon.`
+      error: `Minimum order value of ₹${coupon.minOrderValue.toFixed(2)} is required for this coupon.`
     };
   }
 

@@ -23,6 +23,10 @@ import Signup from './pages/auth/Signup';
 import ForgotPassword from './pages/auth/ForgotPassword';
 import Onboarding from './pages/auth/Onboarding';
 import AuthCallback from './pages/auth/AuthCallback';
+import FAQ from './pages/FAQ';
+import ShippingReturns from './pages/ShippingReturns';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import Terms from './pages/Terms';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -270,6 +274,12 @@ function AppContent() {
 
           <Route path="/wishlist" element={<Wishlist />} />
 
+          {/* Static Informational Pages */}
+          <Route path="/faq" element={<FAQ />} />
+          <Route path="/shipping" element={<ShippingReturns />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/terms" element={<Terms />} />
+
           {/* Protected Admin Console */}
           <Route
             path="/admin"
@@ -300,16 +310,15 @@ function AppContent() {
             <div>
               <h3 className="font-heading font-normal uppercase tracking-wider text-sm mb-4 text-accent-gold">Customer Care</h3>
               <ul className="space-y-2 text-sm text-white/70">
-                <li><Link to="/shop" className="hover:text-accent-gold transition-colors">Help & FAQ</Link></li>
-                <li><Link to="/shop" className="hover:text-accent-gold transition-colors">Shipping & Returns</Link></li>
-                <li><Link to="/shop" className="hover:text-accent-gold transition-colors">Size Guide</Link></li>
+                <li><Link to="/faq" className="hover:text-accent-gold transition-colors">Help & FAQ</Link></li>
+                <li><Link to="/shipping" className="hover:text-accent-gold transition-colors">Shipping & Returns</Link></li>
               </ul>
             </div>
             <div>
               <h3 className="font-heading font-normal uppercase tracking-wider text-sm mb-4 text-accent-gold">Legal</h3>
               <ul className="space-y-2 text-sm text-white/70">
-                <li><Link to="/shop" className="hover:text-accent-gold transition-colors">Privacy Policy</Link></li>
-                <li><Link to="/shop" className="hover:text-accent-gold transition-colors">Terms of Service</Link></li>
+                <li><Link to="/privacy" className="hover:text-accent-gold transition-colors">Privacy Policy</Link></li>
+                <li><Link to="/terms" className="hover:text-accent-gold transition-colors">Terms of Service</Link></li>
               </ul>
             </div>
           </div>

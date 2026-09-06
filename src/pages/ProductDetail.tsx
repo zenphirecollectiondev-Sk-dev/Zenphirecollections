@@ -121,14 +121,47 @@ export default function ProductDetail() {
     };
   }, [dbProduct]);
 
-  const sizeGuideHtml = useMemo(() => {
-    if (product?.size_guide_type === 'custom' && product.custom_size_guide_html) return product.custom_size_guide_html;
-    if (categorySizeGuide) return categorySizeGuide;
+  const parsedSizeGuide = useMemo(() => {
+    let raw = '';
+    if (product?.size_guide_type === 'custom' && product.custom_size_guide_html) {
+      raw = product.custom_size_guide_html;
+    } else if (categorySizeGuide) {
+      raw = categorySizeGuide;
+    }
+
+    if (raw.startsWith('SIZE_GUIDE_IMG::')) {
+      const parts = raw.split('::');
+      return {
+        type: 'image' as const,
+        url: parts[1] || '',
+        title: parts[2] || 'Size Measurement Chart'
+      };
+    }
+
+    if (raw.startsWith('http') || raw.startsWith('data:image')) {
+      return {
+        type: 'image' as const,
+        url: raw,
+        title: 'Size Measurement Chart'
+      };
+    }
+
+    if (raw.trim()) {
+      return { type: 'html' as const, content: raw };
+    }
+
     const isPants = product?.name?.toLowerCase()?.includes('pant') || product?.name?.toLowerCase()?.includes('trouser');
     if (isPants) {
-      return `<table class="w-full text-left text-xs border-collapse"><thead><tr class="border-b border-border font-bold text-text-primary"><th class="py-2.5">Size</th><th class="py-2.5">Waist (in)</th><th class="py-2.5">Hip (in)</th><th class="py-2.5">Inseam (in)</th></tr></thead><tbody class="divide-y divide-border text-text-secondary"><tr><td class="py-2.5 font-bold text-text-primary">S</td><td class="py-2.5">30</td><td class="py-2.5">38</td><td class="py-2.5">30</td></tr><tr><td class="py-2.5 font-bold text-text-primary">M</td><td class="py-2.5">32</td><td class="py-2.5">40</td><td class="py-2.5">31</td></tr><tr><td class="py-2.5 font-bold text-text-primary">L</td><td class="py-2.5">34</td><td class="py-2.5">42</td><td class="py-2.5">32</td></tr><tr><td class="py-2.5 font-bold text-text-primary">XL</td><td class="py-2.5">36</td><td class="py-2.5">44</td><td class="py-2.5">32</td></tr></tbody></table>`;
+      return {
+        type: 'html' as const,
+        content: `<table class="w-full text-left text-xs border-collapse"><thead><tr class="border-b border-border font-bold text-text-primary"><th class="py-2.5">Size</th><th class="py-2.5">Waist (in)</th><th class="py-2.5">Hip (in)</th><th class="py-2.5">Inseam (in)</th></tr></thead><tbody class="divide-y divide-border text-text-secondary"><tr><td class="py-2.5 font-bold text-text-primary">S</td><td class="py-2.5">30</td><td class="py-2.5">38</td><td class="py-2.5">30</td></tr><tr><td class="py-2.5 font-bold text-text-primary">M</td><td class="py-2.5">32</td><td class="py-2.5">40</td><td class="py-2.5">31</td></tr><tr><td class="py-2.5 font-bold text-text-primary">L</td><td class="py-2.5">34</td><td class="py-2.5">42</td><td class="py-2.5">32</td></tr><tr><td class="py-2.5 font-bold text-text-primary">XL</td><td class="py-2.5">36</td><td class="py-2.5">44</td><td class="py-2.5">32</td></tr></tbody></table>`
+      };
     }
-    return `<table class="w-full text-left text-xs border-collapse"><thead><tr class="border-b border-border font-bold text-text-primary"><th class="py-2.5">Size</th><th class="py-2.5">Chest (in)</th><th class="py-2.5">Front Length (in)</th><th class="py-2.5">Across Shoulder (in)</th></tr></thead><tbody class="divide-y divide-border text-text-secondary"><tr><td class="py-2.5 font-bold text-text-primary">S</td><td class="py-2.5">38</td><td class="py-2.5">27.5</td><td class="py-2.5">17.5</td></tr><tr><td class="py-2.5 font-bold text-text-primary">M</td><td class="py-2.5">40</td><td class="py-2.5">28.5</td><td class="py-2.5">18.5</td></tr><tr><td class="py-2.5 font-bold text-text-primary">L</td><td class="py-2.5">42</td><td class="py-2.5">29.5</td><td class="py-2.5">19.5</td></tr><tr><td class="py-2.5 font-bold text-text-primary">XL</td><td class="py-2.5">44</td><td class="py-2.5">30.5</td><td class="py-2.5">20.5</td></tr></tbody></table>`;
+
+    return {
+      type: 'html' as const,
+      content: `<table class="w-full text-left text-xs border-collapse"><thead><tr class="border-b border-border font-bold text-text-primary"><th class="py-2.5">Size</th><th class="py-2.5">Chest (in)</th><th class="py-2.5">Front Length (in)</th><th class="py-2.5">Across Shoulder (in)</th></tr></thead><tbody class="divide-y divide-border text-text-secondary"><tr><td class="py-2.5 font-bold text-text-primary">S</td><td class="py-2.5">38</td><td class="py-2.5">27.5</td><td class="py-2.5">17.5</td></tr><tr><td class="py-2.5 font-bold text-text-primary">M</td><td class="py-2.5">40</td><td class="py-2.5">28.5</td><td class="py-2.5">18.5</td></tr><tr><td class="py-2.5 font-bold text-text-primary">L</td><td class="py-2.5">42</td><td class="py-2.5">29.5</td><td class="py-2.5">19.5</td></tr><tr><td class="py-2.5 font-bold text-text-primary">XL</td><td class="py-2.5">44</td><td class="py-2.5">30.5</td><td class="py-2.5">20.5</td></tr></tbody></table>`
+    };
   }, [product, categorySizeGuide]);
 
 
@@ -145,6 +178,7 @@ export default function ProductDetail() {
   const [isAdded, setIsAdded] = useState(false);
   const [viewBag, setViewBag] = useState(false);
   const [heartAnim, setHeartAnim] = useState(false);
+  const [sizeError, setSizeError] = useState(false);
   const navigate = useNavigate();
   const addItem = useCartStore((state) => state.addItem);
 
@@ -242,7 +276,12 @@ export default function ProductDetail() {
     : availableVariantsForColor.every((v: any) => v.stock_qty === 0);
 
   const handleAddToCart = () => {
-    if (!selectedSize) { alert('Please select a size first.'); return; }
+    if (!selectedSize) {
+      setSizeError(true);
+      setTimeout(() => setSizeError(false), 2000);
+      return;
+    }
+    setSizeError(false);
     if (selectedVariant) {
       addItem({
         id: `${product.id}-${selectedVariant.id}`,
@@ -365,7 +404,7 @@ export default function ProductDetail() {
               </div>
             )}
 
-            {/* Size */}
+              {/* Size */}
             <div>
               <div className="flex justify-between items-center mb-3">
                 <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-primary">Select Size</h3>
@@ -373,23 +412,22 @@ export default function ProductDetail() {
                   Size Guide
                 </button>
               </div>
-              <div className="flex gap-2">
-                {(isPants ? ['28', '30', '32', '34', '36', '38'] : ['S', 'M', 'L', 'XL']).map((size) => {
+              <div className="flex flex-wrap gap-2">
+                {/* Derive sizes from actual variants in DB — no hardcoded list */}
+                {Array.from(new Set(availableVariantsForColor.map((v: any) => v.size))).map((size) => {
                   const variant = availableVariantsForColor.find((v: any) => v.size === size);
                   const available = variant ? variant.stock_qty > 0 : false;
                   return (
                     <button
                       key={size}
-                      disabled={!variant}
-                      onClick={() => setSelectedSize(size)}
-                      className={`size-btn w-12 h-12 border text-xs font-bold flex items-center justify-center transition-all ${!variant
-                        ? 'opacity-30 cursor-not-allowed border-dashed border-border'
-                        : !available
+                      onClick={() => setSelectedSize(size as string)}
+                      className={`size-btn w-12 h-12 border text-xs font-bold flex items-center justify-center transition-all ${
+                        !available
                           ? 'opacity-40 cursor-not-allowed bg-bg-subtle text-text-secondary line-through border-border'
                           : selectedSize === size
                             ? 'ambient-green-gradient text-white border-transparent selected'
                             : 'bg-white border-border text-text-primary hover:border-accent'
-                        }`}
+                      }`}
                     >
                       {size}
                     </button>
@@ -408,6 +446,13 @@ export default function ProductDetail() {
                 ) : (
                   <span className="text-emerald-600 font-semibold flex items-center gap-1.5"><Check size={13} /> In Stock · Ready to ship</span>
                 )}
+              </div>
+            )}
+
+            {/* Size error — shown when Add to Cart clicked without size */}
+            {sizeError && (
+              <div className="text-[11px] flex items-center gap-1.5 text-sale font-bold anim-fade-in">
+                <AlertCircle size={13} /> Please select a size to continue
               </div>
             )}
 
@@ -525,10 +570,25 @@ export default function ProductDetail() {
                 </button>
               </div>
               <div className="overflow-y-auto">
-                <p className="text-[11px] text-text-secondary mb-4 leading-relaxed">
+                <p className="text-[11px] text-text-secondary mb-3 leading-relaxed">
                   All dimensions are in inches. Measure over a light base layer for best accuracy.
                 </p>
-                <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: sizeGuideHtml }} />
+                {parsedSizeGuide.type === 'image' ? (
+                  <div className="space-y-2.5">
+                    <div className="text-xs font-bold uppercase tracking-wider text-accent border-b border-border/60 pb-1.5">
+                      {parsedSizeGuide.title}
+                    </div>
+                    <div className="border border-border bg-bg-subtle p-2 flex justify-center items-center rounded overflow-hidden">
+                      <img
+                        src={parsedSizeGuide.url}
+                        alt={parsedSizeGuide.title}
+                        className="max-w-full max-h-[60vh] object-contain rounded"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: parsedSizeGuide.content }} />
+                )}
               </div>
               <div className="border-t border-border pt-4 mt-4 flex justify-end">
                 <button onClick={() => setIsSizeGuideOpen(false)} className="btn btn-primary px-5 py-2.5 text-[10px] font-bold uppercase tracking-widest">

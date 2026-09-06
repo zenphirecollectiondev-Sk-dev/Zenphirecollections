@@ -5,7 +5,7 @@ import {
   ArrowRight, ChevronLeft, ChevronRight, WifiOff,
 } from "lucide-react";
 import { useWishlistStore } from "../store/useWishlistStore";
-import { getCategories } from "../lib/supabase";
+import { getCategories, supabase } from "../lib/supabase";
 import { dataCache } from "../lib/dataCache";
 import { useCategoryProducts, PAGE_SIZE } from "../hooks/useCategoryProducts";
 import { ProductCardSkeleton } from "../components/ui/ProductCardSkeleton";
@@ -94,9 +94,8 @@ function ProductImage({
           loading={lazy ? "lazy" : "eager"}
           onLoad={() => setImgState("loaded")}
           onError={() => setImgState("error")}
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
-            imgState === "loaded" ? "opacity-100" : "opacity-0"
-          }`}
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${imgState === "loaded" ? "opacity-100" : "opacity-0"
+            }`}
         />
       )}
     </div>
@@ -160,6 +159,35 @@ export default function Shop() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeCategory = searchParams.get("category") || "all";
   const activeGender = searchParams.get("gender") || "all";
+  const activeOccasion = searchParams.get("occasion") || "";
+
+  // -- Occasion product IDs (fetched from occasion_products when ?occasion= is set) --
+  // null = no occasion filter, ["__occasion_loading__"] = still fetching
+  const [occasionProductIds, setOccasionProductIds] = useState<string[] | null>(
+    () => activeOccasion ? ["__occasion_loading__"] : null
+  );
+
+  useEffect(() => {
+    if (!activeOccasion) {
+      setOccasionProductIds(null);
+      return;
+    }
+    // Signal "loading" immediately so the hook shows skeleton
+    setOccasionProductIds(["__occasion_loading__"]);
+    supabase
+      .from('occasion_products' as any)
+      .select('product_id')
+      .eq('occasion', activeOccasion)
+      .then(({ data, error }) => {
+        if (error) {
+          console.warn('occasion_products fetch error:', error);
+          setOccasionProductIds(null);
+          return;
+        }
+        const ids = (data || []).map((r: any) => r.product_id).filter(Boolean);
+        setOccasionProductIds(ids.length > 0 ? ids : null);
+      });
+  }, [activeOccasion]);
 
   // -- Client-side filter state ----------------------------------------------
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
@@ -205,12 +233,27 @@ export default function Shop() {
   // return a sentinel array so the hook stays in "loading" state
   // rather than fetching all products with no filter.
   const activeCategoryIds = useMemo(() => {
-    if (activeCategory === "all") return null;
-    // Categories not yet loaded: return sentinel to keep hook in pending state
+    if (activeCategory === "all" && activeGender === "all") return null;
     if (!categoriesReady) return ["__loading__"];
+
+    let validCatIds: string[] = [];
+
+    if (activeGender !== "all") {
+      // Admin stores gender as child categories named "Male"/"Female"/"Unisex"
+      // with slugs like "shirts-male". There is NO top-level "men"/"women" slug.
+      const genderName = activeGender.toLowerCase(); // "male" | "female" | "unisex"
+      validCatIds = categories
+        .filter((c: any) => c.parent_category_id && c.name.toLowerCase() === genderName)
+        .map((c: any) => c.id);
+      if (validCatIds.length === 0) return ["__empty__"];
+    }
+
+    if (activeCategory === "all") {
+      return validCatIds.length > 0 ? validCatIds : null;
+    }
+
     let cat = categories.find((c: any) => c.slug === activeCategory);
     if (!cat) {
-      // Slug aliases
       if (activeCategory === "trousers") cat = categories.find((c: any) => c.slug === "pants");
       else if (activeCategory === "crop-tops") cat = categories.find((c: any) => c.slug === "crop-top");
       else if (
@@ -220,33 +263,38 @@ export default function Shop() {
       )
         cat = categories.find((c: any) => c.slug === "t-shirts");
     }
-    
+
     if (!cat) return null;
-    
-    // Include the parent category ID itself, plus any sub-categories (e.g., gender variants)
-    const matchingIds = categories
+
+    const catFamilyIds = categories
       .filter((c: any) => c.id === cat.id || c.parent_category_id === cat.id)
       .map((c: any) => c.id);
-      
-    return matchingIds.length > 0 ? matchingIds : null;
-  }, [activeCategory, categories, categoriesReady]);
+
+    if (activeGender !== "all") {
+      const intersected = catFamilyIds.filter(id => validCatIds.includes(id));
+      return intersected.length > 0 ? intersected : ["__empty__"];
+    }
+
+    return catFamilyIds.length > 0 ? catFamilyIds : null;
+  }, [activeCategory, activeGender, categories, categoriesReady]);
 
   // Reset to page 0 whenever the category filter changes
   useEffect(() => {
     setPage(0);
-  }, [activeCategoryIds]);
+  }, [activeCategoryIds, activeOccasion]);
 
   // -- Data from hook (TanStack Query) --------------------------------------
-  const queryState = useCategoryProducts({ categoryIds: activeCategoryIds, page });
+  const queryState = useCategoryProducts({
+    categoryIds: activeCategoryIds,
+    productIds: occasionProductIds,
+    page,
+  });
   const filteredProducts = useMemo((): GridProduct[] => {
     if (queryState.status !== "success") return [];
     let result = [...queryState.products];
 
-    // NOTE: The `?gender=` URL param is not filterable here — the categories
-    // table has no gender column, so comparing the param value ("male") against
-    // category.name ("Shirts") always returns false and empties the grid.
-    // Gender filtering requires a schema-level gender attribute on products or
-    // categories. Param is retained in the URL for future use; no filter applied.
+    // Gender filtering is now handled in activeCategoryIds based on category hierarchy.
+    // The previous implementation ignored it, but now we properly restrict to gender subcategories.
 
     result = result.filter((p) => p.base_price <= maxPrice);
     if (selectedSizes.length > 0) {
@@ -263,8 +311,8 @@ export default function Shop() {
     activeCategory !== "all"
       ? activeCategory.replace(/-/g, " ")
       : activeGender !== "all"
-      ? { male: "Men", female: "Women", unisex: "Unisex" }[activeGender] ?? activeGender
-      : "Shop All";
+        ? { male: "Men", female: "Women", unisex: "Unisex" }[activeGender] ?? activeGender
+        : "Shop All";
 
   // -- Handlers --------------------------------------------------------------
   const handleCategoryChange = (slug: string) => {
@@ -367,8 +415,8 @@ export default function Shop() {
               className="appearance-none bg-transparent border-none text-[10px] uppercase tracking-wider font-semibold py-1.5 pl-0 pr-6 focus:outline-none cursor-pointer text-text-secondary hover:text-text-primary transition-colors duration-150"
             >
               <option value="newest">New Arrivals</option>
-              <option value="price-asc">Price ?</option>
-              <option value="price-desc">Price ?</option>
+              <option value="price-asc">Price ↑</option>
+              <option value="price-desc">Price ↓</option>
             </select>
             <ChevronDown size={11} className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none text-text-secondary" />
           </div>
@@ -419,11 +467,10 @@ export default function Shop() {
                   <button
                     key={size}
                     onClick={() => handleSizeToggle(size)}
-                    className={`size-btn w-10 h-10 border text-xs font-semibold flex items-center justify-center transition-all ${
-                      isSel
+                    className={`size-btn w-10 h-10 border text-xs font-semibold flex items-center justify-center transition-all ${isSel
                         ? "ambient-green-gradient text-white border-transparent selected"
                         : "border-border text-text-primary bg-white hover:border-accent"
-                    }`}
+                      }`}
                   >
                     {size}
                   </button>
@@ -435,7 +482,7 @@ export default function Shop() {
           <div>
             <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-primary mb-3 pb-2 border-b border-border flex justify-between">
               <span>Max Price</span>
-              <span className="text-text-secondary font-normal">?{maxPrice.toLocaleString()}</span>
+              <span className="text-text-secondary font-normal">₹{maxPrice.toLocaleString()}</span>
             </h3>
             <input
               type="range" min="100" max="15000" step="100"
@@ -539,9 +586,8 @@ export default function Shop() {
                           handleWishlist(product.id);
                         }}
                         aria-label="Toggle Wishlist"
-                        className={`wishlist-btn absolute top-2.5 right-2.5 p-1.5 bg-white/90 border border-border/60 rounded-full z-10 ${
-                          heartId === product.id ? "anim-heart-pop" : ""
-                        }`}
+                        className={`wishlist-btn absolute top-2.5 right-2.5 p-1.5 bg-white/90 border border-border/60 rounded-full z-10 ${heartId === product.id ? "anim-heart-pop" : ""
+                          }`}
                       >
                         <Heart
                           size={13}
@@ -561,7 +607,7 @@ export default function Shop() {
                         {product.name}
                       </h3>
                       <p className="text-sm font-semibold text-text-primary">
-                        ?{Number(product.base_price || 0).toFixed(2)}
+                        ₹{Number(product.base_price || 0).toFixed(2)}
                       </p>
                     </div>
                   </Link>
@@ -614,11 +660,10 @@ export default function Shop() {
                         <button
                           key={slug}
                           onClick={() => handleCategoryChange(slug)}
-                          className={`btn px-4 py-2 border text-[10px] font-semibold uppercase tracking-wider ${
-                            isActive
+                          className={`btn px-4 py-2 border text-[10px] font-semibold uppercase tracking-wider ${isActive
                               ? "filter-chip-active bg-white"
                               : "border-border bg-white text-text-primary hover:border-accent"
-                          }`}
+                            }`}
                         >
                           {label}
                         </button>
@@ -640,11 +685,10 @@ export default function Shop() {
                     <button
                       key={size}
                       onClick={() => handleSizeToggle(size)}
-                      className={`size-btn w-10 h-10 border text-xs font-semibold flex items-center justify-center transition-all ${
-                        isSel
+                      className={`size-btn w-10 h-10 border text-xs font-semibold flex items-center justify-center transition-all ${isSel
                           ? "ambient-green-gradient text-white border-transparent selected"
                           : "border-border text-text-primary bg-white hover:border-accent"
-                      }`}
+                        }`}
                     >
                       {size}
                     </button>
@@ -659,7 +703,7 @@ export default function Shop() {
                   Max Price
                 </h3>
                 <span className="text-xs font-bold text-text-primary">
-                  ?{maxPrice.toLocaleString()}
+                  ₹{maxPrice.toLocaleString()}
                 </span>
               </div>
               <input

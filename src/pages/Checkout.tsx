@@ -144,8 +144,8 @@ export default function Checkout() {
     }
   };
 
-  // Handle Coupon Apply
-  const handleApplyCoupon = (e: React.FormEvent) => {
+  // Handle Coupon Apply — tries Supabase coupons table first, falls back to mock
+  const handleApplyCoupon = async (e: React.FormEvent) => {
     e.preventDefault();
     setCouponError(null);
     setCouponSuccess(null);
@@ -155,15 +155,59 @@ export default function Checkout() {
       return;
     }
 
+    const normalizedCode = couponCode.trim().toUpperCase();
+
+    // 1. Try Supabase coupons table
+    try {
+      const { data: dbCoupon } = await supabase
+        .from('coupons' as any)
+        .select('*')
+        .eq('code', normalizedCode)
+        .maybeSingle();
+
+      if (dbCoupon) {
+        // Validate expiry
+        if (new Date() > new Date((dbCoupon as any).expiry)) {
+          setCouponError('This coupon code has expired.');
+          setAppliedCoupon(null);
+          setCouponDiscount(0);
+          return;
+        }
+        // Validate minimum order
+        if (subtotal < ((dbCoupon as any).min_order_value || 0)) {
+          setCouponError(`Minimum order value of ₹${Number((dbCoupon as any).min_order_value).toFixed(2)} is required.`);
+          setAppliedCoupon(null);
+          setCouponDiscount(0);
+          return;
+        }
+        // Calculate discount
+        let discountAmount = 0;
+        if ((dbCoupon as any).discount_type === 'percentage') {
+          discountAmount = (subtotal * (dbCoupon as any).value) / 100;
+        } else {
+          discountAmount = (dbCoupon as any).value;
+        }
+        discountAmount = Math.min(discountAmount, subtotal);
+        const couponObj = { code: normalizedCode, discountType: (dbCoupon as any).discount_type, value: (dbCoupon as any).value };
+        setAppliedCoupon(couponObj);
+        setCouponDiscount(discountAmount);
+        setCouponSuccess(`Coupon "${normalizedCode}" applied! Saved ₹${discountAmount.toFixed(2)}.`);
+        return;
+      }
+    } catch (_) {
+      // Supabase query failed — fall through to mock
+    }
+
+    // 2. Fallback: validate against local mock coupons
     const result = validateCoupon(couponCode, subtotal);
     if (!result.isValid) {
-      setCouponError(result.error || 'Failed to apply coupon.');
+      setCouponError(result.error || 'Invalid or expired coupon code.');
       setAppliedCoupon(null);
       setCouponDiscount(0);
     } else {
       setAppliedCoupon(result.coupon);
       setCouponDiscount(result.discountAmount);
-      setCouponSuccess(`Coupon "${result.coupon?.code}" applied successfully! Saved $${result.discountAmount.toFixed(2)}.`);
+      setCouponSuccess(`Coupon "${result.coupon?.code}" applied! Saved ₹${result.discountAmount.toFixed(2)}.`);
     }
   };
 
@@ -264,6 +308,26 @@ export default function Checkout() {
             }));
 
             await supabase.from('order_items').insert(orderItemsInsert);
+
+            // Decrement stock for each variant (non-blocking — best effort)
+            for (const item of items) {
+              try {
+                const { data: variantData } = await supabase
+                  .from('product_variants')
+                  .select('stock_qty')
+                  .eq('id', item.variantId)
+                  .single();
+                if (variantData) {
+                  const newQty = Math.max(0, variantData.stock_qty - item.quantity);
+                  await supabase
+                    .from('product_variants')
+                    .update({ stock_qty: newQty })
+                    .eq('id', item.variantId);
+                }
+              } catch (stockErr) {
+                console.warn('Stock decrement failed for variant', item.variantId, stockErr);
+              }
+            }
           }
         } catch (dbErr) {
           console.warn('Database order write fell back to local memory (Placeholder key or connection issue):', dbErr);
@@ -628,7 +692,7 @@ export default function Checkout() {
               )}
 
               <p className="text-[11px] text-text-secondary">
-                Try <span className="font-bold text-text-primary">ZENPHIRE10</span> (10% off) or <span className="font-bold text-text-primary">ZENPHIRE50</span> ($50 off orders &gt; $200).
+                Try <span className="font-bold text-text-primary">ZENPHIRE10</span> (10% off) or <span className="font-bold text-text-primary">ZENPHIRE50</span> (₹50 off orders &gt; ₹200).
               </p>
             </div>
 

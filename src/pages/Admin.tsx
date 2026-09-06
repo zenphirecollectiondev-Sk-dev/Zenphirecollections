@@ -57,6 +57,12 @@ interface Category {
   image_url: string | null;
 }
 
+interface SizeGuideTemplate {
+  id: string;
+  name: string;
+  image_url: string;
+}
+
 
 
 export default function Admin() {
@@ -117,6 +123,32 @@ export default function Admin() {
   const [prodCustomSizeGuide, setProdCustomSizeGuide] = useState('');
   const [prodImages, setProdImages] = useState<ProductImage[]>([]);
   const [prodVariants, setProdVariants] = useState<ProductVariant[]>([]);
+  const [prodOccasion, setProdOccasion] = useState<string>('');
+
+  // Image Size Guide States
+  const defaultSizeGuides: SizeGuideTemplate[] = [
+    {
+      id: 'sg-hoodie',
+      name: 'Size Guide for Hoodie / Sweatshirt',
+      image_url: 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=800&auto=format&fit=crop&q=80'
+    },
+    {
+      id: 'sg-tshirt',
+      name: 'Size Guide for Oversized T-Shirt',
+      image_url: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800&auto=format&fit=crop&q=80'
+    },
+    {
+      id: 'sg-pants',
+      name: 'Size Guide for Trousers & Jeans',
+      image_url: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=800&auto=format&fit=crop&q=80'
+    }
+  ];
+  const [sizeGuideTemplates, setSizeGuideTemplates] = useState<SizeGuideTemplate[]>(defaultSizeGuides);
+  const [sizeGuideMode, setSizeGuideMode] = useState<'template' | 'new' | 'legacy'>('template');
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+  const [newSizeGuideName, setNewSizeGuideName] = useState<string>('');
+  const [newSizeGuideImageUrl, setNewSizeGuideImageUrl] = useState<string>('');
+  const [isUploadingSizeGuide, setIsUploadingSizeGuide] = useState<boolean>(false);
 
   // Product creation wizard states
   const [wizardStep, setWizardStep] = useState<1 | 2 | 3>(1);
@@ -456,6 +488,19 @@ ${titleHtml}  <thead>
         }
       } catch (occErr) {
         console.warn('occasion_products table fetch failed or not yet created.', occErr);
+      }
+
+      // 9. Fetch Size Guides from Supabase
+      try {
+        const { data: sgData, error: sgErr } = await supabase
+          .from('size_guides' as any)
+          .select('*')
+          .order('name', { ascending: true });
+        if (!sgErr && sgData && sgData.length > 0) {
+          setSizeGuideTemplates(sgData);
+        }
+      } catch (sgErr) {
+        console.warn('size_guides table fetch failed or not created yet.', sgErr);
       }
 
     } catch (err: any) {
@@ -1050,6 +1095,31 @@ ${titleHtml}  <thead>
     setProdImages(prod.product_images || []);
     setProdVariants(prod.product_variants || []);
 
+    const existingOcc = occasionProducts.find(op => op.product_id === prod.id);
+    setProdOccasion(existingOcc ? existingOcc.occasion : '');
+
+    // Parse Size Guide
+    const sgVal = prod.custom_size_guide_html || '';
+    if (sgVal.startsWith('SIZE_GUIDE_IMG::')) {
+      const parts = sgVal.split('::');
+      const imgUrl = parts[1] || '';
+      const name = parts[2] || '';
+      const matched = sizeGuideTemplates.find(t => t.image_url === imgUrl);
+      if (matched) {
+        setSizeGuideMode('template');
+        setSelectedTemplateId(matched.id);
+      } else {
+        setSizeGuideMode('new');
+        setNewSizeGuideName(name);
+        setNewSizeGuideImageUrl(imgUrl);
+      }
+    } else if (sgVal.trim()) {
+      setSizeGuideMode('legacy');
+    } else {
+      setSizeGuideMode('template');
+      setSelectedTemplateId('');
+    }
+
     // Wizard setup: resolve main & sub-category from prod.category_id
     const productCategoryObj = categories.find(c => c.id === prod.category_id);
     if (productCategoryObj) {
@@ -1081,6 +1151,12 @@ ${titleHtml}  <thead>
     setProdCustomSizeGuide('');
     setProdImages([]);
     setProdVariants([]);
+    setProdOccasion('');
+
+    setSizeGuideMode('template');
+    setSelectedTemplateId('');
+    setNewSizeGuideName('');
+    setNewSizeGuideImageUrl('');
 
     // Wizard resets
     setWizardStep(1);
@@ -1201,6 +1277,41 @@ ${titleHtml}  <thead>
         }
       }
 
+      // Compute Size Guide output
+      let computedSizeGuideHtml: string | null = null;
+      if (sizeGuideMode === 'template' && selectedTemplateId) {
+        const sg = sizeGuideTemplates.find(t => t.id === selectedTemplateId);
+        if (sg) {
+          computedSizeGuideHtml = `SIZE_GUIDE_IMG::${sg.image_url}::${sg.name}`;
+        }
+      } else if (sizeGuideMode === 'new' && newSizeGuideImageUrl) {
+        const name = newSizeGuideName.trim() || 'Size Guide';
+        computedSizeGuideHtml = `SIZE_GUIDE_IMG::${newSizeGuideImageUrl}::${name}`;
+
+        const newTemplate: SizeGuideTemplate = {
+          id: `sg-${Date.now()}`,
+          name: name,
+          image_url: newSizeGuideImageUrl
+        };
+
+        try {
+          const { data: insertedSg } = await supabase
+            .from('size_guides' as any)
+            .insert({ name: name, image_url: newSizeGuideImageUrl })
+            .select()
+            .single();
+          if (insertedSg) {
+            newTemplate.id = insertedSg.id;
+          }
+        } catch (sgInsErr) {
+          console.warn('Could not insert to size_guides table, saving locally:', sgInsErr);
+        }
+
+        setSizeGuideTemplates(prev => [newTemplate, ...prev.filter(t => t.image_url !== newSizeGuideImageUrl)]);
+      } else if (sizeGuideMode === 'legacy' && prodCustomSizeGuide.trim()) {
+        computedSizeGuideHtml = prodCustomSizeGuide.trim();
+      }
+
       let productId: string = '';
       const payload = {
         name: prodName.trim(),
@@ -1209,8 +1320,8 @@ ${titleHtml}  <thead>
         description: prodDesc.trim() || null,
         category_id: finalCategoryId,
         is_active: prodActive,
-        size_guide_type: prodSizeGuideType,
-        custom_size_guide_html: prodSizeGuideType === 'custom' ? prodCustomSizeGuide.trim() : null
+        size_guide_type: computedSizeGuideHtml ? 'custom' : 'category',
+        custom_size_guide_html: computedSizeGuideHtml
       };
 
       if (editingProduct) {
@@ -1271,6 +1382,25 @@ ${titleHtml}  <thead>
         }));
         const { error: varInsertErr } = await supabase.from('product_variants').insert(variantsInsert);
         if (varInsertErr) throw new Error(`Failed to save variants: ${varInsertErr.message}`);
+      }
+
+      // 6. Sync Occasion mapping
+      try {
+        await supabase
+          .from('occasion_products' as any)
+          .delete()
+          .eq('product_id', productId);
+
+        if (prodOccasion) {
+          await supabase
+            .from('occasion_products' as any)
+            .insert({
+              product_id: productId,
+              occasion: prodOccasion
+            });
+        }
+      } catch (occSyncErr: any) {
+        console.warn('Occasion sync non-critical warning:', occSyncErr);
       }
 
       setIsProductModalOpen(false);
@@ -1765,7 +1895,16 @@ ${titleHtml}  <thead>
                               <div className="text-[10px] text-text-secondary mt-0.5 font-mono">{p.slug}</div>
                             </td>
                             <td className="py-4 text-text-secondary uppercase tracking-wider font-semibold text-[10px]">
-                              {categoryName}
+                              <div>{categoryName}</div>
+                              {(() => {
+                                const assignedOcc = occasionProducts.find(op => op.product_id === p.id);
+                                if (!assignedOcc) return null;
+                                return (
+                                  <span className="inline-block text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 mt-1 bg-accent/10 text-accent border border-accent/20">
+                                    {assignedOcc.occasion}
+                                  </span>
+                                );
+                              })()}
                             </td>
                             <td className="py-4 text-text-primary font-bold">
                               ₹{Number(p.base_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -3528,7 +3667,7 @@ ${titleHtml}  <thead>
                     </div>
 
                     {/* 1. Basic specifications row */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                       <div>
                         <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
                           Product Name
@@ -3571,6 +3710,22 @@ ${titleHtml}  <thead>
                           className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent font-semibold"
                           placeholder="₹ 1,499.00"
                         />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
+                          Select Occasion
+                        </label>
+                        <select
+                          value={prodOccasion}
+                          onChange={(e) => setProdOccasion(e.target.value)}
+                          className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent uppercase tracking-wider font-semibold"
+                        >
+                          <option value="">-- None (General) --</option>
+                          <option value="casuals">Casuals</option>
+                          <option value="formal">Formal</option>
+                          <option value="ethnic">Ethnic</option>
+                          <option value="party-wear">Party Wear</option>
+                        </select>
                       </div>
                     </div>
 
@@ -3685,25 +3840,132 @@ ${titleHtml}  <thead>
                           Size Guide Configuration
                         </h4>
                         <p className="text-[10px] text-text-secondary mt-0.5">
-                          Configure standard category tables or write a custom override.
+                          Select a pre-existing size chart template or upload a new size guide image.
                         </p>
                       </div>
 
-                      <div className="flex gap-4">
-                        <label className="flex items-center gap-2 cursor-pointer select-none">
-                          <input
-                            type="checkbox"
-                            name="size-guide-chk"
-                            checked={prodSizeGuideType === 'custom'}
-                            onChange={(e) => setProdSizeGuideType(e.target.checked ? 'custom' : 'category')}
-                            className="accent-accent w-4 h-4"
-                          />
-                          <span className="text-xs font-semibold text-text-primary">Configure custom Size table override</span>
-                        </label>
+                      {/* Mode Tabs */}
+                      <div className="flex border-b border-border text-[11px] font-bold uppercase tracking-wider">
+                        <button
+                          type="button"
+                          onClick={() => setSizeGuideMode('template')}
+                          className={`px-3 py-2 border-b-2 transition-all cursor-pointer ${sizeGuideMode === 'template' ? 'border-accent text-accent bg-white' : 'border-transparent text-text-secondary hover:text-text-primary'}`}
+                        >
+                          Use Saved Size Guide
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSizeGuideMode('new')}
+                          className={`px-3 py-2 border-b-2 transition-all cursor-pointer ${sizeGuideMode === 'new' ? 'border-accent text-accent bg-white' : 'border-transparent text-text-secondary hover:text-text-primary'}`}
+                        >
+                          Upload New Size Guide Image
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSizeGuideMode('legacy')}
+                          className={`px-3 py-2 border-b-2 transition-all cursor-pointer ${sizeGuideMode === 'legacy' ? 'border-accent text-accent bg-white' : 'border-transparent text-text-secondary hover:text-text-primary'}`}
+                        >
+                          HTML Code (Advanced)
+                        </button>
                       </div>
 
-                      {prodSizeGuideType === 'custom' && (
-                        <div>
+                      {/* Option A: Saved Template */}
+                      {sizeGuideMode === 'template' && (
+                        <div className="space-y-3 pt-1">
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
+                            Select Pre-existing Size Guide
+                          </label>
+                          <select
+                            value={selectedTemplateId}
+                            onChange={(e) => setSelectedTemplateId(e.target.value)}
+                            className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent font-semibold uppercase tracking-wider"
+                          >
+                            <option value="">-- Select Size Guide Template --</option>
+                            {sizeGuideTemplates.map((sg) => (
+                              <option key={sg.id} value={sg.id}>
+                                {sg.name}
+                              </option>
+                            ))}
+                          </select>
+
+                          {selectedTemplateId && (() => {
+                            const selectedSg = sizeGuideTemplates.find(sg => sg.id === selectedTemplateId);
+                            if (!selectedSg) return null;
+                            return (
+                              <div className="p-3 border border-border bg-white flex items-center gap-4 rounded">
+                                <img src={selectedSg.image_url} alt={selectedSg.name} className="w-16 h-16 object-contain bg-bg-subtle border border-border flex-shrink-0" />
+                                <div>
+                                  <p className="text-xs font-bold uppercase tracking-wide text-text-primary">{selectedSg.name}</p>
+                                  <p className="text-[10px] text-text-secondary mt-0.5">Template selected. This chart image will be displayed in the size guide modal on the product page.</p>
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      )}
+
+                      {/* Option B: Upload New Image */}
+                      {sizeGuideMode === 'new' && (
+                        <div className="space-y-3 pt-1">
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
+                              Size Guide Name (e.g. Size Guide for Hoodie)
+                            </label>
+                            <input
+                              type="text"
+                              value={newSizeGuideName}
+                              onChange={(e) => setNewSizeGuideName(e.target.value)}
+                              placeholder="e.g. Size Guide for Hoodie"
+                              className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent font-semibold"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
+                              Upload Size Chart Image File
+                            </label>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              disabled={isUploadingSizeGuide}
+                              onChange={handleSizeGuideImageUpload}
+                              className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent file:mr-4 file:py-1 file:px-2 file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
+                            />
+                            {isUploadingSizeGuide && (
+                              <span className="text-[9px] text-text-secondary mt-1 block font-bold animate-pulse">
+                                Uploading size guide image...
+                              </span>
+                            )}
+                          </div>
+
+                          <div>
+                            <label className="block text-[9px] font-bold uppercase tracking-wider text-text-secondary mb-1">
+                              Or Provide Image URL Directly
+                            </label>
+                            <input
+                              type="text"
+                              value={newSizeGuideImageUrl}
+                              onChange={(e) => setNewSizeGuideImageUrl(e.target.value)}
+                              placeholder="https://..."
+                              className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent font-mono"
+                            />
+                          </div>
+
+                          {newSizeGuideImageUrl && (
+                            <div className="p-3 border border-border bg-white flex items-center gap-4 rounded">
+                              <img src={newSizeGuideImageUrl} alt="preview" className="w-20 h-20 object-contain bg-bg-subtle border border-border flex-shrink-0" />
+                              <div>
+                                <p className="text-xs font-bold uppercase tracking-wide text-text-primary">{newSizeGuideName || 'New Size Guide'}</p>
+                                <p className="text-[10px] text-text-secondary mt-0.5">Preview of size chart image. Will be automatically saved to template library for future products.</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Option C: Legacy HTML */}
+                      {sizeGuideMode === 'legacy' && (
+                        <div className="pt-1">
                           <label className="block text-[9px] font-bold uppercase tracking-wider text-text-secondary mb-1">
                             Custom Size Guide (HTML Table)
                           </label>

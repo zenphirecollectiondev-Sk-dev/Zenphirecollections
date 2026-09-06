@@ -61,6 +61,7 @@ interface RawProduct {
 async function fetchCategoryProducts(
   page: number,
   categoryIds: string[] | null,
+  productIds: string[] | null,
 ): Promise<RawProduct[]> {
   const from = page * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
@@ -76,7 +77,10 @@ async function fetchCategoryProducts(
     .order("created_at", { ascending: false })
     .range(from, to);
 
-  if (categoryIds && categoryIds.length > 0) {
+  // Occasion filter: restrict by specific product IDs
+  if (productIds && productIds.length > 0) {
+    q = q.in("id", productIds);
+  } else if (categoryIds && categoryIds.length > 0) {
     q = q.in("category_id", categoryIds);
   }
 
@@ -108,11 +112,15 @@ interface UseCategoryProductsOptions {
   /** The Supabase category IDs to filter on, null for "all",
    *  or the sentinel ["__loading__"] to pause the query until categories resolve. */
   categoryIds: string[] | null;
+  /** Specific product IDs to filter on (used by occasion filter).
+   *  When provided, overrides categoryIds. Sentinel ["__occasion_loading__"] pauses query. */
+  productIds?: string[] | null;
   page: number;
 }
 
 export function useCategoryProducts({
   categoryIds,
+  productIds,
   page,
 }: UseCategoryProductsOptions): CategoryQueryStatus {
   const [isSlow, setIsSlow] = useState(false);
@@ -120,25 +128,26 @@ export function useCategoryProducts({
 
   // "__loading__" sentinel: categories not yet resolved — pause query
   const isAwaitingCategories = categoryIds?.[0] === "__loading__";
+  // "__occasion_loading__" sentinel: occasion products not yet fetched — pause query
+  const isAwaitingOccasion = productIds?.[0] === "__occasion_loading__";
   // The real IDs to pass to Supabase (null = fetch all)
   const resolvedCategoryIds = isAwaitingCategories ? null : categoryIds;
+  const resolvedProductIds = isAwaitingOccasion ? null : (productIds ?? null);
 
-  const queryKeyStr = resolvedCategoryIds ? resolvedCategoryIds.join(',') : "all";
+  const queryKeyStr = resolvedProductIds
+    ? `pids:${resolvedProductIds.join(',')}`
+    : resolvedCategoryIds ? resolvedCategoryIds.join(',') : "all";
 
   const query = useQuery<GridProduct[], Error>({
     queryKey: ["category-products", queryKeyStr, page],
     queryFn: async () => {
-      const raw = await fetchCategoryProducts(page, resolvedCategoryIds);
+      const raw = await fetchCategoryProducts(page, resolvedCategoryIds, resolvedProductIds);
       return raw.map(toGridProduct);
     },
-    // Disable the query entirely while categories are still loading
-    enabled: !isAwaitingCategories,
-    // staleTime=0 for category-filtered queries: always re-fetch when the user
-    // picks a category so we never serve a stale "all products" result for a
-    // category-specific URL. For "all" (null categoryIds) keep 5-min cache.
-    staleTime: resolvedCategoryIds ? 0 : 5 * 60 * 1000,
-    // Don't keep old category data in memory after navigating away
-    gcTime: resolvedCategoryIds ? 30 * 1000 : 5 * 60 * 1000,
+    // Disable the query entirely while categories/occasions are still loading
+    enabled: !isAwaitingCategories && !isAwaitingOccasion,
+    staleTime: (resolvedCategoryIds || resolvedProductIds) ? 0 : 5 * 60 * 1000,
+    gcTime: (resolvedCategoryIds || resolvedProductIds) ? 30 * 1000 : 5 * 60 * 1000,
     placeholderData: keepPreviousData,
     retry: 2,
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10_000),
@@ -164,8 +173,8 @@ export function useCategoryProducts({
   }, [isPendingFresh]);
 
   // -- State machine ---------------------------------------
-  // While waiting for categories to resolve, show loading skeleton
-  if (isAwaitingCategories) {
+  // While waiting for categories/occasions to resolve, show loading skeleton
+  if (isAwaitingCategories || isAwaitingOccasion) {
     return { status: "loading" };
   }
 

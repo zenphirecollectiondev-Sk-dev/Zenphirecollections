@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Search, ArrowRight, Sparkles, Image } from 'lucide-react';
-import { getActiveProducts } from '../lib/supabase';
+import { getActiveProducts, getCategories } from '../lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import { dataCache } from '../lib/dataCache';
 
@@ -16,6 +16,7 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<any[]>([]);
   const [dbProducts, setDbProducts] = useState<any[]>([]);
+  const [categoryMap, setCategoryMap] = useState<Record<string, string>>({});
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
@@ -33,7 +34,6 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
     const cached = dataCache.get<any[]>('products');
     if (cached && cached.length > 0) {
       setDbProducts(cached);
-      // Still revalidate in background if stale
       if (!dataCache.isStale('products')) return;
     }
     async function loadSearchProducts() {
@@ -46,6 +46,24 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
       }
     }
     loadSearchProducts();
+  }, []);
+
+  // Load category map from cache (or fetch) for badge display
+  useEffect(() => {
+    const buildMap = (cats: any[]) => {
+      const map: Record<string, string> = {};
+      cats.forEach((c) => { map[c.id] = c.name; });
+      setCategoryMap(map);
+    };
+    const cached = dataCache.get<any[]>('categories');
+    if (cached && cached.length > 0) {
+      buildMap(cached);
+      return;
+    }
+    getCategories().then((cats) => {
+      dataCache.set('categories', cats || []);
+      buildMap(cats || []);
+    }).catch(() => {});
   }, []);
 
   const products = useMemo(() => dbProducts, [dbProducts]);
@@ -288,12 +306,12 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                           <p className="text-[11px] mt-0.5" style={{ color: '#B8975A' }}>
                             ₹{Number(product.base_price || 0).toLocaleString('en-IN')}
                           </p>
-                          {product.category && (
+                          {product.category_id && categoryMap[product.category_id] && (
                             <span
                               className="inline-block mt-1.5 text-[9px] tracking-[0.15em] uppercase px-2 py-0.5 rounded-full"
                               style={{ background: 'rgba(184,151,90,0.1)', color: 'rgba(184,151,90,0.6)' }}
                             >
-                              {product.category}
+                              {categoryMap[product.category_id]}
                             </span>
                           )}
                         </div>
