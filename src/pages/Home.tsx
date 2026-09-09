@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
-import { ArrowRight, Heart, Image } from 'lucide-react';
+import { ArrowRight, Heart, Image, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useWishlistStore } from '../store/useWishlistStore';
 import { getActiveProducts, getCategories, supabase } from '../lib/supabase';
@@ -27,6 +27,87 @@ export default function Home() {
 
   const [activeCategoryIndex, setActiveCategoryIndex] = useState(0);
   const categoryScrollRef = useRef<HTMLDivElement>(null);
+
+  // Hero Slider State
+  const [activeSlide, setActiveSlide] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const touchStartX = useRef<number | null>(null);
+  const touchEndX = useRef<number | null>(null);
+
+  const heroSlides = useMemo(() => {
+    const slide1Image = homepageConfig?.hero_image_url || null;
+    const slide2Image = homepageConfig?.hero_image_url_2 || null;
+
+    const slides: any[] = [
+      {
+        id: 1,
+        image: slide1Image,
+        position: homepageConfig?.hero_image_position || 'center',
+        titlePart1: 'Raw',
+        titleHighlight1: 'Textures',
+        titlePart2: 'Minimal',
+        titleHighlight2: 'Form',
+        description: 'Organic fabrics, artisan weaves, and relaxed silhouettes designed to stand the test of time. Embodying the true essence of modern simplicity.',
+        buttonText: 'Discover Form',
+        buttonLink: '/shop',
+      }
+    ];
+
+    if (slide2Image) {
+      slides.push({
+        id: 2,
+        image: slide2Image,
+        position: homepageConfig?.hero_image_position_2 || 'center',
+        titlePart1: 'Timeless',
+        titleHighlight1: 'Elegance',
+        titlePart2: 'Curated',
+        titleHighlight2: 'Craft',
+        description: 'Sculpted cuts and versatile essentials engineered for everyday luxury. Elevate your personal style with our latest seasonal collection.',
+        buttonText: 'Explore Collection',
+        buttonLink: '/shop?sort=newest',
+      });
+    }
+
+    return slides;
+  }, [homepageConfig]);
+
+  // Auto-slide effect every 6 seconds (if more than 1 slide and not paused)
+  useEffect(() => {
+    if (isPaused || heroSlides.length <= 1) return;
+    const timer = setInterval(() => {
+      setActiveSlide((prev) => (prev + 1) % heroSlides.length);
+    }, 6000);
+    return () => clearInterval(timer);
+  }, [isPaused, heroSlides.length]);
+
+  const handlePrevSlide = () => {
+    setActiveSlide((prev) => (prev - 1 + heroSlides.length) % heroSlides.length);
+  };
+
+  const handleNextSlide = () => {
+    setActiveSlide((prev) => (prev + 1) % heroSlides.length);
+  };
+
+  // Mobile Touch Swipe Handlers
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchEndX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = () => {
+    if (touchStartX.current === null || touchEndX.current === null) return;
+    const distance = touchStartX.current - touchEndX.current;
+    if (distance > 50) {
+      handleNextSlide();
+    } else if (distance < -50) {
+      handlePrevSlide();
+    }
+    touchStartX.current = null;
+    touchEndX.current = null;
+  };
 
   // Reorder categories: Shirts -> Pants -> T-shirts -> Co-ords / Accessories
   const sortedCategories = useMemo(() => {
@@ -96,7 +177,7 @@ export default function Home() {
 
     // ── Step 1: Hydrate from cache synchronously (return visits: zero flash) ──
     const cachedProds = dataCache.get<any[]>('products');
-    const cachedCats  = dataCache.get<any[]>('categories');
+    const cachedCats = dataCache.get<any[]>('categories');
     // homepageConfig already initialised from cache in useState lazy init
 
     if (cachedProds && cachedProds.length > 0) setProducts(cachedProds);
@@ -199,51 +280,133 @@ export default function Home() {
   return (
     <div className="bg-bg min-h-screen overflow-x-hidden">
 
-      {/* ── 1. HERO ── */}
-      <section className="relative bg-bg-subtle h-[75vh] md:h-[80vh] flex flex-col md:flex-row items-stretch overflow-hidden border-b border-border">
+      {/* ── 1. HERO SLIDER ── */}
+      <section
+        className="relative bg-bg-subtle h-[75vh] md:h-[80vh] flex flex-col md:flex-row items-stretch overflow-hidden border-b border-border group/hero select-none"
+        onMouseEnter={() => setIsPaused(true)}
+        onMouseLeave={() => setIsPaused(false)}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
 
-        <div className="absolute inset-0 md:relative md:w-1/2 flex flex-col justify-end md:justify-center px-6 pb-12 pt-16 md:px-16 lg:px-24 bg-transparent md:bg-bg-subtle z-20">
-          <div className="max-w-md space-y-4 md:space-y-8 hero-content text-left">
+        <div className="absolute inset-0 md:relative md:w-1/2 flex flex-col justify-end md:justify-center px-6 pb-14 pt-16 md:px-16 lg:px-24 bg-transparent md:bg-bg-subtle z-20">
+          <div className="max-w-md hero-content text-left relative min-h-[250px] flex flex-col justify-center">
+            {heroSlides.map((slide, index) => {
+              const isActive = index === activeSlide;
+              return (
+                <div
+                  key={slide.id}
+                  className={`transition-all duration-1000 ease-out space-y-4 md:space-y-8 ${isActive
+                      ? 'opacity-100 translate-y-0 relative z-20 pointer-events-auto'
+                      : 'opacity-0 translate-y-6 absolute inset-0 z-0 pointer-events-none'
+                    }`}
+                >
+                  <h1 className="text-3xl md:text-6xl lg:text-7xl font-sans uppercase font-extralight tracking-tight leading-[1.05] text-white md:text-text-primary">
+                    {slide.titlePart1} <span className="font-semibold block font-heading tracking-wide text-white md:text-text-primary">{slide.titleHighlight1}</span>
+                    {slide.titlePart2} <span className="italic block font-serif tracking-normal text-white/90 md:text-text-secondary">{slide.titleHighlight2}</span>
+                  </h1>
 
-            <h1 className="text-3xl md:text-6xl lg:text-7xl font-sans uppercase font-extralight tracking-tight leading-[1.05] text-white md:text-text-primary">
-              Raw <span className="font-semibold block font-heading tracking-wide text-white md:text-text-primary">Textures</span>
-              Minimal <span className="italic block font-serif tracking-normal text-white/90 md:text-text-secondary">Form</span>
-            </h1>
+                  <p className="hidden sm:block text-xs md:text-sm text-white/80 md:text-text-secondary leading-relaxed max-w-sm font-sans tracking-wide">
+                    {slide.description}
+                  </p>
 
-            <p className="hidden sm:block text-xs md:text-sm text-white/80 md:text-text-secondary leading-relaxed max-w-sm font-sans tracking-wide">
-              Organic fabrics, artisan weaves, and relaxed silhouettes designed to stand the test of time. Embodying the true essence of modern simplicity.
-            </p>
+                  <div className="pt-2 md:pt-4">
+                    <Link
+                      to={slide.buttonLink}
+                      className="btn ambient-green-gradient text-white px-8 py-3.5 text-xs font-bold uppercase tracking-widest hover:opacity-90 transition-all duration-300 shadow-xs inline-flex items-center gap-2 group/btn"
+                    >
+                      {slide.buttonText}
+                      <ArrowRight size={12} className="transition-transform duration-300 group-hover/btn:translate-x-1" />
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
 
-            <div className="pt-2 md:pt-4">
-              <Link
-                to="/shop"
-                className="btn ambient-green-gradient text-white px-8 py-3.5 text-xs font-bold uppercase tracking-widest hover:opacity-90 transition-all duration-300 shadow-xs inline-flex items-center gap-2 group"
-              >
-                Discover Form
-                <ArrowRight size={12} className="transition-transform duration-300 group-hover:translate-x-1" />
-              </Link>
+          {/* Controls & Indicators */}
+          <div className="flex items-center gap-4 mt-6 md:mt-8 z-30">
+            <div className="flex items-center gap-2">
+              {heroSlides.map((_, idx) => {
+                const isActive = idx === activeSlide;
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => setActiveSlide(idx)}
+                    aria-label={`Go to slide ${idx + 1}`}
+                    className={`h-1.5 rounded-full transition-all duration-500 cursor-pointer overflow-hidden relative ${isActive
+                        ? 'w-8 bg-accent'
+                        : 'w-2 bg-white/40 md:bg-text-secondary/30 hover:bg-white/70 md:hover:bg-text-secondary/60'
+                      }`}
+                  >
+                    {isActive && heroSlides.length > 1 && !isPaused && (
+                      <span
+                        className="absolute inset-0 bg-white/60 animate-[progress_6s_linear_infinite]"
+                        style={{
+                          transformOrigin: 'left',
+                          animationDuration: '6000ms'
+                        }}
+                      />
+                    )}
+                  </button>
+                );
+              })}
             </div>
+
+            <span className="text-[10px] tracking-widest uppercase font-mono text-white/70 md:text-text-secondary/70 font-semibold">
+              0{activeSlide + 1} / 0{heroSlides.length}
+            </span>
+
+            {heroSlides.length > 1 && (
+              <div className="flex items-center gap-1.5 ml-auto md:ml-4">
+                <button
+                  onClick={handlePrevSlide}
+                  aria-label="Previous slide"
+                  className="p-2 text-white md:text-text-primary hover:bg-white/10 md:hover:bg-black/5 transition-colors rounded-full cursor-pointer"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <button
+                  onClick={handleNextSlide}
+                  aria-label="Next slide"
+                  className="p-2 text-white md:text-text-primary hover:bg-white/10 md:hover:bg-black/5 transition-colors rounded-full cursor-pointer"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="absolute inset-0 md:relative md:w-1/2 group flex justify-center overflow-hidden z-0 self-stretch">
-          {homepageConfig?.hero_image_url ? (
-            <img
-              src={imgHero(homepageConfig.hero_image_url)}
-              alt="Zenphire Editorial Showcase"
-              fetchPriority="high"
-              loading="eager"
-              decoding="async"
-              className="w-full h-full object-cover transition-transform duration-[2000ms] ease-out group-hover:scale-105"
-              style={{ objectPosition: homepageConfig?.hero_image_position || 'center' }}
-            />
-          ) : configLoading ? (
-            /* Shimmer skeleton while config loads — no jarring green flash */
-            <div className="w-full h-full animate-pulse bg-gradient-to-br from-zinc-100 via-zinc-200 to-zinc-100" />
-          ) : (
-            /* Config loaded but admin has not set a hero image yet */
-            <div className="w-full h-full bg-gradient-to-br from-[#001510] via-[#063A2C] to-[#00221A]" />
-          )}
+        <div className="absolute inset-0 md:relative md:w-1/2 flex justify-center overflow-hidden z-0 self-stretch">
+          {heroSlides.map((slide, index) => {
+            const isActive = index === activeSlide;
+            return (
+              <div
+                key={slide.id}
+                className={`absolute inset-0 transition-all duration-1000 ease-in-out ${isActive ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
+                  }`}
+              >
+                {slide.image ? (
+                  <img
+                    src={typeof slide.image === 'string' && (slide.image.startsWith('http') || slide.image.startsWith('data:')) ? imgHero(slide.image) : slide.image}
+                    alt="Zenphire Editorial Showcase"
+                    fetchPriority={index === 0 ? "high" : "low"}
+                    loading={index === 0 ? "eager" : "lazy"}
+                    decoding="async"
+                    className={`w-full h-full object-cover transition-transform duration-[6000ms] ease-out ${isActive ? 'scale-105' : 'scale-100'
+                      }`}
+                    style={{ objectPosition: slide.position }}
+                  />
+                ) : configLoading ? (
+                  <div className="w-full h-full animate-pulse bg-gradient-to-br from-zinc-100 via-zinc-200 to-zinc-100" />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-[#001510] via-[#063A2C] to-[#00221A]" />
+                )}
+              </div>
+            );
+          })}
           <div
             className="absolute bottom-0 left-0 right-0 h-[40%] md:hidden pointer-events-none z-10"
             style={{

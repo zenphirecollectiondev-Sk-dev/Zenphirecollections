@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { dataCache } from '../lib/dataCache';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Package,
@@ -16,7 +17,17 @@ import {
   Loader2,
   Sliders,
   Copy,
-  Calendar
+  Calendar,
+  LayoutDashboard,
+  ShoppingBag,
+  Tag,
+  BarChart2,
+  Layers,
+  ClipboardList,
+  Sparkles,
+  Truck,
+  Settings2,
+  ShoppingCart,
 } from 'lucide-react';
 
 
@@ -183,27 +194,18 @@ export default function Admin() {
   const [loadingOrderItems, setLoadingOrderItems] = useState(false);
   const [orderSearchQuery, setOrderSearchQuery] = useState('');
 
-  // Global messages
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // Toast notification queue
+  const [toasts, setToasts] = useState<{ id: number; msg: string; isError: boolean }[]>([]);
+  const toastCounter = useRef(0);
 
-  // Size Guide Builder states
-  const [isSizeBuilderOpen, setIsSizeBuilderOpen] = useState(false);
-  const [builderTitle, setBuilderTitle] = useState('');
-  const [builderCategory, setBuilderCategory] = useState<'pants' | 'shirts' | 'coords' | 'custom'>('shirts');
-  const [builderColumns, setBuilderColumns] = useState<string[]>(['Brand Size', 'Shoulder (in)', 'Chest (in)', 'Length (in)']);
-  const [builderRows, setBuilderRows] = useState<any[]>([
-    { 'Brand Size': 'S' },
-    { 'Brand Size': 'M' },
-    { 'Brand Size': 'L' },
-    { 'Brand Size': 'XL' }
-  ]);
-  const [generatedHtml, setGeneratedHtml] = useState('');
-  const [isCopied, setIsCopied] = useState(false);
+  // Keep legacy error/success for loadingData error display
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Homepage state variables
   const [heroImageUrl, setHeroImageUrl] = useState('');
   const [heroImagePosition, setHeroImagePosition] = useState('center');
+  const [heroImageUrl2, setHeroImageUrl2] = useState('');
+  const [heroImagePosition2, setHeroImagePosition2] = useState('center');
   const [theEditImageUrl, setTheEditImageUrl] = useState('');
   const [theEditImagePosition, setTheEditImagePosition] = useState('center');
   const [bestSellersIds, setBestSellersIds] = useState<string[]>([]);
@@ -217,6 +219,7 @@ export default function Admin() {
   const [pantsImageUrl, setPantsImageUrl] = useState('');
   const [isSavingHomepage, setIsSavingHomepage] = useState(false);
   const [isUploadingHero, setIsUploadingHero] = useState(false);
+  const [isUploadingHero2, setIsUploadingHero2] = useState(false);
   const [isUploadingTheEdit, setIsUploadingTheEdit] = useState(false);
   const [isUploadingMen, setIsUploadingMen] = useState(false);
   const [isUploadingWomen, setIsUploadingWomen] = useState(false);
@@ -227,9 +230,11 @@ export default function Admin() {
   const [isUploadingPants, setIsUploadingPants] = useState(false);
 
   const [heroDragActive, setHeroDragActive] = useState(false);
+  const [hero2DragActive, setHero2DragActive] = useState(false);
   const [theEditDragActive, setTheEditDragActive] = useState(false);
 
   const heroContainerRef = useRef<HTMLDivElement>(null);
+  const hero2ContainerRef = useRef<HTMLDivElement>(null);
   const editContainerRef = useRef<HTMLDivElement>(null);
 
   // Search queries for selectors
@@ -255,92 +260,7 @@ export default function Admin() {
     }
   };
 
-  const handleOpenSizeBuilder = () => {
-    setBuilderTitle('');
-    setBuilderCategory('shirts');
-    setBuilderColumns(['Brand Size', 'Shoulder (in)', 'Chest (in)', 'Length (in)']);
-    setBuilderRows([
-      { 'Brand Size': 'S' },
-      { 'Brand Size': 'M' },
-      { 'Brand Size': 'L' },
-      { 'Brand Size': 'XL' }
-    ]);
-    setGeneratedHtml('');
-    setIsCopied(false);
-    setIsSizeBuilderOpen(true);
-  };
 
-  const handleBuilderCategoryChange = (cat: 'pants' | 'shirts' | 'coords' | 'custom') => {
-    setBuilderCategory(cat);
-    const cols = getCategoryColumns(cat);
-    setBuilderColumns(cols);
-    setBuilderRows([
-      { 'Brand Size': 'S' },
-      { 'Brand Size': 'M' },
-      { 'Brand Size': 'L' },
-      { 'Brand Size': 'XL' }
-    ]);
-    setGeneratedHtml('');
-    setIsCopied(false);
-  };
-
-  const handleAddColumn = () => {
-    let suffix = 1;
-    let colName = `Column ${suffix}`;
-    while (builderColumns.includes(colName)) {
-      suffix++;
-      colName = `Column ${suffix}`;
-    }
-    setBuilderColumns([...builderColumns, colName]);
-  };
-
-  const handleRemoveColumn = (colName: string) => {
-    if (colName === 'Brand Size') return;
-    setBuilderColumns(builderColumns.filter(c => c !== colName));
-    // Clean up
-    setBuilderRows(builderRows.map(r => {
-      const copy = { ...r };
-      delete copy[colName];
-      return copy;
-    }));
-  };
-
-  const generateSizeGuideHtml = () => {
-    // Filter out any columns that are empty
-    const activeCols = builderColumns.filter(c => c.trim() !== '');
-
-    const titleHtml = builderTitle.trim()
-      ? `  <caption class="text-xs font-bold text-text-primary mb-2.5 text-left uppercase tracking-widest">${builderTitle.trim()}</caption>\n`
-      : '';
-
-    const headersHtml = activeCols
-      .map(c => `<th class="py-2.5">${c}</th>`)
-      .join('\n      ');
-
-    const rowsHtml = builderRows.map(r => {
-      const tds = activeCols.map((col, idx) => {
-        const isBrand = idx === 0;
-        const val = r[col] || '-';
-        return `<td class="py-2.5${isBrand ? ' font-bold text-text-primary' : ''}">${val}</td>`;
-      }).join('\n      ');
-      return `\n    <tr>\n      ${tds}\n    </tr>`;
-    }).join('');
-
-    const html = `
-<table class="w-full text-left text-xs border-collapse">
-${titleHtml}  <thead>
-    <tr class="border-b border-border font-bold text-text-primary">
-      ${headersHtml}
-    </tr>
-  </thead>
-  <tbody class="divide-y divide-border text-text-secondary">
-    ${rowsHtml.trim()}
-  </tbody>
-</table>`.trim();
-
-    setGeneratedHtml(html);
-    setIsCopied(false);
-  };
 
   // Fetch Dashboard Stats & Data
   const fetchData = async () => {
@@ -462,6 +382,8 @@ ${titleHtml}  <thead>
         if (hpData) {
           setHeroImageUrl(hpData.hero_image_url || '');
           setHeroImagePosition(hpData.hero_image_position || 'center');
+          setHeroImageUrl2(hpData.hero_image_url_2 || '');
+          setHeroImagePosition2(hpData.hero_image_position_2 || 'center');
           setTheEditImageUrl(hpData.the_edit_image_url || '');
           setTheEditImagePosition(hpData.the_edit_image_position || 'center');
           setBestSellersIds(hpData.best_sellers_ids || []);
@@ -497,7 +419,7 @@ ${titleHtml}  <thead>
           .select('*')
           .order('name', { ascending: true });
         if (!sgErr && sgData && sgData.length > 0) {
-          setSizeGuideTemplates(sgData);
+          setSizeGuideTemplates(sgData as any);
         }
       } catch (sgErr) {
         console.warn('size_guides table fetch failed or not created yet.', sgErr);
@@ -691,7 +613,7 @@ ${titleHtml}  <thead>
   // Handle local image upload to Supabase Storage with Base64 fallback
   const handleImageUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
-    type: 'hero' | 'edit' | 'men' | 'women' | 'unisex' | 'category' | 'shirt' | 'tshirt' | 'coords' | 'pants'
+    type: 'hero' | 'hero2' | 'edit' | 'men' | 'women' | 'unisex' | 'category' | 'shirt' | 'tshirt' | 'coords' | 'pants' | 'sizeguide'
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -703,19 +625,22 @@ ${titleHtml}  <thead>
 
     const setLoader =
       type === 'hero' ? setIsUploadingHero :
-        type === 'edit' ? setIsUploadingTheEdit :
-          type === 'men' ? setIsUploadingMen :
-            type === 'women' ? setIsUploadingWomen :
-              type === 'unisex' ? setIsUploadingUnisex :
-                type === 'shirt' ? setIsUploadingShirt :
-                  type === 'tshirt' ? setIsUploadingTshirt :
-                    type === 'coords' ? setIsUploadingCoords :
-                      type === 'pants' ? setIsUploadingPants :
-                        setIsUploadingCategory;
+        type === 'hero2' ? setIsUploadingHero2 :
+          type === 'edit' ? setIsUploadingTheEdit :
+            type === 'men' ? setIsUploadingMen :
+              type === 'women' ? setIsUploadingWomen :
+                type === 'unisex' ? setIsUploadingUnisex :
+                  type === 'shirt' ? setIsUploadingShirt :
+                    type === 'tshirt' ? setIsUploadingTshirt :
+                      type === 'coords' ? setIsUploadingCoords :
+                        type === 'pants' ? setIsUploadingPants :
+                          type === 'sizeguide' ? setIsUploadingSizeGuide :
+                            setIsUploadingCategory;
     setLoader(true);
 
     const assignUrl = (url: string) => {
       if (type === 'hero') setHeroImageUrl(url);
+      else if (type === 'hero2') setHeroImageUrl2(url);
       else if (type === 'edit') setTheEditImageUrl(url);
       else if (type === 'men') setMenImageUrl(url);
       else if (type === 'women') setWomenImageUrl(url);
@@ -725,18 +650,21 @@ ${titleHtml}  <thead>
       else if (type === 'coords') setCoordsImageUrl(url);
       else if (type === 'pants') setPantsImageUrl(url);
       else if (type === 'category') setCatImageUrl(url);
+      else if (type === 'sizeguide') setNewSizeGuideImageUrl(url);
     };
 
     const readableName =
-      type === 'hero' ? 'Hero' :
-        type === 'edit' ? 'The Edit' :
-          type === 'men' ? 'Men Collection' :
-            type === 'women' ? 'Women Collection' :
-              type === 'unisex' ? 'Unisex Collection' :
-                type === 'shirt' ? 'Shirt Category' :
-                  type === 'tshirt' ? 'T-Shirt Category' :
-                    type === 'coords' ? 'Co-ords Category' :
-                      type === 'pants' ? 'Pants Category' : 'Category';
+      type === 'hero' ? 'Hero Slide 1' :
+        type === 'hero2' ? 'Hero Slide 2' :
+          type === 'edit' ? 'The Edit' :
+            type === 'men' ? 'Men Collection' :
+              type === 'women' ? 'Women Collection' :
+                type === 'unisex' ? 'Unisex Collection' :
+                  type === 'shirt' ? 'Shirt Category' :
+                    type === 'tshirt' ? 'T-Shirt Category' :
+                      type === 'coords' ? 'Co-ords Category' :
+                        type === 'pants' ? 'Pants Category' :
+                          type === 'sizeguide' ? 'Size Guide' : 'Category';
 
     try {
       const fileExt = file.name.split('.').pop();
@@ -773,6 +701,10 @@ ${titleHtml}  <thead>
     } finally {
       setLoader(false);
     }
+  };
+
+  const handleSizeGuideImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    handleImageUpload(e, 'sizeguide');
   };
 
   const handleProductImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -901,7 +833,7 @@ ${titleHtml}  <thead>
         }
       });
     });
-    
+
     prodVariants.forEach(v => {
       if (v.sku) {
         const parts = v.sku.split('-');
@@ -997,6 +929,16 @@ ${titleHtml}  <thead>
     setHeroImagePosition(`${posX}% ${posY}%`);
   };
 
+  const handleHero2Drag = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!hero2DragActive || !hero2ContainerRef.current) return;
+    const rect = hero2ContainerRef.current.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    const posX = Math.max(0, Math.min(100, Math.round(x)));
+    const posY = Math.max(0, Math.min(100, Math.round(y)));
+    setHeroImagePosition2(`${posX}% ${posY}%`);
+  };
+
   const handleEditDrag = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!theEditDragActive || !editContainerRef.current) return;
     const rect = editContainerRef.current.getBoundingClientRect();
@@ -1018,6 +960,17 @@ ${titleHtml}  <thead>
     setHeroImagePosition(`${posX}% ${posY}%`);
   };
 
+  const handleHero2TouchDrag = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!hero2ContainerRef.current) return;
+    const touch = e.touches[0];
+    const rect = hero2ContainerRef.current.getBoundingClientRect();
+    const x = ((touch.clientX - rect.left) / rect.width) * 100;
+    const y = ((touch.clientY - rect.top) / rect.height) * 100;
+    const posX = Math.max(0, Math.min(100, Math.round(x)));
+    const posY = Math.max(0, Math.min(100, Math.round(y)));
+    setHeroImagePosition2(`${posX}% ${posY}%`);
+  };
+
   const handleEditTouchDrag = (e: React.TouchEvent<HTMLDivElement>) => {
     if (!editContainerRef.current) return;
     const touch = e.touches[0];
@@ -1032,27 +985,31 @@ ${titleHtml}  <thead>
   // Save Homepage Settings
   const handleSaveHomepage = async () => {
     setIsSavingHomepage(true);
+    const configPayload = {
+      id: 'global',
+      hero_image_url: heroImageUrl.trim() || null,
+      hero_image_position: heroImagePosition,
+      hero_image_url_2: heroImageUrl2.trim() || null,
+      hero_image_position_2: heroImagePosition2,
+      the_edit_image_url: theEditImageUrl.trim() || null,
+      the_edit_image_position: theEditImagePosition,
+      best_sellers_ids: bestSellersIds,
+      new_arrivals_ids: newArrivalsIds,
+      men_collection_image_url: menImageUrl.trim() || null,
+      women_collection_image_url: womenImageUrl.trim() || null,
+      unisex_collection_image_url: unisexImageUrl.trim() || null,
+      shirt_category_image_url: shirtImageUrl.trim() || null,
+      tshirt_category_image_url: tshirtImageUrl.trim() || null,
+      coords_category_image_url: coordsImageUrl.trim() || null,
+      pants_category_image_url: pantsImageUrl.trim() || null,
+      updated_at: new Date().toISOString()
+    };
     try {
       const { error } = await supabase
         .from('homepage_config' as any)
-        .upsert({
-          id: 'global',
-          hero_image_url: heroImageUrl.trim() || null,
-          hero_image_position: heroImagePosition,
-          the_edit_image_url: theEditImageUrl.trim() || null,
-          the_edit_image_position: theEditImagePosition,
-          best_sellers_ids: bestSellersIds,
-          new_arrivals_ids: newArrivalsIds,
-          men_collection_image_url: menImageUrl.trim() || null,
-          women_collection_image_url: womenImageUrl.trim() || null,
-          unisex_collection_image_url: unisexImageUrl.trim() || null,
-          shirt_category_image_url: shirtImageUrl.trim() || null,
-          tshirt_category_image_url: tshirtImageUrl.trim() || null,
-          coords_category_image_url: coordsImageUrl.trim() || null,
-          pants_category_image_url: pantsImageUrl.trim() || null,
-          updated_at: new Date().toISOString()
-        });
+        .upsert(configPayload);
       if (error) throw error;
+      dataCache.set('homepage_config', configPayload);
       triggerNotification('Homepage configuration saved successfully!');
     } catch (err: any) {
       console.error('Error saving homepage config:', err);
@@ -1063,13 +1020,11 @@ ${titleHtml}  <thead>
   };
 
   const triggerNotification = (msg: string, isError = false) => {
-    if (isError) {
-      setErrorMsg(msg);
-      setTimeout(() => setErrorMsg(null), 4000);
-    } else {
-      setSuccessMsg(msg);
-      setTimeout(() => setSuccessMsg(null), 4000);
-    }
+    const id = ++toastCounter.current;
+    setToasts(prev => [...prev, { id, msg, isError }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 4000);
   };
 
   // Helper to generate slug
@@ -1301,7 +1256,7 @@ ${titleHtml}  <thead>
             .select()
             .single();
           if (insertedSg) {
-            newTemplate.id = insertedSg.id;
+            newTemplate.id = (insertedSg as any).id;
           }
         } catch (sgInsErr) {
           console.warn('Could not insert to size_guides table, saving locally:', sgInsErr);
@@ -1320,7 +1275,7 @@ ${titleHtml}  <thead>
         description: prodDesc.trim() || null,
         category_id: finalCategoryId,
         is_active: prodActive,
-        size_guide_type: computedSizeGuideHtml ? 'custom' : 'category',
+        size_guide_type: computedSizeGuideHtml ? 'custom' : prodSizeGuideType || 'category',
         custom_size_guide_html: computedSizeGuideHtml
       };
 
@@ -1551,113 +1506,172 @@ ${titleHtml}  <thead>
   return (
     <div className="max-w-7xl mx-auto px-4 py-12 md:py-16 font-sans antialiased text-slate-800">
 
-      {/* Top Banner Header */}
-      <div className="border border-border/80 p-6 md:p-8 bg-white mb-10 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <span className="text-[10px] uppercase tracking-widest bg-accent text-white font-black px-2.5 py-1">
-            System Console
-          </span>
-          <h1 className="text-2xl md:text-3xl font-heading font-black tracking-wide uppercase mt-3 text-text-primary">
-            Store Management Cockpit
-          </h1>
-          <p className="text-xs text-text-secondary mt-1">
-            Manage your catalog items, inventory levels, sizing rules, and stat analysis.
-          </p>
-        </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          {/* Customer Orders quick count — clickable shortcut */}
-          <button
-            onClick={() => setActiveTab('orders')}
-            className="border border-border bg-bg-subtle px-4 py-2 text-xs font-bold flex items-center gap-2 hover:border-accent hover:bg-white transition-all cursor-pointer"
-            title="View Customer Orders"
-          >
-            <Package size={12} className="text-text-secondary" />
-            <span className="text-text-secondary uppercase tracking-wider">Orders</span>
-            <span className="bg-accent text-white text-[10px] font-black px-1.5 py-0.5 min-w-[18px] text-center">{recentOrders.length}</span>
-          </button>
-          <button
-            onClick={fetchData}
-            disabled={loadingData}
-            className="border border-border bg-white text-text-primary px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-bg-subtle transition-all flex items-center gap-2 shadow-sm disabled:opacity-50"
-          >
-            <RefreshCw size={12} className={loadingData ? 'animate-spin' : ''} /> Sync Data
-          </button>
-        </div>
+      {/* ── Premium Toast Notification Stack (fixed bottom-right) ── */}
+      <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-3 pointer-events-none">
+        <AnimatePresence>
+          {toasts.map((toast) => (
+            <motion.div
+              key={toast.id}
+              initial={{ opacity: 0, x: 60, scale: 0.95 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: 60, scale: 0.95 }}
+              transition={{ type: 'spring', stiffness: 340, damping: 28 }}
+              className={`pointer-events-auto relative flex items-start gap-3 min-w-[280px] max-w-sm px-4 py-3.5 shadow-2xl border overflow-hidden ${
+                toast.isError
+                  ? 'bg-white border-red-200 text-red-700'
+                  : 'bg-white border-emerald-200 text-emerald-800'
+              }`}
+            >
+              <div className={`absolute left-0 top-0 bottom-0 w-1 ${toast.isError ? 'bg-red-500' : 'bg-emerald-500'}`} />
+              <div className={`mt-0.5 flex-shrink-0 rounded-full p-1 ${toast.isError ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                {toast.isError ? <AlertTriangle size={13} strokeWidth={2.5} /> : <Check size={13} strokeWidth={2.5} />}
+              </div>
+              <p className="text-[11px] font-semibold leading-snug flex-1 pr-1">{toast.msg}</p>
+              <button
+                onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
+                className={`flex-shrink-0 mt-0.5 rounded-full p-0.5 transition-colors cursor-pointer ${toast.isError ? 'hover:bg-red-50 text-red-400' : 'hover:bg-emerald-50 text-emerald-400'}`}
+              >
+                <X size={12} />
+              </button>
+              <div className={`absolute bottom-0 left-0 right-0 h-[2px] ${toast.isError ? 'bg-red-100' : 'bg-emerald-100'}`}>
+                <div className={`h-full ${toast.isError ? 'bg-red-400' : 'bg-emerald-400'} animate-[progress_4s_linear_forwards]`} style={{ transformOrigin: 'left' }} />
+              </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
       </div>
 
-      {/* Notifications banner */}
-      <AnimatePresence>
-        {successMsg && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="mb-6 p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2 shadow-sm"
-          >
-            <Check size={14} className="flex-shrink-0" />
-            {successMsg}
-          </motion.div>
-        )}
-        {errorMsg && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="mb-6 p-4 bg-sale/10 border border-sale text-sale text-xs font-semibold flex items-center gap-2 shadow-sm"
-          >
-            <AlertTriangle size={14} className="flex-shrink-0" />
-            {errorMsg}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* ══════════════ ADMIN SHELL ══════════════ */}
+      <div className="border border-border/80 bg-white shadow-[0_1px_16px_rgba(0,0,0,0.06)] mb-8">
 
-      {/* Navigation sub-tabs — mobile: dropdown select / desktop: pill tabs */}
-      <div className="mb-8">
-        {/* Mobile Dropdown (visible on small screens only) */}
-        <div className="md:hidden">
-          <select
-            value={activeTab}
-            onChange={(e) => setActiveTab(e.target.value as any)}
-            className="w-full px-4 py-3 border border-border bg-white text-text-primary text-xs font-bold uppercase tracking-wider focus:outline-none focus:border-accent appearance-none cursor-pointer"
-            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', paddingRight: '36px' }}
-          >
-            <option value="overview">Overview Statistics</option>
-            <option value="products">Product Catalog ({products.length})</option>
-            <option value="categories">Categories &amp; Sizing</option>
-            <option value="inventory">Inventory Stock Ledger</option>
-            <option value="orders">Customer Orders ({recentOrders.length})</option>
-            <option value="coupons">Manage Coupons ({coupons.length})</option>
-            <option value="couriers">Courier Partners ({courierPartners.length})</option>
-            <option value="homepage">Homepage Settings</option>
-            <option value="occasions">Occasion Collections</option>
-          </select>
+        {/* ── Header bar ── */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 px-6 py-4 border-b border-border">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-accent flex items-center justify-center flex-shrink-0">
+              <Settings2 size={15} className="text-white" />
+            </div>
+            <div>
+              <p className="text-[9px] uppercase tracking-[0.18em] text-text-secondary/70 font-black">Admin Console</p>
+              <h1 className="text-base md:text-lg font-heading font-black uppercase tracking-wide text-text-primary leading-tight">
+                Store Management
+              </h1>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Customer Orders — always-visible priority CTA */}
+            <button
+              onClick={() => setActiveTab('orders')}
+              className={`inline-flex items-center gap-2 px-3.5 py-2 text-[11px] font-bold uppercase tracking-widest transition-all cursor-pointer border ${
+                activeTab === 'orders'
+                  ? 'bg-accent text-white border-accent shadow-md'
+                  : 'bg-white text-text-primary border-border hover:border-accent/70 hover:bg-bg-subtle'
+              }`}
+            >
+              <ShoppingCart size={12} />
+              Orders
+              <span className={`inline-flex items-center justify-center h-4 min-w-[16px] px-1 text-[9px] font-black rounded-sm ${
+                activeTab === 'orders' ? 'bg-white/25 text-white' : 'bg-accent text-white'
+              }`}>
+                {recentOrders.length}
+              </span>
+            </button>
+
+            <button
+              onClick={fetchData}
+              disabled={loadingData}
+              className="inline-flex items-center gap-1.5 border border-border bg-white text-text-secondary px-3.5 py-2 text-[11px] font-bold uppercase tracking-widest hover:text-text-primary hover:bg-bg-subtle transition-all disabled:opacity-40"
+            >
+              <RefreshCw size={12} className={loadingData ? 'animate-spin' : ''} />
+              Sync
+            </button>
+          </div>
         </div>
 
-        {/* Desktop Pill Tabs (hidden on mobile) */}
-        <div className="hidden md:flex border-b border-border overflow-x-auto">
+        {/* ── Desktop Nav Bar ── */}
+        <div className="hidden md:flex items-stretch overflow-x-auto">
+
+          {/* Group 1: Core */}
           {([
-            { key: 'overview', label: 'Overview Statistics' },
-            { key: 'products', label: `Product Catalog (${products.length})` },
-            { key: 'categories', label: 'Categories & Sizing' },
-            { key: 'inventory', label: 'Inventory Stock Ledger' },
-            { key: 'orders', label: `Customer Orders (${recentOrders.length})` },
-            { key: 'coupons', label: `Manage Coupons (${coupons.length})` },
-            { key: 'couriers', label: `Courier Partners (${courierPartners.length})` },
-            { key: 'homepage', label: 'Homepage Settings' },
-            { key: 'occasions', label: 'Occasion Collections' },
-          ] as { key: typeof activeTab; label: string }[]).map(({ key, label }) => (
+            { key: 'homepage',  label: 'Homepage',         Icon: LayoutDashboard },
+            { key: 'products',  label: 'Product Catalog',  Icon: ShoppingBag,    badge: products.length },
+            { key: 'coupons',   label: 'Coupons',          Icon: Tag,            badge: coupons.length },
+            { key: 'overview',  label: 'Analytics',        Icon: BarChart2 },
+          ] as { key: typeof activeTab; label: string; Icon: any; badge?: number }[]).map(({ key, label, Icon, badge }) => (
             <button
               key={key}
               onClick={() => setActiveTab(key)}
-              className={`py-3.5 px-5 text-xs font-bold tracking-widest uppercase border-b-2 whitespace-nowrap transition-all flex-shrink-0 ${activeTab === key
-                  ? 'border-accent text-text-primary font-black'
-                  : 'border-transparent text-text-secondary hover:text-text-primary'
-                }`}
+              className={`group relative flex items-center gap-2 px-5 py-4 text-[11px] font-bold uppercase tracking-widest whitespace-nowrap transition-all duration-150 flex-shrink-0 border-b-2 ${
+                activeTab === key
+                  ? 'border-accent text-text-primary bg-bg-subtle'
+                  : 'border-transparent text-text-secondary hover:text-text-primary hover:bg-bg-subtle/60'
+              }`}
             >
+              <Icon size={14} strokeWidth={activeTab === key ? 2.5 : 2} className="flex-shrink-0" />
               {label}
+              {badge !== undefined && (
+                <span className={`inline-flex items-center justify-center h-4 min-w-[18px] px-1.5 text-[9px] font-black rounded-sm ${
+                  activeTab === key ? 'bg-accent text-white' : 'bg-border text-text-secondary'
+                }`}>
+                  {badge}
+                </span>
+              )}
             </button>
           ))}
+
+          {/* Divider */}
+          <div className="w-px my-3 bg-border/70 flex-shrink-0" />
+
+          {/* Group 2: Operations */}
+          {([
+            { key: 'categories', label: 'Categories',  Icon: Layers },
+            { key: 'inventory',  label: 'Inventory',   Icon: ClipboardList },
+            { key: 'occasions',  label: 'Occasions',   Icon: Sparkles },
+            { key: 'couriers',   label: 'Couriers',    Icon: Truck, badge: courierPartners.length },
+          ] as { key: typeof activeTab; label: string; Icon: any; badge?: number }[]).map(({ key, label, Icon, badge }) => (
+            <button
+              key={key}
+              onClick={() => setActiveTab(key)}
+              className={`group relative flex items-center gap-2 px-4 py-4 text-[11px] font-bold uppercase tracking-widest whitespace-nowrap transition-all duration-150 flex-shrink-0 border-b-2 ${
+                activeTab === key
+                  ? 'border-accent text-text-primary bg-bg-subtle'
+                  : 'border-transparent text-text-secondary hover:text-text-primary hover:bg-bg-subtle/60'
+              }`}
+            >
+              <Icon size={14} strokeWidth={activeTab === key ? 2.5 : 2} className="flex-shrink-0" />
+              {label}
+              {badge !== undefined && (
+                <span className={`inline-flex items-center justify-center h-4 min-w-[18px] px-1.5 text-[9px] font-black rounded-sm ${
+                  activeTab === key ? 'bg-accent text-white' : 'bg-border text-text-secondary'
+                }`}>
+                  {badge}
+                </span>
+              )}
+            </button>
+          ))}
+
         </div>
+
+        {/* ── Mobile Dropdown ── */}
+        <div className="md:hidden px-4 py-3">
+          <select
+            value={activeTab}
+            onChange={(e) => setActiveTab(e.target.value as any)}
+            className="w-full px-3 py-2.5 border border-border bg-white text-text-primary text-xs font-bold uppercase tracking-wider focus:outline-none focus:border-accent appearance-none cursor-pointer"
+            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', paddingRight: '36px' }}
+          >
+            <option value="homepage">Homepage Settings</option>
+            <option value="products">Product Catalog ({products.length})</option>
+            <option value="coupons">Coupons ({coupons.length})</option>
+            <option value="overview">Analytics</option>
+            <option value="orders">Customer Orders ({recentOrders.length})</option>
+            <option value="categories">Categories</option>
+            <option value="inventory">Inventory</option>
+            <option value="occasions">Occasions</option>
+            <option value="couriers">Couriers ({courierPartners.length})</option>
+          </select>
+        </div>
+
       </div>
 
       {/* TABS CONTAINER */}
@@ -1775,10 +1789,10 @@ ${titleHtml}  <thead>
                             <td className="py-3 text-right font-semibold text-text-primary">₹{Number(o.total).toLocaleString()}</td>
                             <td className="py-3 pl-6">
                               <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 border ${o.status === 'delivered'
-                                  ? 'bg-green-50 text-green-700 border-green-200'
-                                  : o.status === 'cancelled'
-                                    ? 'bg-red-50 text-sale border-red-200'
-                                    : 'bg-yellow-50 text-yellow-700 border-yellow-200'
+                                ? 'bg-green-50 text-green-700 border-green-200'
+                                : o.status === 'cancelled'
+                                  ? 'bg-red-50 text-sale border-red-200'
+                                  : 'bg-yellow-50 text-yellow-700 border-yellow-200'
                                 }`}>
                                 {o.status}
                               </span>
@@ -1849,12 +1863,6 @@ ${titleHtml}  <thead>
               </div>
               <div className="flex gap-2">
                 <button
-                  onClick={handleOpenSizeBuilder}
-                  className="border border-border bg-white text-text-primary px-5 py-2.5 text-xs font-bold uppercase tracking-widest hover:bg-bg-subtle transition-all flex items-center justify-center gap-1.5 shadow-sm"
-                >
-                  <Sliders size={14} /> Size Guide Generator
-                </button>
-                <button
                   onClick={handleOpenAddProduct}
                   className="bg-accent text-white px-5 py-2.5 text-xs font-bold uppercase tracking-widest hover:bg-accent-hover transition-colors flex items-center justify-center gap-1.5 shadow-sm"
                 >
@@ -1919,8 +1927,8 @@ ${titleHtml}  <thead>
                             </td>
                             <td className="py-4">
                               <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 border ${p.is_active
-                                  ? 'bg-green-50 text-green-700 border-green-200'
-                                  : 'bg-red-50 text-sale border-red-200'
+                                ? 'bg-green-50 text-green-700 border-green-200'
+                                : 'bg-red-50 text-sale border-red-200'
                                 }`}>
                                 {p.is_active ? 'Active' : 'Draft'}
                               </span>
@@ -2244,14 +2252,14 @@ ${titleHtml}  <thead>
                           </td>
                           <td className="py-4 pl-8">
                             <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 border ${o.status === 'delivered'
-                                ? 'bg-green-50 text-green-700 border-green-200'
-                                : o.status === 'cancelled'
-                                  ? 'bg-red-50 text-sale border-red-200'
-                                  : o.status === 'shipped'
-                                    ? 'bg-blue-50 text-blue-700 border-blue-200'
-                                    : o.status === 'processing'
-                                      ? 'bg-purple-50 text-purple-700 border-purple-200'
-                                      : 'bg-yellow-50 text-yellow-700 border-yellow-200'
+                              ? 'bg-green-50 text-green-700 border-green-200'
+                              : o.status === 'cancelled'
+                                ? 'bg-red-50 text-sale border-red-200'
+                                : o.status === 'shipped'
+                                  ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                  : o.status === 'processing'
+                                    ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                    : 'bg-yellow-50 text-yellow-700 border-yellow-200'
                               }`}>
                               {o.status}
                             </span>
@@ -2344,8 +2352,8 @@ ${titleHtml}  <thead>
                             <td className="py-3 text-[10px] text-text-secondary font-mono">{new Date(c.expiry).toLocaleDateString()}</td>
                             <td className="py-3 text-[10px]">
                               <span className={`px-2 py-0.5 border text-[8px] font-black uppercase tracking-widest ${isExpired
-                                  ? 'bg-red-50 text-sale border-red-200'
-                                  : 'bg-green-50 text-green-700 border-green-200'
+                                ? 'bg-red-50 text-sale border-red-200'
+                                : 'bg-green-50 text-green-700 border-green-200'
                                 }`}>
                                 {isExpired ? 'Expired' : 'Active'}
                               </span>
@@ -2532,11 +2540,11 @@ ${titleHtml}  <thead>
 
               {/* Banners block */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Hero Banner Setting */}
+                {/* Hero Banner Slide 1 Setting */}
                 <div className="space-y-4">
                   <div>
                     <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
-                      Hero Banner Image File
+                      Hero Banner Image File (Slide 1)
                     </label>
                     <input
                       type="file"
@@ -2570,7 +2578,7 @@ ${titleHtml}  <thead>
                   {/* Hero preview - Drag to adjust */}
                   <div className="space-y-1">
                     <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider block">
-                      Crop Adjustment (Click & Drag Image to adjust positioning)
+                      Crop Adjustment (Slide 1)
                     </span>
                     <div
                       ref={heroContainerRef}
@@ -2585,7 +2593,7 @@ ${titleHtml}  <thead>
                         <>
                           <img
                             src={heroImageUrl}
-                            alt="Hero Preview"
+                            alt="Hero Preview 1"
                             className="w-full h-full object-cover pointer-events-none"
                             style={{ objectPosition: heroImagePosition }}
                           />
@@ -2601,6 +2609,81 @@ ${titleHtml}  <thead>
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center text-[10px] text-text-secondary/70 italic font-semibold pointer-events-none">
                           No custom hero image file loaded.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Hero Banner Slide 2 Setting */}
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
+                      Hero Banner Image File (Slide 2)
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      disabled={isUploadingHero2}
+                      onChange={(e) => handleImageUpload(e, 'hero2')}
+                      className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent file:mr-4 file:py-1 file:px-2 file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
+                    />
+                    {isUploadingHero2 && (
+                      <span className="text-[9px] text-text-secondary mt-1 block font-bold animate-pulse">
+                        Uploading image file...
+                      </span>
+                    )}
+                    <span className="text-[9px] text-text-secondary mt-1 block font-semibold">
+                      Recommended: 1920 × 1200px (portrait ratio optimal for desktop split showcase).
+                    </span>
+                    {heroImageUrl2 && (
+                      <div className="flex justify-between items-center mt-2 bg-bg-subtle p-2 border border-border">
+                        <span className="text-[10px] text-text-secondary truncate max-w-[200px] font-semibold">Slide 2 loaded</span>
+                        <button
+                          type="button"
+                          onClick={() => setHeroImageUrl2('')}
+                          className="text-[10px] text-sale font-bold hover:underline cursor-pointer"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Hero 2 preview - Drag to adjust */}
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider block">
+                      Crop Adjustment (Slide 2)
+                    </span>
+                    <div
+                      ref={hero2ContainerRef}
+                      onMouseDown={() => setHero2DragActive(true)}
+                      onMouseMove={handleHero2Drag}
+                      onMouseUp={() => setHero2DragActive(false)}
+                      onMouseLeave={() => setHero2DragActive(false)}
+                      onTouchMove={handleHero2TouchDrag}
+                      className="border border-border bg-bg-subtle aspect-[16/9] relative overflow-hidden group select-none cursor-move"
+                    >
+                      {heroImageUrl2 ? (
+                        <>
+                          <img
+                            src={heroImageUrl2}
+                            alt="Hero Preview 2"
+                            className="w-full h-full object-cover pointer-events-none"
+                            style={{ objectPosition: heroImagePosition2 }}
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                            <span className="text-[10px] text-white font-bold uppercase tracking-widest bg-black/60 px-3 py-1.5 border border-white/20">
+                              Click &amp; Drag to adjust focus
+                            </span>
+                          </div>
+                          <div className="absolute bottom-2 left-2 bg-black/80 px-2 py-0.5 border border-white/10 text-[9px] font-mono text-white/95 pointer-events-none rounded">
+                            Pivot: {heroImagePosition2 === 'center' ? '50% 50%' : heroImagePosition2}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center text-[10px] text-text-secondary/70 italic font-semibold pointer-events-none">
+                          No custom slide 2 hero image file loaded.
                         </div>
                       )}
                     </div>
@@ -3231,11 +3314,10 @@ ${titleHtml}  <thead>
                       setSelectedOccasion(occ.key as any);
                       setOccasionSearch('');
                     }}
-                    className={`px-5 py-2.5 text-xs font-bold uppercase tracking-wider border transition-all ${
-                      selectedOccasion === occ.key
+                    className={`px-5 py-2.5 text-xs font-bold uppercase tracking-wider border transition-all ${selectedOccasion === occ.key
                         ? 'bg-accent border-accent text-white shadow-sm'
                         : 'bg-white border-border text-text-secondary hover:border-accent hover:text-text-primary'
-                    }`}
+                      }`}
                   >
                     {occ.label}
                   </button>
@@ -3553,8 +3635,8 @@ ${titleHtml}  <thead>
                             setWizardStep(2);
                           }}
                           className={`p-6 border text-center font-bold uppercase tracking-wider text-[11px] transition-all flex flex-col justify-center items-center h-28 rounded-none ${selectedParentCatId === c.id
-                              ? 'bg-accent border-accent text-white shadow-md'
-                              : 'bg-white border-border text-text-primary hover:border-accent'
+                            ? 'bg-accent border-accent text-white shadow-md'
+                            : 'bg-white border-border text-text-primary hover:border-accent'
                             }`}
                         >
                           <Package size={18} className="mb-2" />
@@ -3618,8 +3700,8 @@ ${titleHtml}  <thead>
                             setWizardStep(3);
                           }}
                           className={`p-6 border text-center font-bold uppercase tracking-wider text-[11px] transition-all flex flex-col justify-center items-center h-28 rounded-none ${selectedGender === gender
-                              ? 'bg-accent border-accent text-white shadow-md'
-                              : 'bg-white border-border text-text-primary hover:border-accent'
+                            ? 'bg-accent border-accent text-white shadow-md'
+                            : 'bg-white border-border text-text-primary hover:border-accent'
                             }`}
                         >
                           <span className="text-lg font-black mb-1">
@@ -3802,7 +3884,7 @@ ${titleHtml}  <thead>
                               >
                                 <Trash2 size={12} />
                               </button>
-                              
+
                               {/* Reorder controls overlay on hover */}
                               <div className="absolute inset-x-0 bottom-0 bg-black/70 p-1 flex justify-between items-center opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button
@@ -4299,11 +4381,9 @@ ${titleHtml}  <thead>
         )}
       </AnimatePresence>
 
-      {/* ==========================================
-          SIZE GUIDE GENERATOR DIALOG MODAL
-          ========================================== */}
+      {/* (Size Guide Generator removed) */}
       <AnimatePresence>
-        {isSizeBuilderOpen && (
+        {false && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             {/* Backdrop */}
             <motion.div

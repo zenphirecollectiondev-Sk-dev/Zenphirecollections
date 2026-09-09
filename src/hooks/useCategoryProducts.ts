@@ -34,6 +34,8 @@ export interface GridProduct {
   coverImageUrl: string | null;
   /** True if at least one variant has stock_qty > 0 */
   inStock: boolean;
+  /** Unique sizes that have stock > 0, e.g. ["S", "M", "L"] */
+  availableSizes: string[];
 }
 
 export type CategoryQueryStatus =
@@ -44,7 +46,7 @@ export type CategoryQueryStatus =
   | { status: "success"; products: GridProduct[]; totalFetched: number };
 
 // --- Internal Types -----------------------------------------------------------
-interface RawVariant { stock_qty: number }
+interface RawVariant { stock_qty: number; size: string | null; }
 interface RawImage { url: string; sort_order: number }
 interface RawProduct {
   id: string;
@@ -71,7 +73,7 @@ async function fetchCategoryProducts(
     .select(
       `id, name, slug, base_price, category_id,
        product_images ( url, sort_order ),
-       product_variants ( stock_qty )`
+       product_variants ( stock_qty, size )`
     )
     .eq("is_active", true)
     .order("created_at", { ascending: false })
@@ -95,6 +97,13 @@ function toGridProduct(raw: RawProduct): GridProduct {
   const sorted = [...(raw.product_images ?? [])].sort(
     (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
   );
+  const variants = raw.product_variants ?? [];
+  // Collect unique non-null sizes that have at least 1 unit in stock
+  const sizesInStock = [...new Set(
+    variants
+      .filter(v => v.stock_qty > 0 && v.size)
+      .map(v => v.size as string)
+  )];
   return {
     id: raw.id,
     name: raw.name,
@@ -102,7 +111,8 @@ function toGridProduct(raw: RawProduct): GridProduct {
     base_price: raw.base_price,
     category_id: raw.category_id,
     coverImageUrl: sorted[0]?.url ?? null,
-    inStock: (raw.product_variants ?? []).some((v) => v.stock_qty > 0),
+    inStock: variants.some((v) => v.stock_qty > 0),
+    availableSizes: sizesInStock,
   };
 }
 

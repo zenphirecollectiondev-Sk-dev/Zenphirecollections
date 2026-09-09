@@ -278,9 +278,10 @@ export default function Shop() {
     return catFamilyIds.length > 0 ? catFamilyIds : null;
   }, [activeCategory, activeGender, categories, categoriesReady]);
 
-  // Reset to page 0 whenever the category filter changes
+  // Reset to page 0 and clear size selection whenever the category filter changes
   useEffect(() => {
     setPage(0);
+    setSelectedSizes([]);
   }, [activeCategoryIds, activeOccasion]);
 
   // -- Data from hook (TanStack Query) --------------------------------------
@@ -292,14 +293,12 @@ export default function Shop() {
   const filteredProducts = useMemo((): GridProduct[] => {
     if (queryState.status !== "success") return [];
     let result = [...queryState.products];
-
-    // Gender filtering is now handled in activeCategoryIds based on category hierarchy.
-    // The previous implementation ignored it, but now we properly restrict to gender subcategories.
-
     result = result.filter((p) => p.base_price <= maxPrice);
     if (selectedSizes.length > 0) {
-      // Size filter not applicable at grid level (we only fetch stock_qty).
-      // Keep all products — size filter is advisory only without per-variant sizes fetched.
+      // Keep products that have at least one selected size in stock
+      result = result.filter((p) =>
+        selectedSizes.some((s) => p.availableSizes.includes(s))
+      );
     }
     if (sortBy === "price-asc") result.sort((a, b) => a.base_price - b.base_price);
     else if (sortBy === "price-desc") result.sort((a, b) => b.base_price - a.base_price);
@@ -342,7 +341,25 @@ export default function Shop() {
     setTimeout(() => setHeartId(null), 400);
   };
 
-  const sizesList = ["S", "M", "L", "XL", "28", "30", "32", "34", "36", "38"];
+  // Standard order for sorting size labels
+  const SIZE_ORDER = ["XS", "S", "M", "L", "XL", "XXL", "XXXL",
+    "28", "30", "32", "34", "36", "38", "40", "42"];
+
+  // Dynamically derived from loaded products — only sizes that actually exist and have stock
+  const sizesList = useMemo(() => {
+    if (queryState.status !== "success") return [];
+    const all = new Set<string>();
+    queryState.products.forEach(p => p.availableSizes.forEach(s => all.add(s)));
+    return [...all].sort((a, b) => {
+      const ia = SIZE_ORDER.indexOf(a);
+      const ib = SIZE_ORDER.indexOf(b);
+      // Known sizes: sort by position; unknown sizes: append alphabetically
+      if (ia !== -1 && ib !== -1) return ia - ib;
+      if (ia !== -1) return -1;
+      if (ib !== -1) return 1;
+      return a.localeCompare(b);
+    });
+  }, [queryState]);
 
   const resultCount =
     queryState.status === "success" ? filteredProducts.length : null;
@@ -457,26 +474,44 @@ export default function Shop() {
           )}
 
           <div>
-            <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-primary mb-4 pb-2 border-b border-border">
-              Size
+            <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-primary mb-4 pb-2 border-b border-border flex items-center justify-between">
+              <span>Size</span>
+              {sizesList.length > 0 && selectedSizes.length > 0 && (
+                <button
+                  onClick={() => setSelectedSizes([])}
+                  className="text-[9px] font-bold text-text-secondary hover:text-sale transition-colors uppercase tracking-widest"
+                >
+                  Clear
+                </button>
+              )}
             </h3>
-            <div className="flex flex-wrap gap-2">
-              {sizesList.map((size) => {
-                const isSel = selectedSizes.includes(size);
-                return (
-                  <button
-                    key={size}
-                    onClick={() => handleSizeToggle(size)}
-                    className={`size-btn w-10 h-10 border text-xs font-semibold flex items-center justify-center transition-all ${isSel
-                        ? "ambient-green-gradient text-white border-transparent selected"
-                        : "border-border text-text-primary bg-white hover:border-accent"
-                      }`}
-                  >
-                    {size}
-                  </button>
-                );
-              })}
-            </div>
+            {queryState.status === 'loading' || queryState.status === 'slow' ? (
+              <div className="flex flex-wrap gap-2">
+                {[1,2,3,4].map(i => (
+                  <div key={i} className="w-10 h-10 bg-border/40 animate-pulse" />
+                ))}
+              </div>
+            ) : sizesList.length === 0 ? (
+              <p className="text-[10px] text-text-secondary/50 italic">No sizes available</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {sizesList.map((size) => {
+                  const isSel = selectedSizes.includes(size);
+                  return (
+                    <button
+                      key={size}
+                      onClick={() => handleSizeToggle(size)}
+                      className={`size-btn w-10 h-10 border text-xs font-semibold flex items-center justify-center transition-all ${isSel
+                          ? "ambient-green-gradient text-white border-transparent selected"
+                          : "border-border text-text-primary bg-white hover:border-accent"
+                        }`}
+                    >
+                      {size}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div>
@@ -675,26 +710,44 @@ export default function Shop() {
             )}
 
             <div>
-              <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-primary mb-3">
-                Size
+              <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-primary mb-3 flex items-center justify-between">
+                <span>Size</span>
+                {sizesList.length > 0 && selectedSizes.length > 0 && (
+                  <button
+                    onClick={() => setSelectedSizes([])}
+                    className="text-[9px] font-bold text-text-secondary hover:text-sale transition-colors uppercase tracking-widest"
+                  >
+                    Clear
+                  </button>
+                )}
               </h3>
-              <div className="flex flex-wrap gap-2">
-                {sizesList.map((size) => {
-                  const isSel = selectedSizes.includes(size);
-                  return (
-                    <button
-                      key={size}
-                      onClick={() => handleSizeToggle(size)}
-                      className={`size-btn w-10 h-10 border text-xs font-semibold flex items-center justify-center transition-all ${isSel
-                          ? "ambient-green-gradient text-white border-transparent selected"
-                          : "border-border text-text-primary bg-white hover:border-accent"
-                        }`}
-                    >
-                      {size}
-                    </button>
-                  );
-                })}
-              </div>
+              {queryState.status === 'loading' || queryState.status === 'slow' ? (
+                <div className="flex flex-wrap gap-2">
+                  {[1,2,3,4].map(i => (
+                    <div key={i} className="w-10 h-10 bg-border/40 animate-pulse" />
+                  ))}
+                </div>
+              ) : sizesList.length === 0 ? (
+                <p className="text-[10px] text-text-secondary/50 italic">No sizes available</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {sizesList.map((size) => {
+                    const isSel = selectedSizes.includes(size);
+                    return (
+                      <button
+                        key={size}
+                        onClick={() => handleSizeToggle(size)}
+                        className={`size-btn w-10 h-10 border text-xs font-semibold flex items-center justify-center transition-all ${isSel
+                            ? "ambient-green-gradient text-white border-transparent selected"
+                            : "border-border text-text-primary bg-white hover:border-accent"
+                          }`}
+                      >
+                        {size}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             <div>

@@ -165,13 +165,6 @@ export default function ProductDetail() {
   }, [product, categorySizeGuide]);
 
 
-  const isPants = useMemo(() => {
-    if (!product) return false;
-    const nameLower = product.name?.toLowerCase() || '';
-    const slugLower = product.slug?.toLowerCase() || '';
-    return nameLower.includes('pant') || nameLower.includes('trouser') || nameLower.includes('jeans') || slugLower.includes('pant') || slugLower.includes('trouser') || slugLower.includes('jeans');
-  }, [product]);
-
   const [selectedSize, setSelectedSize] = useState<string>('');
   const [selectedColor, setSelectedColor] = useState<string>('');
   const [activeImageIdx, setActiveImageIdx] = useState<number>(0);

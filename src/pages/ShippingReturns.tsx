@@ -18,7 +18,7 @@ export default function ShippingReturns() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
         {[
           { icon: Truck, title: "Free Shipping", desc: "On all orders above ?1,000. Orders below ?1,000 are charged a flat ?150." },
-          { icon: Clock, title: "Delivery Time", desc: "Standard: 5–7 business days. Express (select pin codes): 2–3 business days." },
+          { icon: Clock, title: "Delivery Time", desc: "Standard: 5ï¿½7 business days. Express (select pin codes): 2ï¿½3 business days." },
           { icon: RefreshCw, title: "7-Day Returns", desc: "Hassle-free returns within 7 days of delivery for unworn items with tags intact." },
           { icon: Shield, title: "Secure Packaging", desc: "Every order is carefully packed to ensure your garment arrives in perfect condition." },
         ].map(({ icon: Icon, title, desc }) => (
@@ -36,7 +36,7 @@ export default function ShippingReturns() {
         <section>
           <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary mb-4 pb-2 border-b border-border">Shipping Policy</h2>
           <div className="space-y-3 text-sm text-text-secondary leading-relaxed">
-            <p>Orders are processed within 1–2 business days of payment confirmation. You will receive an email with your tracking number once your order is dispatched.</p>
+            <p>Orders are processed within 1ï¿½2 business days of payment confirmation. You will receive an email with your tracking number once your order is dispatched.</p>
             <p>We ship pan-India via trusted courier partners. Delivery timelines may vary during sale periods or public holidays.</p>
             <p>COD (Cash on Delivery) is currently not available. We accept all digital payment methods.</p>
           </div>
@@ -52,8 +52,8 @@ export default function ShippingReturns() {
         <section>
           <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary mb-4 pb-2 border-b border-border">Refund Timeline</h2>
           <div className="space-y-3 text-sm text-text-secondary leading-relaxed">
-            <p>Once we receive and inspect your return, we will process the refund within 5–7 business days to your original payment method.</p>
-            <p>UPI and wallet refunds may reflect immediately upon processing. Bank transfers can take an additional 3–5 business days depending on your bank.</p>
+            <p>Once we receive and inspect your return, we will process the refund within 5ï¿½7 business days to your original payment method.</p>
+            <p>UPI and wallet refunds may reflect immediately upon processing. Bank transfers can take an additional 3ï¿½5 business days depending on your bank.</p>
           </div>
         </section>
       </div>

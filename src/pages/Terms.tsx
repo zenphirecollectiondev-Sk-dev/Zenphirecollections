@@ -60,7 +60,7 @@ export default function Terms() {
               <CheckCircle2 size={18} /> 4. Intellectural Property
             </h2>
             <p>
-              All content on this site—including logos, product designs, imagery, text, code, and graphical layouts—is the exclusive intellectual property of Zenphire Collections. Unauthorized reproduction or commercial use without written permission is strictly prohibited.
+              All content on this siteï¿½including logos, product designs, imagery, text, code, and graphical layoutsï¿½is the exclusive intellectual property of Zenphire Collections. Unauthorized reproduction or commercial use without written permission is strictly prohibited.
             </p>
           </section>
 

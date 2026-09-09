@@ -6,7 +6,7 @@ const faqs = [
   {
     category: 'Orders & Shipping',
     items: [
-      { q: 'How long does delivery take?', a: 'Standard delivery takes 5–7 business days across India. Express delivery (2–3 business days) is available for select pin codes.' },
+      { q: 'How long does delivery take?', a: 'Standard delivery takes 5ï¿½7 business days across India. Express delivery (2ï¿½3 business days) is available for select pin codes.' },
       { q: 'Do you offer free shipping?', a: 'Yes! Orders above ?1,000 qualify for free standard shipping. Orders below ?1,000 carry a flat ?150 shipping fee.' },
       { q: 'Can I track my order?', a: 'Once your order is dispatched, you will receive a tracking ID in your Account dashboard under "My Orders".' },
       { q: 'Do you ship internationally?', a: 'Currently, Zenphire ships within India only. International shipping is planned for a future update.' },
@@ -17,7 +17,7 @@ const faqs = [
     items: [
       { q: 'What is your return policy?', a: 'We accept returns within 7 days of delivery for unworn, unwashed items with original tags attached. Items on sale are not eligible for return.' },
       { q: 'How do I initiate a return?', a: 'Contact us via the Account page with your order ID. Our team will arrange a pickup within 2 business days.' },
-      { q: 'When will I receive my refund?', a: 'Refunds are processed to the original payment method within 5–7 business days after we receive and inspect the item.' },
+      { q: 'When will I receive my refund?', a: 'Refunds are processed to the original payment method within 5ï¿½7 business days after we receive and inspect the item.' },
       { q: 'Can I exchange for a different size?', a: 'Yes, size exchanges are available subject to stock. Raise an exchange request from your Account page.' },
     ],
   },

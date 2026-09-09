@@ -464,6 +464,8 @@ CREATE TABLE IF NOT EXISTS public.homepage_config (
   id text PRIMARY KEY DEFAULT 'global',
   hero_image_url text,
   hero_image_position text DEFAULT 'center',
+  hero_image_url_2 text,
+  hero_image_position_2 text DEFAULT 'center',
   the_edit_image_url text,
   the_edit_image_position text DEFAULT 'center',
   best_sellers_ids text[],
@@ -494,6 +496,8 @@ ADD COLUMN IF NOT EXISTS image_url text;
 
 -- Migration to alter existing homepage_config table if columns don't exist
 ALTER TABLE public.homepage_config
+ADD COLUMN IF NOT EXISTS hero_image_url_2 text,
+ADD COLUMN IF NOT EXISTS hero_image_position_2 text DEFAULT 'center',
 ADD COLUMN IF NOT EXISTS men_collection_image_url text,
 ADD COLUMN IF NOT EXISTS women_collection_image_url text,
 ADD COLUMN IF NOT EXISTS unisex_collection_image_url text,
