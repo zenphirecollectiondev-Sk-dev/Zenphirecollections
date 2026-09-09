@@ -15,8 +15,6 @@ import {
   Activity,
   DollarSign,
   Loader2,
-  Sliders,
-  Copy,
   Calendar,
   LayoutDashboard,
   ShoppingBag,
@@ -198,8 +196,7 @@ export default function Admin() {
   const [toasts, setToasts] = useState<{ id: number; msg: string; isError: boolean }[]>([]);
   const toastCounter = useRef(0);
 
-  // Keep legacy error/success for loadingData error display
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
 
   // Homepage state variables
   const [heroImageUrl, setHeroImageUrl] = useState('');
@@ -247,25 +244,10 @@ export default function Admin() {
   const [occasionSearch, setOccasionSearch] = useState('');
   const [isAddingOccasion, setIsAddingOccasion] = useState(false);
 
-  const getCategoryColumns = (category: string) => {
-    switch (category) {
-      case 'pants':
-        return ['Brand Size', 'Waist (in)', 'Inseam (in)'];
-      case 'shirts':
-        return ['Brand Size', 'Shoulder (in)', 'Chest (in)', 'Length (in)'];
-      case 'coords':
-        return ['Brand Size', 'Shoulder (in)', 'Chest (in)', 'Waist (in)', 'Length (in)'];
-      default:
-        return ['Brand Size'];
-    }
-  };
-
-
 
   // Fetch Dashboard Stats & Data
   const fetchData = async () => {
     setLoadingData(true);
-    setErrorMsg(null);
 
     try {
       // 1. Fetch Categories
@@ -427,7 +409,6 @@ export default function Admin() {
 
     } catch (err: any) {
       console.error('Error fetching admin data:', err);
-      setErrorMsg(err.message || 'Error occurred while loading data.');
     } finally {
       setLoadingData(false);
     }
@@ -4376,266 +4357,6 @@ export default function Admin() {
                 </div>
 
               </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* (Size Guide Generator removed) */}
-      <AnimatePresence>
-        {false && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsSizeBuilderOpen(false)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-xs"
-            />
-
-            {/* Modal Box */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 15 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              className="relative w-full max-w-4xl bg-white border border-border p-6 md:p-8 shadow-2xl z-10 flex flex-col max-h-[90vh] overflow-y-auto"
-            >
-              <div className="flex justify-between items-center border-b border-border pb-4 mb-6">
-                <div>
-                  <span className="text-[9px] uppercase tracking-widest text-text-secondary font-black bg-bg-subtle px-2 py-0.5 border border-border">
-                    Interactive Tool
-                  </span>
-                  <h3 className="text-lg font-heading font-black uppercase mt-1 text-text-primary">
-                    Size Guide Generator
-                  </h3>
-                </div>
-                <button
-                  onClick={() => setIsSizeBuilderOpen(false)}
-                  className="p-1.5 text-text-secondary hover:text-text-primary hover:bg-bg-subtle transition-colors rounded-full"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-
-                {/* Left Column: Row Builder */}
-                <div className="lg:col-span-7 space-y-6">
-
-                  {/* Table Title Input */}
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
-                      Table Title (Optional Caption)
-                    </label>
-                    <input
-                      type="text"
-                      value={builderTitle}
-                      onChange={(e) => setBuilderTitle(e.target.value)}
-                      placeholder="e.g. Slim Fit Denim Sizing Guide"
-                      className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-2">
-                      1. Category Columns Config
-                    </label>
-                    <div className="flex gap-2">
-                      <select
-                        value={builderCategory}
-                        onChange={(e: any) => handleBuilderCategoryChange(e.target.value)}
-                        className="flex-1 px-3 py-2 border border-border bg-white text-xs font-bold uppercase tracking-wider text-text-primary focus:outline-none focus:border-accent"
-                      >
-                        <option value="shirts">Shirts & Tops Preset (Shoulder, Chest, Length)</option>
-                        <option value="pants">Pants & Bottoms Preset (Waist, Inseam)</option>
-                        <option value="coords">Co-ords Preset (Shoulder, Chest, Waist, Length)</option>
-                        <option value="custom">Custom Columns Blank</option>
-                      </select>
-                      <button
-                        type="button"
-                        onClick={handleAddColumn}
-                        className="bg-accent text-white px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-accent-hover transition-colors"
-                      >
-                        + Add Column
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary">
-                        2. Declare Sizes & Measurements
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newRow: any = {};
-                          builderColumns.forEach(c => {
-                            newRow[c] = '';
-                          });
-                          setBuilderRows([...builderRows, newRow]);
-                        }}
-                        className="text-[10px] font-bold text-accent hover:underline uppercase tracking-wider"
-                      >
-                        + Add Size Row
-                      </button>
-                    </div>
-
-                    <div className="overflow-x-auto border border-border bg-bg-subtle p-3">
-                      <table className="w-full text-left text-xs border-collapse">
-                        <thead>
-                          <tr className="text-[9px] uppercase tracking-wider text-text-secondary border-b border-border">
-                            {builderColumns.map((col, idx) => (
-                              <th key={idx} className="pb-2 px-1.5 align-middle">
-                                <div className="flex items-center gap-1">
-                                  {idx === 0 ? (
-                                    <span className="font-bold text-text-primary text-[10px]">{col}</span>
-                                  ) : (
-                                    <input
-                                      type="text"
-                                      value={col}
-                                      onChange={(e) => {
-                                        const newName = e.target.value;
-                                        const updatedCols = [...builderColumns];
-                                        const oldName = updatedCols[idx];
-                                        updatedCols[idx] = newName;
-                                        setBuilderColumns(updatedCols);
-
-                                        // Update keys in rows
-                                        setBuilderRows(builderRows.map(r => {
-                                          const copy = { ...r };
-                                          copy[newName] = copy[oldName] || '';
-                                          delete copy[oldName];
-                                          return copy;
-                                        }));
-                                      }}
-                                      className="border border-border/80 bg-white px-1.5 py-0.5 text-[9px] font-bold uppercase text-text-primary focus:outline-none focus:border-accent w-20"
-                                      placeholder="Header"
-                                    />
-                                  )}
-                                  {idx > 0 && (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleRemoveColumn(col)}
-                                      className="text-text-secondary hover:text-sale font-normal text-[8px] ml-0.5"
-                                      title="Delete Column"
-                                    >
-                                      ✕
-                                    </button>
-                                  )}
-                                </div>
-                              </th>
-                            ))}
-                            <th className="pb-2 px-1.5 align-middle w-24">
-                              <button
-                                type="button"
-                                onClick={handleAddColumn}
-                                className="text-[9px] font-bold text-accent hover:underline uppercase tracking-wider"
-                              >
-                                + Add Column
-                              </button>
-                            </th>
-                            <th className="pb-2 w-10 text-right">Delete</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border/60">
-                          {builderRows.map((row, rowIdx) => (
-                            <tr key={rowIdx} className="align-middle">
-                              {builderColumns.map((colName, colIdx) => (
-                                <td key={colIdx} className="py-2.5 px-1.5">
-                                  <input
-                                    type="text"
-                                    value={row[colName] || ''}
-                                    onChange={(e) => {
-                                      const updated = [...builderRows];
-                                      updated[rowIdx] = {
-                                        ...updated[rowIdx],
-                                        [colName]: e.target.value
-                                      };
-                                      setBuilderRows(updated);
-                                    }}
-                                    placeholder={colIdx === 0 ? "e.g. M" : "in"}
-                                    className={`px-2 py-1 border border-border bg-white text-xs focus:outline-none focus:border-accent ${colIdx === 0 ? 'w-16 text-center font-bold' : 'w-full max-w-[80px]'
-                                      }`}
-                                  />
-                                </td>
-                              ))}
-                              {/* Empty cell to align with '+ Add Column' th header */}
-                              <td className="py-2.5 px-1.5 w-24"></td>
-                              <td className="py-2.5 text-right">
-                                <button
-                                  type="button"
-                                  onClick={() => setBuilderRows(builderRows.filter((_, i) => i !== rowIdx))}
-                                  className="text-text-secondary hover:text-sale p-1 transition-colors"
-                                >
-                                  <Trash2 size={13} />
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={generateSizeGuideHtml}
-                    className="w-full bg-accent text-white py-3 text-xs font-bold uppercase tracking-widest hover:bg-accent-hover transition-colors shadow-sm"
-                  >
-                    Generate HTML Table Markup
-                  </button>
-                </div>
-
-                {/* Right Column: HTML Output & Preview */}
-                <div className="lg:col-span-5 space-y-4 flex flex-col justify-between">
-                  <div className="space-y-4">
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary">
-                      3. Generated HTML & Clipboard
-                    </label>
-                    {generatedHtml ? (
-                      <div className="space-y-3">
-                        <textarea
-                          readOnly
-                          value={generatedHtml}
-                          rows={10}
-                          className="w-full p-3 border border-border bg-bg-subtle text-text-primary text-[10px] font-mono focus:outline-none resize-none"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            navigator.clipboard.writeText(generatedHtml);
-                            setIsCopied(true);
-                            triggerNotification('Size Guide HTML copied to clipboard!');
-                          }}
-                          className="w-full border border-accent bg-white text-text-primary py-2.5 text-xs font-bold uppercase tracking-widest hover:bg-bg-subtle transition-all flex items-center justify-center gap-2 shadow-xs"
-                        >
-                          {isCopied ? <Check size={12} className="text-emerald-700" /> : <Copy size={12} />}
-                          {isCopied ? 'Copied Successfully' : 'Copy HTML Code'}
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="border border-dashed border-border p-12 text-center text-xs text-text-secondary flex flex-col items-center justify-center gap-2 bg-bg-subtle h-60">
-                        <Sliders size={20} className="text-text-secondary stroke-[1.2] mb-1" />
-                        <p>Fill in sizes on the left, then click Generate to preview HTML code here.</p>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="pt-6 border-t border-border flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => setIsSizeBuilderOpen(false)}
-                      className="px-5 py-2.5 border border-border bg-white text-text-primary text-xs font-bold uppercase tracking-widest hover:bg-bg-subtle transition-colors"
-                    >
-                      Close Generator
-                    </button>
-                  </div>
-                </div>
-
-              </div>
-
             </motion.div>
           </div>
         )}
