@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Heart, Trash2, ArrowRight, Loader2, Image } from 'lucide-react';
+import { Heart, Trash2, ArrowRight, Image } from 'lucide-react';
 import { useWishlistStore } from '../store/useWishlistStore';
 import { getProductsByIds } from '../lib/supabase';
 
@@ -30,11 +30,25 @@ export default function Wishlist() {
 
   if (loading) {
     return (
-      <div className="min-h-[70vh] flex flex-col items-center justify-center">
-        <Loader2 size={32} className="animate-spin text-text-secondary mb-2" />
-        <p className="text-xs uppercase tracking-widest text-text-secondary font-bold">
-          Loading Wishlist...
-        </p>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 min-h-[70vh]">
+        {/* Header skeleton */}
+        <div className="border-b border-border pb-6 mb-8">
+          <div className="h-2.5 w-20 bg-bg-subtle animate-pulse mb-2" />
+          <div className="h-8 w-48 bg-bg-subtle animate-pulse" />
+        </div>
+        {/* Product card skeletons */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="animate-pulse">
+              <div className="aspect-[3/4] w-full bg-zinc-100 border border-zinc-200 mb-3" />
+              <div className="space-y-2">
+                <div className="h-2 w-10 bg-zinc-100" />
+                <div className="h-3 w-3/4 bg-zinc-200" />
+                <div className="h-3 w-1/4 bg-zinc-200" />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }

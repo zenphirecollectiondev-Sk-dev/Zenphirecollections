@@ -13,6 +13,7 @@ import { EmptyState } from "../components/ui/EmptyState";
 import { ErrorState } from "../components/ui/ErrorState";
 import type { GridProduct } from "../hooks/useCategoryProducts";
 import { imgCard } from "../lib/imgTransform";
+import { motion, AnimatePresence } from "framer-motion";
 
 // --- Image card with proper loading / error states ---------------------------
 
@@ -661,13 +662,26 @@ export default function Shop() {
       </div>
 
       {/* MOBILE FILTER BOTTOM SHEET */}
-      {isMobileFilterOpen && (
-        <div className="fixed inset-0 z-[100] md:hidden">
-          <div
-            onClick={() => setIsMobileFilterOpen(false)}
-            className="fixed inset-0 bg-black/40 lightbox-backdrop"
-          />
-          <div className="fixed bottom-0 left-0 right-0 max-h-[82vh] bg-white border-t border-border flex flex-col p-6 space-y-6 overflow-y-auto drawer-bottom shadow-2xl">
+      <AnimatePresence>
+        {isMobileFilterOpen && (
+          <div className="fixed inset-0 z-[100] md:hidden">
+            <motion.div
+              key="filter-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.22 }}
+              onClick={() => setIsMobileFilterOpen(false)}
+              className="fixed inset-0 bg-black/40"
+            />
+            <motion.div
+              key="filter-sheet"
+              initial={{ y: '100%', opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: '100%', opacity: 0 }}
+              transition={{ type: 'tween', duration: 0.30, ease: [0.22, 1, 0.36, 1] }}
+              className="fixed bottom-0 left-0 right-0 max-h-[82vh] bg-white border-t border-border flex flex-col p-6 space-y-6 overflow-y-auto shadow-2xl"
+            >
             <div className="flex justify-between items-center pb-3 border-b border-border">
               <h2 className="font-heading font-black text-base uppercase tracking-widest">
                 Filters
@@ -770,7 +784,7 @@ export default function Shop() {
             <div className="flex gap-3 pt-3 border-t border-border">
               <button
                 onClick={resetFilters}
-                className="btn flex-1 py-3 border border-border text-[10px] font-bold uppercase tracking-widest hover:bg-bg-subtle"
+                className="btn btn-secondary flex-1 py-3 text-[10px] font-bold uppercase tracking-widest"
               >
                 Reset
               </button>
@@ -781,9 +795,10 @@ export default function Shop() {
                 Apply
               </button>
             </div>
+          </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
     </div>
   );
 }

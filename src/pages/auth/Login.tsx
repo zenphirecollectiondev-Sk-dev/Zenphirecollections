@@ -74,7 +74,7 @@ export default function Login() {
             <button
               onClick={handleGoogleLogin}
               disabled={loading}
-              className="w-full border border-border bg-white text-text-primary py-4 font-bold uppercase text-xs tracking-widest hover:bg-bg-subtle transition-colors flex items-center justify-center gap-3 disabled:opacity-50"
+              className="btn btn-secondary w-full py-4 font-bold uppercase text-xs tracking-widest flex items-center justify-center gap-3 disabled:opacity-50"
             >
               {loading ? (
                 <span className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin"></span>
@@ -106,7 +106,7 @@ export default function Login() {
             <button
               onClick={handleGoogleLogin}
               disabled={loading}
-              className="w-full bg-accent text-white py-4 font-bold uppercase text-xs tracking-widest hover:bg-accent-hover transition-colors flex items-center justify-center gap-2.5 disabled:opacity-50 shadow-sm"
+              className="btn btn-primary w-full py-4 font-bold uppercase text-xs tracking-widest flex items-center justify-center gap-2.5 disabled:opacity-50"
             >
               {loading ? (
                 <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>

@@ -361,22 +361,37 @@ export default function Admin() {
           .maybeSingle();
         if (hpErr) throw hpErr;
         const hpData = data as any;
-        if (hpData) {
-          setHeroImageUrl(hpData.hero_image_url || '');
-          setHeroImagePosition(hpData.hero_image_position || 'center');
-          setHeroImageUrl2(hpData.hero_image_url_2 || '');
-          setHeroImagePosition2(hpData.hero_image_position_2 || 'center');
-          setTheEditImageUrl(hpData.the_edit_image_url || '');
-          setTheEditImagePosition(hpData.the_edit_image_position || 'center');
-          setBestSellersIds(hpData.best_sellers_ids || []);
-          setNewArrivalsIds(hpData.new_arrivals_ids || []);
-          setMenImageUrl(hpData.men_collection_image_url || '');
-          setWomenImageUrl(hpData.women_collection_image_url || '');
-          setUnisexImageUrl(hpData.unisex_collection_image_url || '');
-          setShirtImageUrl(hpData.shirt_category_image_url || '');
-          setTshirtImageUrl(hpData.tshirt_category_image_url || '');
-          setCoordsImageUrl(hpData.coords_category_image_url || '');
-          setPantsImageUrl(hpData.pants_category_image_url || '');
+        
+        let localBackup: any = null;
+        try {
+          const raw = localStorage.getItem('zenphire_homepage_config');
+          if (raw) localBackup = JSON.parse(raw);
+        } catch (e) {}
+
+        const merged = hpData || localBackup
+          ? {
+              ...localBackup,
+              ...hpData,
+              hero_image_url_2: hpData?.hero_image_url_2 || localBackup?.hero_image_url_2 || '',
+            }
+          : null;
+
+        if (merged) {
+          setHeroImageUrl(merged.hero_image_url || '');
+          setHeroImagePosition(merged.hero_image_position || 'center');
+          setHeroImageUrl2(merged.hero_image_url_2 || '');
+          setHeroImagePosition2(merged.hero_image_position_2 || 'center');
+          setTheEditImageUrl(merged.the_edit_image_url || '');
+          setTheEditImagePosition(merged.the_edit_image_position || 'center');
+          setBestSellersIds(merged.best_sellers_ids || []);
+          setNewArrivalsIds(merged.new_arrivals_ids || []);
+          setMenImageUrl(merged.men_collection_image_url || '');
+          setWomenImageUrl(merged.women_collection_image_url || '');
+          setUnisexImageUrl(merged.unisex_collection_image_url || '');
+          setShirtImageUrl(merged.shirt_category_image_url || '');
+          setTshirtImageUrl(merged.tshirt_category_image_url || '');
+          setCoordsImageUrl(merged.coords_category_image_url || '');
+          setPantsImageUrl(merged.pants_category_image_url || '');
         }
       } catch (hErr) {
         console.warn('homepage_config table fetch failed or not yet created. Using defaults.', hErr);
@@ -591,6 +606,64 @@ export default function Admin() {
     ).slice(0, 8);
   }, [products, occasionSearch, selectedOccasion, occasionProducts]);
 
+  // Helper to compress and resize image on the client side before storage/base64 upload
+  const compressImage = async (
+    file: File,
+    maxWidth = 1920,
+    maxHeight = 1920,
+    quality = 0.85
+  ): Promise<{ blob: Blob; dataUrl: string }> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new window.Image();
+        img.onload = () => {
+          let width = img.width;
+          let height = img.height;
+
+          if (width > maxWidth || height > maxHeight) {
+            if (width / height > maxWidth / maxHeight) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            } else {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const dataUrl = canvas.toDataURL('image/jpeg', quality);
+            canvas.toBlob(
+              (blob) => {
+                resolve({
+                  blob: blob || file,
+                  dataUrl
+                });
+              },
+              'image/jpeg',
+              quality
+            );
+          } else {
+            resolve({ blob: file, dataUrl: (e.target?.result as string) || '' });
+          }
+        };
+        img.onerror = () => {
+          resolve({ blob: file, dataUrl: (e.target?.result as string) || '' });
+        };
+        img.src = (e.target?.result as string) || '';
+      };
+      reader.onerror = () => {
+        resolve({ blob: file, dataUrl: '' });
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
   // Handle local image upload to Supabase Storage with Base64 fallback
   const handleImageUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
@@ -598,11 +671,6 @@ export default function Admin() {
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    if (file.size > 5 * 1024 * 1024) {
-      alert("Image is too large. Please select an image under 5MB.");
-      return;
-    }
 
     const setLoader =
       type === 'hero' ? setIsUploadingHero :
@@ -648,39 +716,60 @@ export default function Admin() {
                           type === 'sizeguide' ? 'Size Guide' : 'Category';
 
     try {
-      const fileExt = file.name.split('.').pop();
+      // 1. Optimize / compress image client-side to ensure small payload size & fast upload
+      const { blob: compressedBlob, dataUrl: compressedDataUrl } = await compressImage(file, 1920, 1920, 0.85);
+
+      const fileExt = file.name.split('.').pop() || 'jpg';
       const fileName = `${type}-${Date.now()}.${fileExt}`;
       const filePath = `banners/${fileName}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from('homepage-assets')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: true
-        });
+      let publicUrl = '';
+      try {
+        const { error: uploadError } = await supabase.storage
+          .from('homepage-assets')
+          .upload(filePath, compressedBlob, {
+            cacheControl: '3600',
+            upsert: true
+          });
 
-      if (uploadError) {
-        throw new Error(uploadError.message);
+        if (!uploadError) {
+          const { data } = supabase.storage
+            .from('homepage-assets')
+            .getPublicUrl(filePath);
+          publicUrl = data.publicUrl;
+        } else {
+          // Attempt fallback bucket if homepage-assets fails
+          const { error: uploadError2 } = await supabase.storage
+            .from('product-images')
+            .upload(filePath, compressedBlob, {
+              cacheControl: '3600',
+              upsert: true
+            });
+          if (!uploadError2) {
+            const { data } = supabase.storage
+              .from('product-images')
+              .getPublicUrl(filePath);
+            publicUrl = data.publicUrl;
+          }
+        }
+      } catch (storageErr) {
+        console.warn('Supabase storage upload failed:', storageErr);
       }
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('homepage-assets')
-        .getPublicUrl(filePath);
-
-      assignUrl(publicUrl);
-      triggerNotification(`${readableName} image uploaded successfully!`);
+      if (publicUrl) {
+        assignUrl(publicUrl);
+        triggerNotification(`${readableName} image uploaded to cloud storage! Click "Save Homepage Settings" to persist.`);
+      } else {
+        // Safe compressed Data URL fallback
+        assignUrl(compressedDataUrl);
+        triggerNotification(`${readableName} image loaded & compressed. Click "Save Homepage Settings" to persist.`);
+      }
     } catch (err: any) {
-      console.warn('Storage bucket upload failed, using Data URL fallback.', err);
-      // Data URL fallback if bucket doesn't exist
-      const reader = new FileReader();
-      reader.onload = (uploadEvent) => {
-        const base64 = uploadEvent.target?.result as string;
-        assignUrl(base64);
-        triggerNotification(`${readableName} image loaded locally.`);
-      };
-      reader.readAsDataURL(file);
+      console.error('Error processing image:', err);
+      triggerNotification(err.message || 'Error processing image upload', true);
     } finally {
       setLoader(false);
+      e.target.value = '';
     }
   };
 
@@ -692,13 +781,6 @@ export default function Admin() {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    for (let i = 0; i < files.length; i++) {
-      if (files[i].size > 5 * 1024 * 1024) {
-        alert(`Image "${files[i].name}" is too large. Please select images under 5MB.`);
-        return;
-      }
-    }
-
     setIsUploadingProductImage(true);
 
     try {
@@ -706,7 +788,9 @@ export default function Admin() {
 
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const fileExt = file.name.split('.').pop();
+        const { blob: compressedBlob, dataUrl: compressedDataUrl } = await compressImage(file, 1400, 1400, 0.85);
+
+        const fileExt = file.name.split('.').pop() || 'jpg';
         const fileName = `product-${Date.now()}-${i}.${fileExt}`;
         const filePath = `products/${fileName}`;
 
@@ -714,7 +798,7 @@ export default function Admin() {
         try {
           const { error: uploadError } = await supabase.storage
             .from('product-images')
-            .upload(filePath, file, {
+            .upload(filePath, compressedBlob, {
               cacheControl: '3600',
               upsert: true
             });
@@ -727,28 +811,19 @@ export default function Admin() {
           } else {
             const { error: uploadError2 } = await supabase.storage
               .from('homepage-assets')
-              .upload(filePath, file, {
+              .upload(filePath, compressedBlob, {
                 cacheControl: '3600',
                 upsert: true
               });
-            if (uploadError2) throw uploadError2;
-            const { data } = supabase.storage
-              .from('homepage-assets')
-              .getPublicUrl(filePath);
-            publicUrl = data.publicUrl;
+            if (!uploadError2) {
+              const { data } = supabase.storage
+                .from('homepage-assets')
+                .getPublicUrl(filePath);
+              publicUrl = data.publicUrl;
+            }
           }
         } catch (storageErr) {
           console.warn('Storage bucket upload failed, using Data URL fallback.', storageErr);
-          const base64 = await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onload = (uploadEvent) => resolve(uploadEvent.target?.result as string);
-            reader.readAsDataURL(file);
-          });
-          uploadedImages.push({
-            url: base64,
-            sort_order: prodImages.length + uploadedImages.length
-          });
-          continue;
         }
 
         if (publicUrl) {
@@ -756,12 +831,17 @@ export default function Admin() {
             url: publicUrl,
             sort_order: prodImages.length + uploadedImages.length
           });
+        } else {
+          uploadedImages.push({
+            url: compressedDataUrl,
+            sort_order: prodImages.length + uploadedImages.length
+          });
         }
       }
 
       if (uploadedImages.length > 0) {
         setProdImages((prev) => [...prev, ...uploadedImages]);
-        triggerNotification(`${uploadedImages.length} image(s) uploaded successfully!`);
+        triggerNotification(`${uploadedImages.length} image(s) processed successfully!`);
       }
     } catch (err: any) {
       console.error('Error uploading product images:', err);
@@ -966,7 +1046,7 @@ export default function Admin() {
   // Save Homepage Settings
   const handleSaveHomepage = async () => {
     setIsSavingHomepage(true);
-    const configPayload = {
+    const configPayload: any = {
       id: 'global',
       hero_image_url: heroImageUrl.trim() || null,
       hero_image_position: heroImagePosition,
@@ -989,9 +1069,38 @@ export default function Admin() {
       const { error } = await supabase
         .from('homepage_config' as any)
         .upsert(configPayload);
-      if (error) throw error;
+
+      if (error) {
+        console.warn('Full homepage upsert failed, attempting fallback to core columns:', error);
+        // Fallback with core columns in case new columns are not yet added in Supabase schema
+        const corePayload = {
+          id: 'global',
+          hero_image_url: heroImageUrl.trim() || null,
+          hero_image_position: heroImagePosition,
+          the_edit_image_url: theEditImageUrl.trim() || null,
+          the_edit_image_position: theEditImagePosition,
+          best_sellers_ids: bestSellersIds,
+          new_arrivals_ids: newArrivalsIds,
+          men_collection_image_url: menImageUrl.trim() || null,
+          women_collection_image_url: womenImageUrl.trim() || null,
+          unisex_collection_image_url: unisexImageUrl.trim() || null,
+          updated_at: new Date().toISOString()
+        };
+        const fallbackRes = await supabase
+          .from('homepage_config' as any)
+          .upsert(corePayload);
+        if (fallbackRes.error) {
+          throw fallbackRes.error;
+        }
+        triggerNotification('Core Homepage settings saved! (Run supabase_schema.sql to enable Slide 2 & extra category columns in Supabase).');
+      } else {
+        triggerNotification('Homepage configuration saved successfully!');
+      }
+
       dataCache.set('homepage_config', configPayload);
-      triggerNotification('Homepage configuration saved successfully!');
+      try {
+        localStorage.setItem('zenphire_homepage_config', JSON.stringify(configPayload));
+      } catch (e) {}
     } catch (err: any) {
       console.error('Error saving homepage config:', err);
       triggerNotification(err.message || 'Failed to save homepage settings. Make sure you created the homepage_config table.', true);
@@ -2513,10 +2622,19 @@ export default function Admin() {
           >
             {/* Left Side: Configuration Fields */}
             <div className="lg:col-span-8 space-y-8 bg-white border border-border/80 p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)]">
-              <div>
-                <h3 className="text-xs font-heading font-black uppercase tracking-wider text-text-primary pb-2 border-b border-border">
+              <div className="flex justify-between items-center pb-2 border-b border-border">
+                <h3 className="text-xs font-heading font-black uppercase tracking-wider text-text-primary">
                   Banners & Creative Assets Settings
                 </h3>
+                <button
+                  type="button"
+                  disabled={isSavingHomepage}
+                  onClick={handleSaveHomepage}
+                  className="bg-accent text-white px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest hover:bg-accent-hover transition-colors flex items-center justify-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
+                >
+                  {isSavingHomepage ? <Loader2 size={10} className="animate-spin" /> : null}
+                  Save Homepage Settings
+                </button>
               </div>
 
               {/* Banners block */}
@@ -2525,35 +2643,46 @@ export default function Admin() {
                 <div className="space-y-4">
                   <div>
                     <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
-                      Hero Banner Image File (Slide 1)
+                      Hero Banner Image (Slide 1)
                     </label>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      disabled={isUploadingHero}
-                      onChange={(e) => handleImageUpload(e, 'hero')}
-                      className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent file:mr-4 file:py-1 file:px-2 file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
-                    />
-                    {isUploadingHero && (
-                      <span className="text-[9px] text-text-secondary mt-1 block font-bold animate-pulse">
-                        Uploading image file...
-                      </span>
-                    )}
-                    <span className="text-[9px] text-text-secondary mt-1 block font-semibold">
-                      Recommended: 1920 × 1200px (portrait ratio optimal for desktop split showcase).
-                    </span>
-                    {heroImageUrl && (
-                      <div className="flex justify-between items-center mt-2 bg-bg-subtle p-2 border border-border">
-                        <span className="text-[10px] text-text-secondary truncate max-w-[200px] font-semibold">Image file loaded</span>
-                        <button
-                          type="button"
-                          onClick={() => setHeroImageUrl('')}
-                          className="text-[10px] text-sale font-bold hover:underline cursor-pointer"
-                        >
-                          Clear
-                        </button>
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={heroImageUrl}
+                          onChange={(e) => setHeroImageUrl(e.target.value)}
+                          placeholder="Paste image URL (https://...)"
+                          className="flex-1 px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent"
+                        />
+                        {heroImageUrl && (
+                          <button
+                            type="button"
+                            onClick={() => setHeroImageUrl('')}
+                            className="px-2.5 py-1 bg-bg-subtle text-sale border border-border text-[10px] font-bold hover:bg-sale/10 cursor-pointer"
+                          >
+                            Clear
+                          </button>
+                        )}
                       </div>
-                    )}
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-text-secondary uppercase font-semibold">Or upload:</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          disabled={isUploadingHero}
+                          onChange={(e) => handleImageUpload(e, 'hero')}
+                          className="text-xs text-text-primary file:mr-2 file:py-1 file:px-2.5 file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
+                        />
+                      </div>
+                      {isUploadingHero && (
+                        <span className="text-[9px] text-accent mt-1 block font-bold animate-pulse">
+                          Optimizing & uploading image...
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[9px] text-text-secondary mt-1 block font-semibold">
+                      Recommended: 1920 × 1200px.
+                    </span>
                   </div>
 
                   {/* Hero preview - Drag to adjust */}
@@ -2589,7 +2718,7 @@ export default function Admin() {
                         </>
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center text-[10px] text-text-secondary/70 italic font-semibold pointer-events-none">
-                          No custom hero image file loaded.
+                          No custom hero image loaded.
                         </div>
                       )}
                     </div>
@@ -2600,35 +2729,46 @@ export default function Admin() {
                 <div className="space-y-4">
                   <div>
                     <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
-                      Hero Banner Image File (Slide 2)
+                      Hero Banner Image (Slide 2 - Auto Slide)
                     </label>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      disabled={isUploadingHero2}
-                      onChange={(e) => handleImageUpload(e, 'hero2')}
-                      className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent file:mr-4 file:py-1 file:px-2 file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
-                    />
-                    {isUploadingHero2 && (
-                      <span className="text-[9px] text-text-secondary mt-1 block font-bold animate-pulse">
-                        Uploading image file...
-                      </span>
-                    )}
-                    <span className="text-[9px] text-text-secondary mt-1 block font-semibold">
-                      Recommended: 1920 × 1200px (portrait ratio optimal for desktop split showcase).
-                    </span>
-                    {heroImageUrl2 && (
-                      <div className="flex justify-between items-center mt-2 bg-bg-subtle p-2 border border-border">
-                        <span className="text-[10px] text-text-secondary truncate max-w-[200px] font-semibold">Slide 2 loaded</span>
-                        <button
-                          type="button"
-                          onClick={() => setHeroImageUrl2('')}
-                          className="text-[10px] text-sale font-bold hover:underline cursor-pointer"
-                        >
-                          Clear
-                        </button>
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={heroImageUrl2}
+                          onChange={(e) => setHeroImageUrl2(e.target.value)}
+                          placeholder="Paste slide 2 image URL (https://...)"
+                          className="flex-1 px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent"
+                        />
+                        {heroImageUrl2 && (
+                          <button
+                            type="button"
+                            onClick={() => setHeroImageUrl2('')}
+                            className="px-2.5 py-1 bg-bg-subtle text-sale border border-border text-[10px] font-bold hover:bg-sale/10 cursor-pointer"
+                          >
+                            Clear
+                          </button>
+                        )}
                       </div>
-                    )}
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-text-secondary uppercase font-semibold">Or upload:</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          disabled={isUploadingHero2}
+                          onChange={(e) => handleImageUpload(e, 'hero2')}
+                          className="text-xs text-text-primary file:mr-2 file:py-1 file:px-2.5 file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
+                        />
+                      </div>
+                      {isUploadingHero2 && (
+                        <span className="text-[9px] text-accent mt-1 block font-bold animate-pulse">
+                          Optimizing & uploading image...
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[9px] text-text-secondary mt-1 block font-semibold">
+                      Slides automatically every 6 seconds on the storefront.
+                    </span>
                   </div>
 
                   {/* Hero 2 preview - Drag to adjust */}
@@ -2664,7 +2804,7 @@ export default function Admin() {
                         </>
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center text-[10px] text-text-secondary/70 italic font-semibold pointer-events-none">
-                          No custom slide 2 hero image file loaded.
+                          No custom slide 2 hero image loaded.
                         </div>
                       )}
                     </div>
@@ -2672,42 +2812,50 @@ export default function Admin() {
                 </div>
 
                 {/* The Edit Banner Setting */}
-                <div className="space-y-4">
+                <div className="space-y-4 md:col-span-2">
                   <div>
                     <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
-                      "The Edit" Banner Image File
+                      "The Edit" Banner Image
                     </label>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      disabled={isUploadingTheEdit}
-                      onChange={(e) => handleImageUpload(e, 'edit')}
-                      className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent file:mr-4 file:py-1 file:px-2 file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
-                    />
-                    {isUploadingTheEdit && (
-                      <span className="text-[9px] text-text-secondary mt-1 block font-bold animate-pulse">
-                        Uploading image file...
-                      </span>
-                    )}
-                    <span className="text-[9px] text-text-secondary mt-1 block font-semibold">
-                      Recommended: 800 × 600px (4:3 landscape ratio).
-                    </span>
-                    {theEditImageUrl && (
-                      <div className="flex justify-between items-center mt-2 bg-bg-subtle p-2 border border-border">
-                        <span className="text-[10px] text-text-secondary truncate max-w-[200px] font-semibold">Image file loaded</span>
-                        <button
-                          type="button"
-                          onClick={() => setTheEditImageUrl('')}
-                          className="text-[10px] text-sale font-bold hover:underline cursor-pointer"
-                        >
-                          Clear
-                        </button>
+                    <div className="space-y-2 max-w-md">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={theEditImageUrl}
+                          onChange={(e) => setTheEditImageUrl(e.target.value)}
+                          placeholder="Paste image URL (https://...)"
+                          className="flex-1 px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent"
+                        />
+                        {theEditImageUrl && (
+                          <button
+                            type="button"
+                            onClick={() => setTheEditImageUrl('')}
+                            className="px-2.5 py-1 bg-bg-subtle text-sale border border-border text-[10px] font-bold hover:bg-sale/10 cursor-pointer"
+                          >
+                            Clear
+                          </button>
+                        )}
                       </div>
-                    )}
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-text-secondary uppercase font-semibold">Or upload:</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          disabled={isUploadingTheEdit}
+                          onChange={(e) => handleImageUpload(e, 'edit')}
+                          className="text-xs text-text-primary file:mr-2 file:py-1 file:px-2.5 file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
+                        />
+                      </div>
+                      {isUploadingTheEdit && (
+                        <span className="text-[9px] text-accent mt-1 block font-bold animate-pulse">
+                          Optimizing & uploading image...
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {/* The Edit preview - Drag to adjust */}
-                  <div className="space-y-1">
+                  <div className="space-y-1 max-w-md">
                     <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider block">
                       Crop Adjustment (Click & Drag Image to adjust positioning)
                     </span>
@@ -2739,7 +2887,7 @@ export default function Admin() {
                         </>
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center text-[10px] text-text-secondary/70 italic font-semibold pointer-events-none">
-                          No custom "The Edit" image file loaded.
+                          No custom "The Edit" image loaded.
                         </div>
                       )}
                     </div>
@@ -2756,18 +2904,27 @@ export default function Admin() {
                   {/* Men Collection image */}
                   <div className="space-y-3">
                     <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
-                      Men Collection Image File
+                      Men Collection Image
                     </label>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      disabled={isUploadingMen}
-                      onChange={(e) => handleImageUpload(e, 'men')}
-                      className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent file:mr-4 file:py-1 file:px-2 file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
-                    />
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={menImageUrl}
+                        onChange={(e) => setMenImageUrl(e.target.value)}
+                        placeholder="Paste image URL..."
+                        className="w-full px-3 py-1.5 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent"
+                      />
+                      <input
+                        type="file"
+                        accept="image/*"
+                        disabled={isUploadingMen}
+                        onChange={(e) => handleImageUpload(e, 'men')}
+                        className="w-full text-xs text-text-primary file:mr-2 file:py-1 file:px-2 file:border-0 file:text-[9px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
+                      />
+                    </div>
                     {isUploadingMen && (
-                      <span className="text-[9px] text-text-secondary mt-1 block font-bold animate-pulse">
-                        Uploading image file...
+                      <span className="text-[9px] text-accent mt-1 block font-bold animate-pulse">
+                        Uploading...
                       </span>
                     )}
                     {menImageUrl ? (
@@ -2793,18 +2950,27 @@ export default function Admin() {
                   {/* Women Collection image */}
                   <div className="space-y-3">
                     <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
-                      Women Collection Image File
+                      Women Collection Image
                     </label>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      disabled={isUploadingWomen}
-                      onChange={(e) => handleImageUpload(e, 'women')}
-                      className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent file:mr-4 file:py-1 file:px-2 file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
-                    />
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={womenImageUrl}
+                        onChange={(e) => setWomenImageUrl(e.target.value)}
+                        placeholder="Paste image URL..."
+                        className="w-full px-3 py-1.5 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent"
+                      />
+                      <input
+                        type="file"
+                        accept="image/*"
+                        disabled={isUploadingWomen}
+                        onChange={(e) => handleImageUpload(e, 'women')}
+                        className="w-full text-xs text-text-primary file:mr-2 file:py-1 file:px-2 file:border-0 file:text-[9px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
+                      />
+                    </div>
                     {isUploadingWomen && (
-                      <span className="text-[9px] text-text-secondary mt-1 block font-bold animate-pulse">
-                        Uploading image file...
+                      <span className="text-[9px] text-accent mt-1 block font-bold animate-pulse">
+                        Uploading...
                       </span>
                     )}
                     {womenImageUrl ? (
@@ -2830,18 +2996,27 @@ export default function Admin() {
                   {/* Unisex Collection image */}
                   <div className="space-y-3">
                     <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
-                      Unisex Collection Image File
+                      Unisex Collection Image
                     </label>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      disabled={isUploadingUnisex}
-                      onChange={(e) => handleImageUpload(e, 'unisex')}
-                      className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent file:mr-4 file:py-1 file:px-2 file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
-                    />
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={unisexImageUrl}
+                        onChange={(e) => setUnisexImageUrl(e.target.value)}
+                        placeholder="Paste image URL..."
+                        className="w-full px-3 py-1.5 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent"
+                      />
+                      <input
+                        type="file"
+                        accept="image/*"
+                        disabled={isUploadingUnisex}
+                        onChange={(e) => handleImageUpload(e, 'unisex')}
+                        className="w-full text-xs text-text-primary file:mr-2 file:py-1 file:px-2 file:border-0 file:text-[9px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
+                      />
+                    </div>
                     {isUploadingUnisex && (
-                      <span className="text-[9px] text-text-secondary mt-1 block font-bold animate-pulse">
-                        Uploading image file...
+                      <span className="text-[9px] text-accent mt-1 block font-bold animate-pulse">
+                        Uploading...
                       </span>
                     )}
                     {unisexImageUrl ? (
@@ -2877,15 +3052,24 @@ export default function Admin() {
                     <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
                       Shirts Category Image
                     </label>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      disabled={isUploadingShirt}
-                      onChange={(e) => handleImageUpload(e, 'shirt')}
-                      className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent file:mr-2 file:py-1 file:px-2 file:border-0 file:text-[9px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
-                    />
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={shirtImageUrl}
+                        onChange={(e) => setShirtImageUrl(e.target.value)}
+                        placeholder="Paste image URL..."
+                        className="w-full px-2.5 py-1.5 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent"
+                      />
+                      <input
+                        type="file"
+                        accept="image/*"
+                        disabled={isUploadingShirt}
+                        onChange={(e) => handleImageUpload(e, 'shirt')}
+                        className="w-full text-[10px] text-text-primary file:mr-1 file:py-0.5 file:px-2 file:border-0 file:text-[9px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
+                      />
+                    </div>
                     {isUploadingShirt && (
-                      <span className="text-[9px] text-text-secondary mt-1 block font-bold animate-pulse">
+                      <span className="text-[9px] text-accent mt-1 block font-bold animate-pulse">
                         Uploading...
                       </span>
                     )}
@@ -2914,15 +3098,24 @@ export default function Admin() {
                     <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
                       T-Shirts Category Image
                     </label>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      disabled={isUploadingTshirt}
-                      onChange={(e) => handleImageUpload(e, 'tshirt')}
-                      className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent file:mr-2 file:py-1 file:px-2 file:border-0 file:text-[9px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
-                    />
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={tshirtImageUrl}
+                        onChange={(e) => setTshirtImageUrl(e.target.value)}
+                        placeholder="Paste image URL..."
+                        className="w-full px-2.5 py-1.5 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent"
+                      />
+                      <input
+                        type="file"
+                        accept="image/*"
+                        disabled={isUploadingTshirt}
+                        onChange={(e) => handleImageUpload(e, 'tshirt')}
+                        className="w-full text-[10px] text-text-primary file:mr-1 file:py-0.5 file:px-2 file:border-0 file:text-[9px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
+                      />
+                    </div>
                     {isUploadingTshirt && (
-                      <span className="text-[9px] text-text-secondary mt-1 block font-bold animate-pulse">
+                      <span className="text-[9px] text-accent mt-1 block font-bold animate-pulse">
                         Uploading...
                       </span>
                     )}
@@ -2951,15 +3144,24 @@ export default function Admin() {
                     <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
                       Co-ords Category Image
                     </label>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      disabled={isUploadingCoords}
-                      onChange={(e) => handleImageUpload(e, 'coords')}
-                      className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent file:mr-2 file:py-1 file:px-2 file:border-0 file:text-[9px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
-                    />
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={coordsImageUrl}
+                        onChange={(e) => setCoordsImageUrl(e.target.value)}
+                        placeholder="Paste image URL..."
+                        className="w-full px-2.5 py-1.5 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent"
+                      />
+                      <input
+                        type="file"
+                        accept="image/*"
+                        disabled={isUploadingCoords}
+                        onChange={(e) => handleImageUpload(e, 'coords')}
+                        className="w-full text-[10px] text-text-primary file:mr-1 file:py-0.5 file:px-2 file:border-0 file:text-[9px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
+                      />
+                    </div>
                     {isUploadingCoords && (
-                      <span className="text-[9px] text-text-secondary mt-1 block font-bold animate-pulse">
+                      <span className="text-[9px] text-accent mt-1 block font-bold animate-pulse">
                         Uploading...
                       </span>
                     )}
@@ -2988,15 +3190,24 @@ export default function Admin() {
                     <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
                       Pants Category Image
                     </label>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      disabled={isUploadingPants}
-                      onChange={(e) => handleImageUpload(e, 'pants')}
-                      className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent file:mr-2 file:py-1 file:px-2 file:border-0 file:text-[9px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
-                    />
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={pantsImageUrl}
+                        onChange={(e) => setPantsImageUrl(e.target.value)}
+                        placeholder="Paste image URL..."
+                        className="w-full px-2.5 py-1.5 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent"
+                      />
+                      <input
+                        type="file"
+                        accept="image/*"
+                        disabled={isUploadingPants}
+                        onChange={(e) => handleImageUpload(e, 'pants')}
+                        className="w-full text-[10px] text-text-primary file:mr-1 file:py-0.5 file:px-2 file:border-0 file:text-[9px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
+                      />
+                    </div>
                     {isUploadingPants && (
-                      <span className="text-[9px] text-text-secondary mt-1 block font-bold animate-pulse">
+                      <span className="text-[9px] text-accent mt-1 block font-bold animate-pulse">
                         Uploading...
                       </span>
                     )}

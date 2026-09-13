@@ -21,16 +21,21 @@ export default function Home() {
   // Keep `loading` alias so existing JSX that uses it still works
   const loading = productsLoading;
   const [heartId, setHeartId] = useState<string | null>(null);
-  const [homepageConfig, setHomepageConfig] = useState<any | null>(
-    () => dataCache.get<any>('homepage_config') ?? null
-  );
+  const [homepageConfig, setHomepageConfig] = useState<any | null>(() => {
+    const cached = dataCache.get<any>('homepage_config');
+    if (cached) return cached;
+    try {
+      const raw = localStorage.getItem('zenphire_homepage_config');
+      if (raw) return JSON.parse(raw);
+    } catch (e) {}
+    return null;
+  });
 
   const [activeCategoryIndex, setActiveCategoryIndex] = useState(0);
   const categoryScrollRef = useRef<HTMLDivElement>(null);
 
   // Hero Slider State
   const [activeSlide, setActiveSlide] = useState(0);
-  const [isPaused, setIsPaused] = useState(false);
   const touchStartX = useRef<number | null>(null);
   const touchEndX = useRef<number | null>(null);
 
@@ -71,14 +76,14 @@ export default function Home() {
     return slides;
   }, [homepageConfig]);
 
-  // Auto-slide effect every 6 seconds (if more than 1 slide and not paused)
+  // Auto-slide effect every 6 seconds (if more than 1 slide)
   useEffect(() => {
-    if (isPaused || heroSlides.length <= 1) return;
+    if (heroSlides.length <= 1) return;
     const timer = setInterval(() => {
       setActiveSlide((prev) => (prev + 1) % heroSlides.length);
     }, 6000);
     return () => clearInterval(timer);
-  }, [isPaused, heroSlides.length]);
+  }, [activeSlide, heroSlides.length]);
 
   const handlePrevSlide = () => {
     setActiveSlide((prev) => (prev - 1 + heroSlides.length) % heroSlides.length);
@@ -200,13 +205,28 @@ export default function Home() {
           dataCache.set('categories', catResult.value);
           setCategories(catResult.value.filter((c: any) => !c.parent_category_id));
         }
-        const hpData =
+        let hpData =
           hpResult.status === 'fulfilled' && !(hpResult.value as any)?.error
             ? ((hpResult.value as any)?.data ?? null)
             : null;
-        if (hpData) {
-          dataCache.set('homepage_config', hpData);
-          setHomepageConfig(hpData);
+
+        let localBackup: any = null;
+        try {
+          const raw = localStorage.getItem('zenphire_homepage_config');
+          if (raw) localBackup = JSON.parse(raw);
+        } catch (e) {}
+
+        const merged = hpData || localBackup
+          ? {
+              ...localBackup,
+              ...hpData,
+              hero_image_url_2: hpData?.hero_image_url_2 || localBackup?.hero_image_url_2 || null,
+            }
+          : null;
+
+        if (merged) {
+          dataCache.set('homepage_config', merged);
+          setHomepageConfig(merged);
         }
       } catch (err) {
         console.warn('Home config load error:', err);
@@ -283,8 +303,6 @@ export default function Home() {
       {/* ── 1. HERO SLIDER ── */}
       <section
         className="relative bg-bg-subtle h-[75vh] md:h-[80vh] flex flex-col md:flex-row items-stretch overflow-hidden border-b border-border group/hero select-none"
-        onMouseEnter={() => setIsPaused(true)}
-        onMouseLeave={() => setIsPaused(false)}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -340,8 +358,9 @@ export default function Home() {
                         : 'w-2 bg-white/40 md:bg-text-secondary/30 hover:bg-white/70 md:hover:bg-text-secondary/60'
                       }`}
                   >
-                    {isActive && heroSlides.length > 1 && !isPaused && (
+                    {isActive && heroSlides.length > 1 && (
                       <span
+                        key={`prog-${activeSlide}`}
                         className="absolute inset-0 bg-white/60 animate-[progress_6s_linear_infinite]"
                         style={{
                           transformOrigin: 'left',
@@ -672,19 +691,19 @@ export default function Home() {
               <div className="hidden md:block">
                 <button
                   onClick={() => scrollBestSellers('left')}
-                  className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-text-secondary hover:text-accent-gold hover:border-accent-gold transition-colors duration-300 focus:outline-none cursor-pointer"
+                  className="btn-icon w-9 h-9 rounded-full border border-border flex items-center justify-center text-text-secondary hover:text-accent-gold hover:border-accent-gold transition-colors duration-300 focus:outline-none cursor-pointer"
                   aria-label="Scroll left"
                 >
-                  &larr;
+                  <ChevronLeft size={16} />
                 </button>
               </div>
               <div className="hidden md:block">
                 <button
                   onClick={() => scrollBestSellers('right')}
-                  className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-text-secondary hover:text-accent-gold hover:border-accent-gold transition-colors duration-300 focus:outline-none cursor-pointer"
+                  className="btn-icon w-9 h-9 rounded-full border border-border flex items-center justify-center text-text-secondary hover:text-accent-gold hover:border-accent-gold transition-colors duration-300 focus:outline-none cursor-pointer"
                   aria-label="Scroll right"
                 >
-                  &rarr;
+                  <ChevronRight size={16} />
                 </button>
               </div>
               <Link to="/shop" className="nav-link text-xs font-semibold uppercase tracking-widest text-accent-gold hover:opacity-80 font-heading inline-flex items-center gap-1.5 whitespace-nowrap ml-4">

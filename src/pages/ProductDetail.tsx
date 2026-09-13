@@ -437,7 +437,7 @@ export default function ProductDetail() {
                 ) : selectedVariant?.stock_qty <= 4 ? (
                   <span className="text-sale font-bold flex items-center gap-1.5"><AlertCircle size={13} /> Only {selectedVariant.stock_qty} left</span>
                 ) : (
-                  <span className="text-emerald-600 font-semibold flex items-center gap-1.5"><Check size={13} /> In Stock · Ready to ship</span>
+                  <span className="text-accent-gold font-semibold flex items-center gap-1.5"><Check size={13} /> In Stock &middot; Ready to ship</span>
                 )}
               </div>
             )}
@@ -463,9 +463,9 @@ export default function ProductDetail() {
                   disabled={isOutOfStock}
                   onClick={handleAddToCart}
                   className={`btn btn-primary flex-1 py-4 font-bold uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 ${isAdded
-                    ? 'bg-emerald-600 text-white'
+                    ? '!bg-[#00221A] !border-[#063A2C]'
                     : isOutOfStock
-                      ? 'bg-border text-text-secondary cursor-not-allowed opacity-50'
+                      ? '!bg-border !text-text-secondary cursor-not-allowed opacity-50'
                       : ''
                     }`}
                 >
@@ -477,7 +477,7 @@ export default function ProductDetail() {
               <button
                 onClick={handleWishlistToggle}
                 aria-label="Toggle Wishlist"
-                className={`wishlist-btn px-5 border border-border bg-white text-text-primary hover:bg-bg-subtle flex items-center justify-center ${heartAnim ? 'anim-heart-pop' : ''}`}
+                className={`wishlist-btn btn btn-secondary px-5 flex items-center justify-center ${heartAnim ? 'anim-heart-pop' : ''}`}
               >
                 <Heart size={18} className={isWishlisted(product.id) ? 'fill-sale stroke-sale' : 'stroke-text-primary'} />
               </button>

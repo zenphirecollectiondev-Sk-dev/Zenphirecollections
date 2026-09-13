@@ -114,7 +114,7 @@ export default function Cart() {
 
           {/* Checkout summary column */}
           <div className="lg:col-span-4">
-            <div className="bg-bg-subtle border border-border p-6 space-y-6">
+            <div className="bg-bg-subtle border border-border p-6 space-y-6" style={{ boxShadow: 'var(--shadow-panel)' }}>
               <h2 className="text-xs font-heading font-bold uppercase tracking-wider text-text-primary pb-3 border-b border-border">
                 Order Summary
               </h2>
@@ -127,7 +127,7 @@ export default function Cart() {
                 <div className="flex justify-between text-text-secondary">
                   <span>Shipping</span>
                   {shipping === 0 ? (
-                    <span className="font-bold text-emerald-600 uppercase text-xs">Free</span>
+                    <span className="font-bold text-accent-gold uppercase text-xs">Free</span>
                   ) : (
                     <span className="font-semibold text-text-primary">₹{shipping.toFixed(2)}</span>
                   )}
@@ -153,7 +153,7 @@ export default function Cart() {
                 </Link>
                 <Link
                   to="/shop"
-                  className="btn block w-full border border-border bg-white text-text-primary py-3 font-semibold uppercase text-[10px] tracking-widest hover:bg-bg-subtle text-center mt-3"
+                  className="btn btn-secondary block w-full py-3 font-semibold uppercase text-[10px] tracking-widest text-center mt-3"
                 >
                   Continue Shopping
                 </Link>

@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const faqs = [
   {
@@ -47,14 +48,27 @@ function FAQItem({ q, a }: { q: string; a: string }) {
         onClick={() => setOpen(!open)}
         className="w-full flex justify-between items-center py-4 text-left gap-4 group"
       >
-        <span className="text-sm font-medium text-text-primary group-hover:text-accent transition-colors">{q}</span>
-        <ChevronDown size={15} className={`flex-shrink-0 text-text-secondary transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+        <span className="text-sm font-medium text-text-primary group-hover:text-accent transition-colors duration-150">{q}</span>
+        <ChevronDown
+          size={15}
+          className={`flex-shrink-0 text-text-secondary transition-transform duration-200 ${open ? 'rotate-180 text-accent-gold' : ''}`}
+        />
       </button>
-      {open && (
-        <div className="pb-4">
-          <p className="text-sm text-text-secondary leading-relaxed">{a}</p>
-        </div>
-      )}
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.22, ease: 'easeInOut' }}
+            className="overflow-hidden"
+          >
+            <div className="pb-4">
+              <p className="text-sm text-text-secondary leading-relaxed">{a}</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

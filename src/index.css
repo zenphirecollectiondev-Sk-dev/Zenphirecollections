@@ -72,6 +72,15 @@
   --color-heading-primary-mid: #063A2C;
   --color-heading-primary-end: #00221A;
   --color-heading-secondary: #B8975A;
+
+  /* ── Shadow Scale — resting → elevated → overlay ── */
+  --shadow-card: 0 1px 4px rgba(0, 0, 0, 0.06);
+  --shadow-card-hover: 0 8px 24px rgba(0, 0, 0, 0.10);
+  --shadow-panel: 0 2px 12px rgba(0, 0, 0, 0.08);
+  --shadow-elevated: 0 8px 32px rgba(0, 0, 0, 0.14);
+
+  /* ── Focus-visible ring (gold tinted for brand alignment) ── */
+  --focus-ring: 0 0 0 2px #ffffff, 0 0 0 4px rgba(184, 151, 90, 0.55);
 }
 
 /* =========================================
@@ -101,6 +110,12 @@
   h5,
   h6 {
     @apply font-heading tracking-tight text-text-primary;
+  }
+
+  /* Global accessible focus ring — matches brand gold tint */
+  :focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
   }
 }
 
@@ -156,6 +171,16 @@
 
   to {
     transform: translateX(0);
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(100%);
   }
 }
 
@@ -305,6 +330,25 @@
 .btn:disabled {
   cursor: not-allowed;
   opacity: 0.5;
+}
+
+/* Variant: secondary — outline/ghost button (shared across CartDrawer, Cart, Checkout, etc.) */
+.btn-secondary {
+  background-color: #ffffff;
+  color: var(--color-text-primary, #1A1A1A);
+  border: 1px solid #E5E5E5;
+  position: relative;
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: #F9F9F9;
+  border-color: #2B2B2B;
 }
 
 /* Variant: primary — near-black green fill with gold gradient glow underline on hover */
@@ -549,6 +593,15 @@
   animation: slideInRight var(--dur-base) var(--ease) both;
 }
 
+/* animate-slide-in: used by CartDrawer for right-panel entrance */
+.animate-slide-in {
+  animation: slideInRight var(--dur-base) var(--ease-enter) both;
+}
+
+.animate-slide-out {
+  animation: slideOutRight var(--dur-base) var(--ease) both;
+}
+
 .drawer-bottom {
   animation: slideInUp var(--dur-base) var(--ease) both;
 }
@@ -676,4 +729,22 @@
 
 .subheading-primary {
   color: var(--color-heading-secondary);
+}
+
+/* =========================================
+   HERO SLIDER PROGRESS KEYFRAME
+   ========================================= */
+
+@keyframes progress {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.animate-progress {
+  animation: progress 6s linear infinite;
+  transform-origin: left;
 }

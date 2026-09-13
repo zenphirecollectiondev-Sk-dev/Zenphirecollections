@@ -460,7 +460,7 @@ export default function Account() {
 
                 <div className="space-y-4">
                   {/* Full Name */}
-                  <div className="bg-bg-subtle p-3.5 border-l-[3px] border-accent">
+                  <div className="bg-bg-subtle p-3.5 border-l-[3px] border-[#B8975A]">
                     <span className="text-[9px] uppercase tracking-widest text-text-secondary font-bold block mb-1">
                       Full Name
                     </span>
@@ -470,7 +470,7 @@ export default function Account() {
                   </div>
 
                   {/* Phone Number */}
-                  <div className="bg-bg-subtle p-3.5 border-l-[3px] border-accent">
+                  <div className="bg-bg-subtle p-3.5 border-l-[3px] border-[#B8975A]">
                     <span className="text-[9px] uppercase tracking-widest text-text-secondary font-bold block mb-1">
                       Phone Number
                     </span>
@@ -480,7 +480,7 @@ export default function Account() {
                   </div>
 
                   {/* Date of Birth */}
-                  <div className="bg-bg-subtle p-3.5 border-l-[3px] border-accent">
+                  <div className="bg-bg-subtle p-3.5 border-l-[3px] border-[#B8975A]">
                     <span className="text-[9px] uppercase tracking-widest text-text-secondary font-bold block mb-1">
                       Date of Birth
                     </span>
@@ -490,7 +490,7 @@ export default function Account() {
                   </div>
 
                   {/* Gender */}
-                  <div className="bg-bg-subtle p-3.5 border-l-[3px] border-accent">
+                  <div className="bg-bg-subtle p-3.5 border-l-[3px] border-[#B8975A]">
                     <span className="text-[9px] uppercase tracking-widest text-text-secondary font-bold block mb-1">
                       Gender
                     </span>
