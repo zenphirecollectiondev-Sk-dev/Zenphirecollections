@@ -111,8 +111,8 @@ function toGridProduct(raw: RawProduct): GridProduct {
     base_price: raw.base_price,
     category_id: raw.category_id,
     coverImageUrl: sorted[0]?.url ?? null,
-    inStock: variants.some((v) => v.stock_qty > 0),
-    availableSizes: sizesInStock,
+    inStock: variants.length === 0 || variants.some((v) => v.stock_qty > 0),
+    availableSizes: sizesInStock.length > 0 ? sizesInStock : ['S', 'M', 'L', 'XL'],
   };
 }
 

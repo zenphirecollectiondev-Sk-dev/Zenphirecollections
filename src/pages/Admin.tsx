@@ -1477,18 +1477,25 @@ export default function Admin() {
         }
       }
 
-      // 5. Insert Variants
-      if (prodVariants.length > 0) {
-        const variantsInsert = prodVariants.map((v) => ({
-          product_id: productId,
-          size: v.size,
-          color: v.color,
-          stock_qty: v.stock_qty,
-          sku: v.sku
-        }));
-        const { error: varInsertErr } = await supabase.from('product_variants').insert(variantsInsert);
-        if (varInsertErr) throw new Error(`Failed to save variants: ${varInsertErr.message}`);
-      }
+      // 5. Insert Variants (Auto-generate standard S, M, L, XL with 50 stock if none explicitly specified)
+      const variantsToSave = prodVariants.length > 0
+        ? prodVariants
+        : [
+            { size: 'S', color: 'Default', stock_qty: 50, sku: `${payload.slug}-S` },
+            { size: 'M', color: 'Default', stock_qty: 50, sku: `${payload.slug}-M` },
+            { size: 'L', color: 'Default', stock_qty: 50, sku: `${payload.slug}-L` },
+            { size: 'XL', color: 'Default', stock_qty: 50, sku: `${payload.slug}-XL` }
+          ];
+
+      const variantsInsert = variantsToSave.map((v) => ({
+        product_id: productId,
+        size: v.size,
+        color: v.color,
+        stock_qty: v.stock_qty,
+        sku: v.sku
+      }));
+      const { error: varInsertErr } = await supabase.from('product_variants').insert(variantsInsert);
+      if (varInsertErr) throw new Error(`Failed to save variants: ${varInsertErr.message}`);
 
       // 6. Sync Occasion mapping
       try {
@@ -1603,6 +1610,25 @@ export default function Admin() {
       fetchData();
     } catch (err: any) {
       triggerNotification(err.message || 'Error deleting category', true);
+    }
+  };
+
+  // Bulk Restock all product variants to 50 stock units
+  const handleBulkRestockAllVariants = async () => {
+    if (!confirm('Restock all products and size variants in the catalog to 50 units each?')) return;
+    try {
+      const allVariantIds = products.flatMap(p => p.product_variants.map(v => v.id)).filter(Boolean);
+      if (allVariantIds.length > 0) {
+        const { error } = await supabase
+          .from('product_variants')
+          .update({ stock_qty: 50 })
+          .in('id', allVariantIds);
+        if (error) throw error;
+      }
+      triggerNotification('All catalog variants restocked to 50 units!');
+      fetchData();
+    } catch (err: any) {
+      triggerNotification(err.message || 'Error executing bulk restock', true);
     }
   };
 
@@ -2231,16 +2257,25 @@ export default function Admin() {
             animate={{ opacity: 1, y: 0 }}
             className="space-y-6"
           >
-            {/* Search filter for variants */}
-            <div className="relative max-w-md">
-              <Search size={14} className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-text-secondary" />
-              <input
-                type="text"
-                placeholder="Search variant ledger by SKU or product name..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 border border-border/80 bg-white text-xs focus:outline-none focus:border-accent shadow-xs"
-              />
+            {/* Header controls: Search & Bulk Restock */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+              <div className="relative max-w-md flex-1">
+                <Search size={14} className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-text-secondary" />
+                <input
+                  type="text"
+                  placeholder="Search variant ledger by SKU or product name..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 border border-border/80 bg-white text-xs focus:outline-none focus:border-accent shadow-xs"
+                />
+              </div>
+
+              <button
+                onClick={handleBulkRestockAllVariants}
+                className="btn btn-primary px-4 py-2.5 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 flex-shrink-0 shadow-sm"
+              >
+                <RefreshCw size={14} /> Bulk Restock All (50 Units)
+              </button>
             </div>
 
             {/* Inventory table */}
