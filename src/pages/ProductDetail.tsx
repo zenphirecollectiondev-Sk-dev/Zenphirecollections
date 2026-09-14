@@ -7,6 +7,8 @@ import { getProductDetails, supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import { dataCache } from '../lib/dataCache';
 import { imgHero, imgCard, imgThumb } from '../lib/imgTransform';
+import DOMPurify from 'dompurify';
+import { usePageSEO } from '../hooks/usePageSEO';
 
 export default function ProductDetail() {
   const { toggleWishlist, isWishlisted } = useWishlistStore();
@@ -197,6 +199,32 @@ export default function ProductDetail() {
     setIsLightboxOpen(true);
   };
 
+  // Dynamic SEO & Structured Data
+  usePageSEO({
+    title: product ? product.name : 'Product Details',
+    description: product ? product.description : 'Explore luxury clothing and essentials on Zenphire.',
+    image: product?.product_images?.[0]?.url || undefined,
+    jsonLd: product ? {
+      '@context': 'https://schema.org/',
+      '@type': 'Product',
+      name: product.name,
+      image: product.product_images?.map((img: any) => img.url) || [],
+      description: product.description,
+      brand: {
+        '@type': 'Brand',
+        name: 'Zenphire'
+      },
+      offers: {
+        '@type': 'Offer',
+        priceCurrency: 'INR',
+        price: product.base_price,
+        availability: product.product_variants?.some((v: any) => v.stock_qty > 0)
+          ? 'https://schema.org/InStock'
+          : 'https://schema.org/OutOfStock'
+      }
+    } : undefined
+  });
+
   if (loading && !product) {
     return (
       <div className="bg-bg min-h-screen overflow-x-hidden">
@@ -274,6 +302,9 @@ export default function ProductDetail() {
       setTimeout(() => setSizeError(false), 2000);
       return;
     }
+    if (isOutOfStock || (selectedVariant && selectedVariant.stock_qty <= 0)) {
+      return;
+    }
     setSizeError(false);
     if (selectedVariant) {
       addItem({
@@ -319,7 +350,7 @@ export default function ProductDetail() {
         <div className="space-y-3">
           {/* Main image — clickable for lightbox */}
           <div
-            className="w-full bg-bg-subtle border border-border overflow-hidden relative group cursor-zoom-in"
+            className="w-full max-h-[60vh] sm:max-h-[70vh] md:max-h-none bg-bg-subtle border border-border overflow-hidden relative group cursor-zoom-in flex items-center justify-center"
             onClick={() => openLightbox(activeImageIdx)}
             role="button"
             aria-label="Enlarge image"
@@ -331,7 +362,7 @@ export default function ProductDetail() {
                 fetchPriority="high"
                 loading="eager"
                 decoding="async"
-                className="w-full h-auto block relative z-10 transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] group-hover:scale-[1.03]"
+                className="w-full h-full max-h-[60vh] sm:max-h-[70vh] md:max-h-none object-cover object-top block relative z-10 transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] group-hover:scale-[1.03]"
               />
             ) : (
               <div className="aspect-[3/4] w-full flex items-center justify-center bg-bg-subtle">
@@ -413,8 +444,12 @@ export default function ProductDetail() {
                   return (
                     <button
                       key={size}
-                      onClick={() => setSelectedSize(size as string)}
-                      className={`size-btn w-12 h-12 border text-xs font-bold flex items-center justify-center transition-all ${
+                      disabled={!available}
+                      onClick={() => {
+                        if (!available) return;
+                        setSelectedSize(size as string);
+                      }}
+                      className={`size-btn min-w-[44px] min-h-[44px] w-12 h-12 border text-xs font-bold flex items-center justify-center transition-all ${
                         !available
                           ? 'opacity-40 cursor-not-allowed bg-bg-subtle text-text-secondary line-through border-border'
                           : selectedSize === size
@@ -454,7 +489,7 @@ export default function ProductDetail() {
               {viewBag ? (
                 <button
                   onClick={() => navigate('/cart')}
-                  className="btn btn-primary flex-1 py-4 font-bold uppercase text-[10px] tracking-widest flex items-center justify-center gap-2"
+                  className="btn btn-primary flex-1 min-h-[48px] py-4 font-bold uppercase text-[10px] tracking-widest flex items-center justify-center gap-2"
                 >
                   <ShoppingBag size={15} /> View Bag
                 </button>
@@ -462,7 +497,7 @@ export default function ProductDetail() {
                 <button
                   disabled={isOutOfStock}
                   onClick={handleAddToCart}
-                  className={`btn btn-primary flex-1 py-4 font-bold uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 ${isAdded
+                  className={`btn btn-primary flex-1 min-h-[48px] py-4 font-bold uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 ${isAdded
                     ? '!bg-[#00221A] !border-[#063A2C]'
                     : isOutOfStock
                       ? '!bg-border !text-text-secondary cursor-not-allowed opacity-50'
@@ -477,7 +512,7 @@ export default function ProductDetail() {
               <button
                 onClick={handleWishlistToggle}
                 aria-label="Toggle Wishlist"
-                className={`wishlist-btn btn btn-secondary px-5 flex items-center justify-center ${heartAnim ? 'anim-heart-pop' : ''}`}
+                className={`wishlist-btn btn btn-secondary min-w-[48px] min-h-[48px] px-5 flex items-center justify-center ${heartAnim ? 'anim-heart-pop' : ''}`}
               >
                 <Heart size={18} className={isWishlisted(product.id) ? 'fill-sale stroke-sale' : 'stroke-text-primary'} />
               </button>
@@ -492,40 +527,40 @@ export default function ProductDetail() {
           <h2 className="text-lg font-heading font-black uppercase tracking-widest text-text-primary mb-8 text-center">
             You May Also Like
           </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 anim-stagger">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 sm:gap-4 md:gap-6 anim-stagger">
             {recommendations.map((rec: any) => (
               <Link
                 key={rec.id}
                 to={`/product/${rec.slug}`}
                 onClick={() => { setSelectedSize(''); setActiveImageIdx(0); }}
-                className="group product-card block"
+                className="group product-card block bg-bg-subtle border border-border overflow-hidden transition-all duration-300 hover:shadow-md"
               >
-                <div className="w-full bg-bg-subtle overflow-hidden border border-border relative mb-3">
+                <div className="aspect-[3/4] w-full bg-bg-subtle overflow-hidden relative">
                   {rec.product_images?.[0]?.url ? (
                     <img
                       src={imgCard(rec.product_images[0].url)}
                       alt={rec.name}
                       loading="lazy"
                       decoding="async"
-                      className="card-img w-full h-auto block relative z-10"
+                      className="card-img w-full h-full object-cover object-top block relative z-10 transition-transform duration-500 group-hover:scale-105"
                     />
                   ) : (
-                    <div className="aspect-[3/4] w-full flex items-center justify-center bg-bg-subtle">
+                    <div className="w-full h-full flex items-center justify-center bg-bg-subtle">
                       <Image size={24} className="text-text-secondary/20" />
                     </div>
                   )}
                   <button
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleWishlist(rec.id); }}
                     aria-label="Toggle Wishlist"
-                    className="wishlist-btn absolute top-2.5 right-2.5 p-1.5 bg-white/90 border border-border/60 rounded-full z-10"
+                    className="wishlist-btn absolute top-2.5 right-2.5 min-w-[36px] min-h-[36px] flex items-center justify-center p-2 bg-white/90 border border-border/60 rounded-full z-10 shadow-xs"
                   >
-                    <Heart size={13} className={isWishlisted(rec.id) ? 'fill-sale stroke-sale' : 'stroke-text-primary'} />
+                    <Heart size={14} className={isWishlisted(rec.id) ? 'fill-sale stroke-sale' : 'stroke-text-primary'} />
                   </button>
                 </div>
-                <div className="space-y-0.5">
+                <div className="p-3.5 space-y-1">
                   <p className="text-[9px] uppercase tracking-widest text-text-secondary font-bold">Zenphire</p>
-                  <h3 className="text-sm font-medium text-text-primary group-hover:underline underline-offset-2 truncate">{rec.name}</h3>
-                  <p className="text-sm font-semibold text-text-primary">₹{Number(rec.base_price || 0).toFixed(2)}</p>
+                  <h3 className="text-xs font-medium text-text-primary group-hover:text-accent-gold transition-colors duration-200 truncate">{rec.name}</h3>
+                  <p className="text-xs font-semibold text-text-primary">₹{Number(rec.base_price || 0).toFixed(2)}</p>
                 </div>
               </Link>
             ))}
@@ -558,8 +593,12 @@ export default function ProductDetail() {
                   <p className="text-[9px] uppercase tracking-widest text-text-secondary font-bold">Reference Guide</p>
                   <h3 className="text-sm font-heading font-black uppercase mt-0.5">Size Measurements</h3>
                 </div>
-                <button onClick={() => setIsSizeGuideOpen(false)} className="btn-icon p-1.5 text-text-secondary hover:text-text-primary hover:bg-bg-subtle rounded-full">
-                  <X size={16} />
+                <button
+                  onClick={() => setIsSizeGuideOpen(false)}
+                  aria-label="Close size guide"
+                  className="btn-icon min-w-[44px] min-h-[44px] flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-subtle rounded-full"
+                >
+                  <X size={18} />
                 </button>
               </div>
               <div className="overflow-y-auto">
@@ -580,7 +619,15 @@ export default function ProductDetail() {
                     </div>
                   </div>
                 ) : (
-                  <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: parsedSizeGuide.content }} />
+                  <div
+                    className="prose prose-sm max-w-none"
+                    dangerouslySetInnerHTML={{
+                      __html: DOMPurify.sanitize(parsedSizeGuide.content, {
+                        ALLOWED_TAGS: ['table', 'thead', 'tbody', 'tr', 'th', 'td', 'p', 'br', 'strong', 'em', 'ul', 'ol', 'li', 'span', 'div'],
+                        ALLOWED_ATTR: ['class', 'style']
+                      })
+                    }}
+                  />
                 )}
               </div>
               <div className="border-t border-border pt-4 mt-4 flex justify-end">
@@ -612,7 +659,7 @@ export default function ProductDetail() {
               </p>
               <button
                 onClick={() => setIsLightboxOpen(false)}
-                className="btn-icon p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-full"
+                className="btn-icon min-w-[44px] min-h-[44px] flex items-center justify-center p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-full"
                 aria-label="Close"
               >
                 <X size={20} />

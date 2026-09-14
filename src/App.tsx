@@ -58,6 +58,19 @@ function AppContent() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isOffline, setIsOffline] = useState(() => !navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     occasions: false,
     women: false,
@@ -85,6 +98,12 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-bg text-text-primary flex flex-col font-sans overflow-x-hidden w-full relative">
+      {/* Offline Network Banner */}
+      {isOffline && (
+        <div className="bg-amber-600 text-white text-[11px] font-bold py-1.5 px-4 text-center tracking-wider uppercase z-[250]">
+          You are currently offline. Pages and cart items are loaded from local cache.
+        </div>
+      )}
       {/* Sticky Minimal Navigation with moving dark ambient gradient on customer-facing pages */}
       <header className={`sticky top-0 z-50 transition-all duration-300 relative shadow-md ${isCustomerPage ? 'ambient-green-gradient shadow-black/15' : 'bg-white border-b border-border shadow-sm'}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -92,7 +111,7 @@ function AppContent() {
           <div className="flex items-center gap-6">
             <button
               onClick={() => setIsMobileMenuOpen(true)}
-              className={`btn-icon md:hidden p-2 rounded-full ${isCustomerPage ? 'hover:bg-white/10' : 'hover:bg-bg-subtle'}`}
+              className={`btn-icon md:hidden min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full ${isCustomerPage ? 'hover:bg-white/10' : 'hover:bg-bg-subtle'}`}
               aria-label="Toggle Menu"
             >
               <Menu size={20} className={`stroke-[1.5] ${isCustomerPage ? 'text-accent-gold' : 'text-text-primary'}`} />
@@ -200,11 +219,11 @@ function AppContent() {
           </div>
 
           {/* Right Icons (Mobile) */}
-          <div className="flex md:hidden items-center gap-2">
+          <div className="flex md:hidden items-center gap-1">
             <button
               onClick={() => setIsSearchOpen(true)}
               aria-label="Search"
-              className={`btn-icon p-2 rounded-full transition-colors duration-200 ${isCustomerPage ? 'text-accent-gold hover:bg-white/10' : 'text-text-primary hover:bg-bg-subtle'}`}
+              className={`btn-icon min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full transition-colors duration-200 ${isCustomerPage ? 'text-accent-gold hover:bg-white/10' : 'text-text-primary hover:bg-bg-subtle'}`}
             >
               <Search size={19} className="stroke-[1.5]" />
             </button>
@@ -212,11 +231,11 @@ function AppContent() {
             <button
               onClick={() => setIsCartOpen(true)}
               aria-label="Cart"
-              className={`btn-icon p-2 rounded-full relative transition-colors duration-200 ${isCustomerPage ? 'text-accent-gold hover:bg-white/10' : 'text-text-primary hover:bg-bg-subtle'}`}
+              className={`btn-icon min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full relative transition-colors duration-200 ${isCustomerPage ? 'text-accent-gold hover:bg-white/10' : 'text-text-primary hover:bg-bg-subtle'}`}
             >
               <ShoppingBag size={19} className="stroke-[1.5]" />
               {cartCount > 0 && (
-                <span className={`absolute top-1.5 right-1.5 text-[8px] font-bold w-3.5 h-3.5 flex items-center justify-center rounded-full transition-all duration-300 ${isCustomerPage ? 'bg-white text-header-base' : 'bg-accent text-white'}`}>
+                <span className={`absolute top-2 right-2 text-[8px] font-bold w-3.5 h-3.5 flex items-center justify-center rounded-full transition-all duration-300 ${isCustomerPage ? 'bg-white text-header-base' : 'bg-accent text-white'}`}>
                   {cartCount}
                 </span>
               )}
@@ -309,16 +328,16 @@ function AppContent() {
             </div>
             <div>
               <h3 className="font-heading font-normal uppercase tracking-wider text-sm mb-4 text-accent-gold">Customer Care</h3>
-              <ul className="space-y-2 text-sm text-white/70">
-                <li><Link to="/faq" className="hover:text-accent-gold transition-colors">Help & FAQ</Link></li>
-                <li><Link to="/shipping" className="hover:text-accent-gold transition-colors">Shipping & Returns</Link></li>
+              <ul className="space-y-3 text-sm text-white/70">
+                <li><Link to="/faq" className="inline-block py-1 hover:text-accent-gold transition-colors">Help & FAQ</Link></li>
+                <li><Link to="/shipping" className="inline-block py-1 hover:text-accent-gold transition-colors">Shipping & Returns</Link></li>
               </ul>
             </div>
             <div>
               <h3 className="font-heading font-normal uppercase tracking-wider text-sm mb-4 text-accent-gold">Legal</h3>
-              <ul className="space-y-2 text-sm text-white/70">
-                <li><Link to="/privacy" className="hover:text-accent-gold transition-colors">Privacy Policy</Link></li>
-                <li><Link to="/terms" className="hover:text-accent-gold transition-colors">Terms of Service</Link></li>
+              <ul className="space-y-3 text-sm text-white/70">
+                <li><Link to="/privacy" className="inline-block py-1 hover:text-accent-gold transition-colors">Privacy Policy</Link></li>
+                <li><Link to="/terms" className="inline-block py-1 hover:text-accent-gold transition-colors">Terms of Service</Link></li>
               </ul>
             </div>
           </div>
@@ -445,7 +464,7 @@ function MobileMenuDrawer({ onClose, openSections, toggleSection, wishlistCount,
           <button
             onClick={onClose}
             aria-label="Close menu"
-            className="w-8 h-8 flex items-center justify-center rounded-full text-[#B8975A]/70 hover:text-[#B8975A] hover:bg-white/8 transition-all duration-200"
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-[#B8975A]/70 hover:text-[#B8975A] hover:bg-white/8 transition-all duration-200"
           >
             <X size={18} strokeWidth={1.5} />
           </button>
@@ -472,7 +491,7 @@ function MobileMenuDrawer({ onClose, openSections, toggleSection, wishlistCount,
             <div key={section.key} className="mb-1">
               <button
                 onClick={() => toggleSection(section.key)}
-                className="group w-full flex items-center justify-between px-3 py-3 rounded-lg hover:bg-white/6 transition-all duration-200"
+                className="group w-full min-h-[44px] flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-white/6 transition-all duration-200"
               >
                 <span className="text-[12px] font-heading tracking-[0.18em] uppercase font-medium text-[#B8975A]/85 group-hover:text-[#B8975A] transition-colors">
                   {section.label}
@@ -504,7 +523,7 @@ function MobileMenuDrawer({ onClose, openSections, toggleSection, wishlistCount,
                           <Link
                             to={item.to}
                             onClick={onClose}
-                            className="flex items-center gap-2.5 px-3 py-2 rounded-md text-[11px] font-sans tracking-[0.14em] uppercase font-medium text-white/50 hover:text-[#E4C783] hover:bg-white/5 transition-all duration-180"
+                            className="flex items-center gap-2.5 px-3 py-2.5 min-h-[40px] rounded-md text-[11px] font-sans tracking-[0.14em] uppercase font-medium text-white/50 hover:text-[#E4C783] hover:bg-white/5 transition-all duration-180"
                           >
                             <span className="w-1 h-1 rounded-full bg-[#B8975A]/35 flex-shrink-0" />
                             {item.name}

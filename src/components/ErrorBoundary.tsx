@@ -21,24 +21,34 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    // Log internally for developer debugging — never exposed to the user
     console.error('Uncaught error:', error, errorInfo);
   }
 
   public render() {
     if (this.state.hasError) {
       return (
-        <div className="p-8 max-w-2xl mx-auto mt-10 border border-sale/20 bg-bg-subtle text-text-primary">
-          <h2 className="text-base font-heading font-black uppercase text-sale mb-2">Application Render Error</h2>
-          <p className="text-xs font-semibold mb-4">{this.state.error?.message}</p>
-          <pre className="text-[10px] overflow-x-auto p-4 bg-white border border-border font-mono text-text-secondary">
-            {this.state.error?.stack}
-          </pre>
-          <button
-            onClick={() => window.location.reload()}
-            className="mt-6 bg-accent text-white px-5 py-2 text-xs font-bold uppercase tracking-widest hover:bg-accent-hover transition-colors"
-          >
-            Reload Page
-          </button>
+        <div className="p-8 max-w-md mx-auto mt-20 text-center text-text-primary">
+          <h2 className="text-base font-heading font-bold uppercase tracking-wider mb-3">
+            Something went wrong
+          </h2>
+          <p className="text-sm text-text-secondary leading-relaxed mb-6">
+            We encountered an unexpected error. Please reload the page or return to the homepage.
+          </p>
+          <div className="flex items-center justify-center gap-3">
+            <button
+              onClick={() => window.location.reload()}
+              className="btn btn-primary px-5 py-2.5 text-xs font-bold uppercase tracking-widest"
+            >
+              Reload Page
+            </button>
+            <a
+              href="/"
+              className="btn px-5 py-2.5 text-xs font-bold uppercase tracking-widest border border-border hover:bg-bg-subtle transition-colors"
+            >
+              Go Home
+            </a>
+          </div>
         </div>
       );
     }

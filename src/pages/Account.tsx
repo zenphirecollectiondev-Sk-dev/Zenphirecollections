@@ -165,6 +165,15 @@ export default function Account() {
     e.preventDefault();
     if (!user) return;
 
+    // Validate phone number format if provided
+    if (phone.trim()) {
+      const phoneRegex = /^[6-9]\d{9}$/;
+      if (!phoneRegex.test(phone.trim())) {
+        setProfileError('Please enter a valid 10-digit Indian mobile number.');
+        return;
+      }
+    }
+
     setLoadingProfile(true);
     setProfileSuccess(false);
     setProfileError(null);
@@ -731,7 +740,7 @@ export default function Account() {
                     </div>
 
                     {/* City, State, Pincode */}
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div>
                         <label htmlFor="addr-city" className="block text-[9px] font-bold uppercase tracking-wide text-text-secondary mb-1">
                           City
@@ -805,13 +814,13 @@ export default function Account() {
                       <button
                         type="button"
                         onClick={() => setAddressFormOpen(false)}
-                        className="px-4 py-2.5 border border-border bg-white text-text-primary text-[10px] font-bold uppercase tracking-wider hover:bg-bg-subtle transition-colors"
+                        className="px-4 py-2.5 min-h-[40px] border border-border bg-white text-text-primary text-[10px] font-bold uppercase tracking-wider hover:bg-bg-subtle transition-colors"
                       >
                         Cancel
                       </button>
                       <button
                         type="submit"
-                        className="btn btn-primary px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider"
+                        className="btn btn-primary px-4 py-2.5 min-h-[40px] text-[10px] font-bold uppercase tracking-wider"
                       >
                         {editingAddressId ? 'Update Address' : 'Save Address'}
                       </button>
@@ -839,7 +848,7 @@ export default function Account() {
                   </p>
                   <button
                     onClick={handleOpenAddForm}
-                    className="btn btn-primary mt-4 px-5 py-2.5 text-[10px] font-bold uppercase tracking-widest shadow-sm"
+                    className="btn btn-primary mt-4 px-5 py-2.5 text-[10px] font-bold uppercase tracking-widest shadow-sm min-h-[44px]"
                   >
                     Add your first address
                   </button>
@@ -889,30 +898,30 @@ export default function Account() {
                         {!addr.is_default ? (
                           <button
                             onClick={() => handleSetDefaultAddress(addr.id)}
-                            className="text-[9px] font-bold uppercase tracking-wider text-text-secondary hover:text-accent transition-colors"
+                            className="text-[9px] font-bold uppercase tracking-wider text-text-secondary hover:text-accent transition-colors min-h-[36px] flex items-center"
                           >
                             Set Default
                           </button>
                         ) : (
-                          <span className="text-[9px] font-bold uppercase tracking-wider text-green-700 flex items-center gap-1">
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-green-700 flex items-center gap-1 min-h-[36px]">
                             <Check size={10} /> Active Default
                           </span>
                         )}
 
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
                           <button
                             onClick={() => handleOpenEditForm(addr)}
                             aria-label="Edit address"
-                            className="text-text-secondary hover:text-accent p-1 transition-colors"
+                            className="text-text-secondary hover:text-accent p-2 min-w-[36px] min-h-[36px] flex items-center justify-center transition-colors rounded"
                           >
-                            <Edit2 size={12} />
+                            <Edit2 size={13} />
                           </button>
                           <button
                             onClick={() => handleDeleteAddress(addr.id)}
                             aria-label="Delete address"
-                            className="text-text-secondary hover:text-sale p-1 transition-colors"
+                            className="text-text-secondary hover:text-sale p-2 min-w-[36px] min-h-[36px] flex items-center justify-center transition-colors rounded"
                           >
-                            <Trash2 size={12} />
+                            <Trash2 size={13} />
                           </button>
                         </div>
                       </div>

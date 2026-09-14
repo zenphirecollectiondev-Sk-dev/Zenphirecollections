@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Heart, Trash2, ArrowRight, Image } from 'lucide-react';
 import { useWishlistStore } from '../store/useWishlistStore';
 import { getProductsByIds } from '../lib/supabase';
+import { imgCard } from '../lib/imgTransform';
 
 export default function Wishlist() {
   const { productIds, toggleWishlist } = useWishlistStore();
@@ -37,14 +38,14 @@ export default function Wishlist() {
           <div className="h-8 w-48 bg-bg-subtle animate-pulse" />
         </div>
         {/* Product card skeletons */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 sm:gap-4 md:gap-8">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="animate-pulse">
-              <div className="aspect-[3/4] w-full bg-zinc-100 border border-zinc-200 mb-3" />
-              <div className="space-y-2">
-                <div className="h-2 w-10 bg-zinc-100" />
-                <div className="h-3 w-3/4 bg-zinc-200" />
-                <div className="h-3 w-1/4 bg-zinc-200" />
+            <div key={i} className="animate-pulse bg-bg-subtle border border-border overflow-hidden">
+              <div className="aspect-[3/4] w-full bg-black/5 mb-3" />
+              <div className="p-3 space-y-2">
+                <div className="h-2 w-10 bg-black/10" />
+                <div className="h-3 w-3/4 bg-black/10" />
+                <div className="h-3 w-1/4 bg-black/10" />
               </div>
             </div>
           ))}
@@ -60,7 +61,7 @@ export default function Wishlist() {
         <span className="text-xs uppercase tracking-[0.2em] text-text-secondary font-bold">
           Saved Items
         </span>
-        <h1 className="text-3xl font-heading font-black uppercase mt-1">
+        <h1 className="text-2xl sm:text-3xl font-heading font-black uppercase mt-1">
           My Wishlist
         </h1>
       </div>
@@ -74,25 +75,27 @@ export default function Wishlist() {
           </p>
           <Link
             to="/shop"
-            className="btn btn-primary inline-flex items-center gap-2 px-6 py-3 text-xs font-bold uppercase tracking-widest"
+            className="btn btn-primary inline-flex items-center gap-2 px-6 py-3 text-xs font-bold uppercase tracking-widest min-h-[44px]"
           >
             Start Shopping <ArrowRight size={13} />
           </Link>
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 sm:gap-4 md:gap-8">
           {wishlistProducts.map((product) => (
-            <div key={product.id} className="group product-card relative">
-              <div className="w-full bg-bg-subtle overflow-hidden border border-border relative mb-3">
+            <div key={product.id} className="group product-card block bg-bg-subtle border border-border overflow-hidden transition-all duration-300 hover:shadow-md">
+              <div className="aspect-[3/4] w-full bg-bg-subtle overflow-hidden relative">
                 <Link to={`/product/${product.slug}`}>
                   {product.product_images?.[0]?.url ? (
                     <img
-                      src={product.product_images[0].url}
+                      src={imgCard(product.product_images[0].url)}
                       alt={product.name}
-                      className="card-img w-full h-auto block relative z-10"
+                      loading="lazy"
+                      decoding="async"
+                      className="card-img w-full h-full object-cover object-top block relative z-10 transition-transform duration-500 group-hover:scale-105"
                     />
                   ) : (
-                    <div className="aspect-[3/4] w-full flex items-center justify-center bg-bg-subtle">
+                    <div className="w-full h-full flex items-center justify-center bg-bg-subtle">
                       <Image size={24} className="text-text-secondary/20" />
                     </div>
                   )}
@@ -101,29 +104,29 @@ export default function Wishlist() {
                 <button
                   onClick={() => toggleWishlist(product.id)}
                   aria-label="Remove from wishlist"
-                  className="wishlist-btn absolute top-2.5 right-2.5 p-2 bg-white/90 text-sale border border-border/60 rounded-full"
+                  className="wishlist-btn absolute top-2.5 right-2.5 min-w-[36px] min-h-[36px] flex items-center justify-center p-2 bg-white/90 text-sale border border-border/60 rounded-full shadow-xs"
                 >
-                  <Trash2 size={16} className="stroke-[1.5]" />
+                  <Trash2 size={15} className="stroke-[1.5]" />
                 </button>
               </div>
 
               {/* Text info */}
-              <div className="space-y-1">
-                <p className="text-[10px] uppercase tracking-widest text-text-secondary font-bold">
+              <div className="p-3.5 space-y-1">
+                <p className="text-[9px] uppercase tracking-widest text-text-secondary font-bold">
                   Zenphire
                 </p>
                 <Link to={`/product/${product.slug}`}>
-                  <h3 className="text-sm font-medium text-text-primary group-hover:underline truncate">
+                  <h3 className="text-xs font-medium text-text-primary group-hover:text-accent-gold transition-colors duration-200 truncate">
                     {product.name}
                   </h3>
                 </Link>
-                <div className="flex justify-between items-center">
-                  <p className="text-sm font-semibold text-text-primary">
+                <div className="flex justify-between items-center pt-0.5">
+                  <p className="text-xs font-semibold text-text-primary">
                     ₹{Number(product.base_price || 0).toFixed(2)}
                   </p>
                   <Link
                     to={`/product/${product.slug}`}
-                    className="text-xs uppercase tracking-wider font-bold text-text-secondary hover:text-text-primary underline underline-offset-4"
+                    className="text-[10px] uppercase tracking-wider font-bold text-text-secondary hover:text-text-primary underline underline-offset-4"
                   >
                     View
                   </Link>

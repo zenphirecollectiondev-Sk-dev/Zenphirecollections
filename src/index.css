@@ -10,24 +10,6 @@
   font-display: swap;
 }
 
-@font-face {
-  font-family: 'Kugile';
-  src: url('/fonts/Kugile.otf') format('opentype'),
-       url('/fonts/Kugile.ttf') format('truetype');
-  font-weight: normal;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Mending';
-  src: url('/fonts/Mending.otf') format('opentype'),
-       url('/fonts/Mending.ttf') format('truetype');
-  font-weight: normal;
-  font-style: normal;
-  font-display: swap;
-}
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -747,4 +729,87 @@
 .animate-progress {
   animation: progress 6s linear infinite;
   transform-origin: left;
+}
+
+/* =========================================
+   ZENPHIRE SIGNATURE DIAMOND PRELOADER
+   ========================================= */
+
+.preloader-diamond-container {
+  position: relative;
+  width: 50px;
+  height: 50px;
+}
+
+.preloader-diamond {
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(184, 151, 90, 0.35);
+  transform: rotate(45deg);
+  animation: pulseDiamond 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.preloader-diamond-inner {
+  position: absolute;
+  inset: 12px;
+  border: 1px solid rgba(184, 151, 90, 0.85);
+  transform: rotate(45deg);
+  animation: spinDiamond 3s linear infinite;
+}
+
+.preloader-text {
+  font-family: 'Cinzel', serif;
+  font-size: 13px;
+  letter-spacing: 0.35em;
+  color: #B8975A;
+  text-transform: uppercase;
+  animation: textGlow 2s ease-in-out infinite alternate;
+}
+
+@keyframes spinDiamond {
+  0% {
+    transform: rotate(45deg);
+  }
+  100% {
+    transform: rotate(405deg);
+  }
+}
+
+@keyframes pulseDiamond {
+  0%, 100% {
+    transform: rotate(45deg) scale(0.92);
+    opacity: 0.5;
+  }
+  50% {
+    transform: rotate(45deg) scale(1.08);
+    opacity: 1;
+  }
+}
+
+@keyframes textGlow {
+  0% {
+    opacity: 0.45;
+    text-shadow: 0 0 8px rgba(184, 151, 90, 0);
+  }
+  100% {
+    opacity: 1;
+    text-shadow: 0 0 18px rgba(184, 151, 90, 0.5);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .preloader-diamond,
+  .preloader-diamond-inner,
+  .preloader-text {
+    animation: none !important;
+  }
+  .preloader-diamond {
+    opacity: 0.8 !important;
+  }
+  .preloader-diamond-inner {
+    opacity: 0.9 !important;
+  }
+  .preloader-text {
+    opacity: 1 !important;
+  }
 }

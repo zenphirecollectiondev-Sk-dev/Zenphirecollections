@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { X, Plus, Minus, Trash2, ShoppingBag } from 'lucide-react';
 import { useCartStore } from '../store/useCartStore';
@@ -11,12 +12,26 @@ interface CartDrawerProps {
 export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
   const { items, removeItem, updateQuantity } = useCartStore();
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   const subtotal = items.reduce((acc, item) => acc + item.price * item.quantity, 0);
 
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[150] flex justify-end">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Shopping Cart"
+          className="fixed inset-0 z-[150] flex justify-end"
+        >
           {/* Backdrop — fades in on open, fades out on close */}
           <motion.div
             key="cart-backdrop"
@@ -51,7 +66,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
               <button
                 onClick={onClose}
                 aria-label="Close cart"
-                className="btn-icon p-1.5 hover:bg-bg-subtle rounded-full"
+                className="btn-icon min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-bg-subtle rounded-full"
               >
                 <X size={20} />
               </button>
@@ -65,7 +80,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                   <p className="text-text-secondary font-medium text-sm">Your shopping cart is empty.</p>
                   <button
                     onClick={onClose}
-                    className="btn btn-primary px-6 py-3 text-[10px] font-bold uppercase tracking-widest"
+                    className="btn btn-primary px-6 py-3 text-[10px] font-bold uppercase tracking-widest min-h-[44px]"
                   >
                     Continue Shopping
                   </button>
@@ -102,26 +117,28 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                           <div className="flex items-center border border-border">
                             <button
                               onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                              className="p-1.5 hover:bg-bg-subtle text-text-secondary transition-colors"
+                              aria-label="Decrease quantity"
+                              className="w-9 h-9 flex items-center justify-center hover:bg-bg-subtle text-text-secondary transition-colors"
                             >
-                              <Minus size={12} />
+                              <Minus size={13} />
                             </button>
-                            <span className="px-3 text-xs font-semibold select-none">
+                            <span className="px-3 min-w-[28px] text-center text-xs font-semibold select-none">
                               {item.quantity}
                             </span>
                             <button
                               onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                              className="p-1.5 hover:bg-bg-subtle text-text-secondary transition-colors"
+                              aria-label="Increase quantity"
+                              className="w-9 h-9 flex items-center justify-center hover:bg-bg-subtle text-text-secondary transition-colors"
                             >
-                              <Plus size={12} />
+                              <Plus size={13} />
                             </button>
                           </div>
                           <button
                             onClick={() => removeItem(item.id)}
-                            className="btn-icon p-1 text-text-secondary hover:text-sale"
+                            className="btn-icon min-w-[40px] min-h-[40px] flex items-center justify-center text-text-secondary hover:text-sale rounded-full"
                             aria-label="Remove item"
                           >
-                            <Trash2 size={15} />
+                            <Trash2 size={16} />
                           </button>
                         </div>
                       </div>

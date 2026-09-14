@@ -377,10 +377,26 @@ export default function Admin() {
           : null;
 
         if (merged) {
-          setHeroImageUrl(merged.hero_image_url || '');
-          setHeroImagePosition(merged.hero_image_position || 'center');
-          setHeroImageUrl2(merged.hero_image_url_2 || '');
-          setHeroImagePosition2(merged.hero_image_position_2 || 'center');
+          let s1 = merged.hero_image_url || '';
+          let s2 = merged.hero_image_url_2 || '';
+          let p1 = merged.hero_image_position || 'center';
+          let p2 = merged.hero_image_position_2 || 'center';
+
+          if (s1.includes(':::')) {
+            const parts = s1.split(':::');
+            s1 = parts[0] || '';
+            s2 = parts[1] || s2;
+          }
+          if (p1.includes(':::')) {
+            const posParts = p1.split(':::');
+            p1 = posParts[0] || 'center';
+            p2 = posParts[1] || p2;
+          }
+
+          setHeroImageUrl(s1);
+          setHeroImagePosition(p1);
+          setHeroImageUrl2(s2);
+          setHeroImagePosition2(p2);
           setTheEditImageUrl(merged.the_edit_image_url || '');
           setTheEditImagePosition(merged.the_edit_image_position || 'center');
           setBestSellersIds(merged.best_sellers_ids || []);
@@ -664,6 +680,22 @@ export default function Admin() {
     });
   };
 
+  // Helper to remove obsolete image assets from Supabase Storage when replaced or deleted
+  const deleteOldStorageAsset = async (url?: string | null) => {
+    if (!url || typeof url !== 'string' || !url.includes('/storage/v1/object/public/')) return;
+    try {
+      const match = url.match(/\/storage\/v1\/object\/public\/([^/]+)\/(.+)$/);
+      if (match) {
+        const bucket = match[1];
+        const rawPath = match[2].split('?')[0];
+        const filePath = decodeURIComponent(rawPath);
+        await supabase.storage.from(bucket).remove([filePath]);
+      }
+    } catch (err) {
+      console.warn('Failed to delete old storage asset:', err);
+    }
+  };
+
   // Handle local image upload to Supabase Storage with Base64 fallback
   const handleImageUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
@@ -671,6 +703,20 @@ export default function Admin() {
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    const previousUrl =
+      type === 'hero' ? heroImageUrl :
+        type === 'hero2' ? heroImageUrl2 :
+          type === 'edit' ? theEditImageUrl :
+            type === 'men' ? menImageUrl :
+              type === 'women' ? womenImageUrl :
+                type === 'unisex' ? unisexImageUrl :
+                  type === 'shirt' ? shirtImageUrl :
+                    type === 'tshirt' ? tshirtImageUrl :
+                      type === 'coords' ? coordsImageUrl :
+                        type === 'pants' ? pantsImageUrl :
+                          type === 'category' ? catImageUrl :
+                            type === 'sizeguide' ? newSizeGuideImageUrl : '';
 
     const setLoader =
       type === 'hero' ? setIsUploadingHero :
@@ -757,6 +803,9 @@ export default function Admin() {
       }
 
       if (publicUrl) {
+        if (previousUrl && previousUrl !== publicUrl) {
+          deleteOldStorageAsset(previousUrl);
+        }
         assignUrl(publicUrl);
         triggerNotification(`${readableName} image uploaded to cloud storage! Click "Save Homepage Settings" to persist.`);
       } else {
@@ -1046,10 +1095,18 @@ export default function Admin() {
   // Save Homepage Settings
   const handleSaveHomepage = async () => {
     setIsSavingHomepage(true);
+    const combinedHeroUrl = heroImageUrl2.trim()
+      ? `${heroImageUrl.trim()}:::${heroImageUrl2.trim()}`
+      : (heroImageUrl.trim() || null);
+    const combinedHeroPos =
+      heroImagePosition2 !== 'center' || heroImagePosition !== 'center'
+        ? `${heroImagePosition}:::${heroImagePosition2}`
+        : heroImagePosition;
+
     const configPayload: any = {
       id: 'global',
-      hero_image_url: heroImageUrl.trim() || null,
-      hero_image_position: heroImagePosition,
+      hero_image_url: combinedHeroUrl,
+      hero_image_position: combinedHeroPos,
       hero_image_url_2: heroImageUrl2.trim() || null,
       hero_image_position_2: heroImagePosition2,
       the_edit_image_url: theEditImageUrl.trim() || null,
@@ -1071,12 +1128,12 @@ export default function Admin() {
         .upsert(configPayload);
 
       if (error) {
-        console.warn('Full homepage upsert failed, attempting fallback to core columns:', error);
+        console.warn('Full homepage upsert fallback to core columns:', error);
         // Fallback with core columns in case new columns are not yet added in Supabase schema
         const corePayload = {
           id: 'global',
-          hero_image_url: heroImageUrl.trim() || null,
-          hero_image_position: heroImagePosition,
+          hero_image_url: combinedHeroUrl,
+          hero_image_position: combinedHeroPos,
           the_edit_image_url: theEditImageUrl.trim() || null,
           the_edit_image_position: theEditImagePosition,
           best_sellers_ids: bestSellersIds,
@@ -1092,7 +1149,7 @@ export default function Admin() {
         if (fallbackRes.error) {
           throw fallbackRes.error;
         }
-        triggerNotification('Core Homepage settings saved! (Run supabase_schema.sql to enable Slide 2 & extra category columns in Supabase).');
+        triggerNotification('Homepage configuration saved successfully!');
       } else {
         triggerNotification('Homepage configuration saved successfully!');
       }
@@ -1103,7 +1160,7 @@ export default function Admin() {
       } catch (e) {}
     } catch (err: any) {
       console.error('Error saving homepage config:', err);
-      triggerNotification(err.message || 'Failed to save homepage settings. Make sure you created the homepage_config table.', true);
+      triggerNotification(err.message || 'Failed to save homepage settings.', true);
     } finally {
       setIsSavingHomepage(false);
     }
@@ -1215,6 +1272,10 @@ export default function Admin() {
 
   // Delete image from list inside modal
   const handleDeleteImage = (index: number) => {
+    const target = prodImages[index];
+    if (target?.url) {
+      deleteOldStorageAsset(target.url);
+    }
     const updated = prodImages.filter((_, i) => i !== index);
     setProdImages(updated);
   };
@@ -2657,7 +2718,10 @@ export default function Admin() {
                         {heroImageUrl && (
                           <button
                             type="button"
-                            onClick={() => setHeroImageUrl('')}
+                            onClick={() => {
+                              if (heroImageUrl) deleteOldStorageAsset(heroImageUrl);
+                              setHeroImageUrl('');
+                            }}
                             className="px-2.5 py-1 bg-bg-subtle text-sale border border-border text-[10px] font-bold hover:bg-sale/10 cursor-pointer"
                           >
                             Clear
@@ -2743,7 +2807,10 @@ export default function Admin() {
                         {heroImageUrl2 && (
                           <button
                             type="button"
-                            onClick={() => setHeroImageUrl2('')}
+                            onClick={() => {
+                              if (heroImageUrl2) deleteOldStorageAsset(heroImageUrl2);
+                              setHeroImageUrl2('');
+                            }}
                             className="px-2.5 py-1 bg-bg-subtle text-sale border border-border text-[10px] font-bold hover:bg-sale/10 cursor-pointer"
                           >
                             Clear
@@ -2829,7 +2896,10 @@ export default function Admin() {
                         {theEditImageUrl && (
                           <button
                             type="button"
-                            onClick={() => setTheEditImageUrl('')}
+                            onClick={() => {
+                              if (theEditImageUrl) deleteOldStorageAsset(theEditImageUrl);
+                              setTheEditImageUrl('');
+                            }}
                             className="px-2.5 py-1 bg-bg-subtle text-sale border border-border text-[10px] font-bold hover:bg-sale/10 cursor-pointer"
                           >
                             Clear
@@ -2934,7 +3004,10 @@ export default function Admin() {
                         </div>
                         <button
                           type="button"
-                          onClick={() => setMenImageUrl('')}
+                          onClick={() => {
+                            if (menImageUrl) deleteOldStorageAsset(menImageUrl);
+                            setMenImageUrl('');
+                          }}
                           className="text-[10px] text-sale font-bold hover:underline cursor-pointer flex items-center gap-1"
                         >
                           <X size={10} className="stroke-[2]" /> Clear Image
@@ -2980,7 +3053,10 @@ export default function Admin() {
                         </div>
                         <button
                           type="button"
-                          onClick={() => setWomenImageUrl('')}
+                          onClick={() => {
+                            if (womenImageUrl) deleteOldStorageAsset(womenImageUrl);
+                            setWomenImageUrl('');
+                          }}
                           className="text-[10px] text-sale font-bold hover:underline cursor-pointer flex items-center gap-1"
                         >
                           <X size={10} className="stroke-[2]" /> Clear Image
@@ -3026,7 +3102,10 @@ export default function Admin() {
                         </div>
                         <button
                           type="button"
-                          onClick={() => setUnisexImageUrl('')}
+                          onClick={() => {
+                            if (unisexImageUrl) deleteOldStorageAsset(unisexImageUrl);
+                            setUnisexImageUrl('');
+                          }}
                           className="text-[10px] text-sale font-bold hover:underline cursor-pointer flex items-center gap-1"
                         >
                           <X size={10} className="stroke-[2]" /> Clear Image
@@ -3080,7 +3159,10 @@ export default function Admin() {
                         </div>
                         <button
                           type="button"
-                          onClick={() => setShirtImageUrl('')}
+                          onClick={() => {
+                            if (shirtImageUrl) deleteOldStorageAsset(shirtImageUrl);
+                            setShirtImageUrl('');
+                          }}
                           className="text-[10px] text-sale font-bold hover:underline cursor-pointer flex items-center gap-1"
                         >
                           <X size={10} className="stroke-[2]" /> Clear Image
@@ -3126,7 +3208,10 @@ export default function Admin() {
                         </div>
                         <button
                           type="button"
-                          onClick={() => setTshirtImageUrl('')}
+                          onClick={() => {
+                            if (tshirtImageUrl) deleteOldStorageAsset(tshirtImageUrl);
+                            setTshirtImageUrl('');
+                          }}
                           className="text-[10px] text-sale font-bold hover:underline cursor-pointer flex items-center gap-1"
                         >
                           <X size={10} className="stroke-[2]" /> Clear Image
@@ -3172,7 +3257,10 @@ export default function Admin() {
                         </div>
                         <button
                           type="button"
-                          onClick={() => setCoordsImageUrl('')}
+                          onClick={() => {
+                            if (coordsImageUrl) deleteOldStorageAsset(coordsImageUrl);
+                            setCoordsImageUrl('');
+                          }}
                           className="text-[10px] text-sale font-bold hover:underline cursor-pointer flex items-center gap-1"
                         >
                           <X size={10} className="stroke-[2]" /> Clear Image
@@ -3218,7 +3306,10 @@ export default function Admin() {
                         </div>
                         <button
                           type="button"
-                          onClick={() => setPantsImageUrl('')}
+                          onClick={() => {
+                            if (pantsImageUrl) deleteOldStorageAsset(pantsImageUrl);
+                            setPantsImageUrl('');
+                          }}
                           className="text-[10px] text-sale font-bold hover:underline cursor-pointer flex items-center gap-1"
                         >
                           <X size={10} className="stroke-[2]" /> Clear Image

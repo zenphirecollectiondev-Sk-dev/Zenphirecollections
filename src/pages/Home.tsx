@@ -1,12 +1,19 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { ArrowRight, Heart, Image, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useWishlistStore } from '../store/useWishlistStore';
 import { getActiveProducts, getCategories, supabase } from '../lib/supabase';
 import { dataCache } from '../lib/dataCache';
 import { imgHero, imgCard } from '../lib/imgTransform';
+import { usePageSEO } from '../hooks/usePageSEO';
 
 export default function Home() {
+  usePageSEO({
+    title: 'ZENPHIRE — Luxury Essentials & Modern Clothing Collection',
+    description: 'Discover Zenphire luxury apparel, versatile essentials, and sculpted cuts engineered for everyday luxury.'
+  });
+
   const { toggleWishlist, isWishlisted } = useWishlistStore();
   const [products, setProducts] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
@@ -27,7 +34,7 @@ export default function Home() {
     try {
       const raw = localStorage.getItem('zenphire_homepage_config');
       if (raw) return JSON.parse(raw);
-    } catch (e) {}
+    } catch (e) { }
     return null;
   });
 
@@ -36,18 +43,33 @@ export default function Home() {
 
   // Hero Slider State
   const [activeSlide, setActiveSlide] = useState(0);
+  const [imagesLoaded, setImagesLoaded] = useState<Record<number, boolean>>({});
+  const [heroBannerReady, setHeroBannerReady] = useState(false);
   const touchStartX = useRef<number | null>(null);
   const touchEndX = useRef<number | null>(null);
 
   const heroSlides = useMemo(() => {
-    const slide1Image = homepageConfig?.hero_image_url || null;
-    const slide2Image = homepageConfig?.hero_image_url_2 || null;
+    let slide1Image = homepageConfig?.hero_image_url || null;
+    let slide2Image = homepageConfig?.hero_image_url_2 || null;
+    let pos1 = homepageConfig?.hero_image_position || 'center';
+    let pos2 = homepageConfig?.hero_image_position_2 || 'center';
+
+    if (slide1Image && slide1Image.includes(':::')) {
+      const parts = slide1Image.split(':::');
+      slide1Image = parts[0] || null;
+      slide2Image = parts[1] || slide2Image;
+    }
+    if (pos1 && pos1.includes(':::')) {
+      const pParts = pos1.split(':::');
+      pos1 = pParts[0] || 'center';
+      pos2 = pParts[1] || pos2;
+    }
 
     const slides: any[] = [
       {
         id: 1,
         image: slide1Image,
-        position: homepageConfig?.hero_image_position || 'center',
+        position: pos1,
         titlePart1: 'Raw',
         titleHighlight1: 'Textures',
         titlePart2: 'Minimal',
@@ -62,7 +84,7 @@ export default function Home() {
       slides.push({
         id: 2,
         image: slide2Image,
-        position: homepageConfig?.hero_image_position_2 || 'center',
+        position: pos2,
         titlePart1: 'Timeless',
         titleHighlight1: 'Elegance',
         titlePart2: 'Curated',
@@ -76,14 +98,80 @@ export default function Home() {
     return slides;
   }, [homepageConfig]);
 
-  // Auto-slide effect every 6 seconds (if more than 1 slide)
+  // Preload hero slide images so we know exact readiness state (Slide 1 unblocks view, Slide 2+ preload in background)
   useEffect(() => {
-    if (heroSlides.length <= 1) return;
+    let mounted = true;
+    const firstSlide = heroSlides[0];
+
+    // Safety fallback timer: ensure banner transitions within 4.0s even on complete network stall
+    const fallbackTimer = setTimeout(() => {
+      if (mounted) setHeroBannerReady(true);
+    }, 4000);
+
+    if (!firstSlide || !firstSlide.image) {
+      if (mounted) {
+        setHeroBannerReady(true);
+        if (firstSlide) setImagesLoaded((prev) => ({ ...prev, [firstSlide.id]: true }));
+      }
+      return () => {
+        mounted = false;
+        clearTimeout(fallbackTimer);
+      };
+    }
+
+    heroSlides.forEach((slide, index) => {
+      if (!slide.image) {
+        if (mounted) {
+          setImagesLoaded((prev) => ({ ...prev, [slide.id]: true }));
+          if (index === 0) setHeroBannerReady(true);
+        }
+        return;
+      }
+      const imgUrl = typeof slide.image === 'string' && (slide.image.startsWith('http') || slide.image.startsWith('data:'))
+        ? imgHero(slide.image)
+        : slide.image;
+
+      const img = new window.Image();
+      img.src = imgUrl;
+
+      const handleSuccess = () => {
+        if (!mounted) return;
+        setImagesLoaded((prev) => ({ ...prev, [slide.id]: true }));
+        if (index === 0) setHeroBannerReady(true);
+      };
+
+      const handleError = () => {
+        if (!mounted) return;
+        setImagesLoaded((prev) => ({ ...prev, [slide.id]: true }));
+        if (index === 0) setHeroBannerReady(true);
+      };
+
+      if (img.complete) {
+        handleSuccess();
+      } else {
+        img.onload = handleSuccess;
+        img.onerror = handleError;
+      }
+    });
+
+    return () => {
+      mounted = false;
+      clearTimeout(fallbackTimer);
+    };
+  }, [heroSlides]);
+
+  const isCurrentSlideLoaded = !heroSlides[activeSlide]?.image || !!imagesLoaded[heroSlides[activeSlide]?.id];
+
+  // Auto-slide effect every 6 seconds — only starts counting when the active slide's banner image is fully loaded and heroBannerReady is true
+  useEffect(() => {
+    if (!heroBannerReady || heroSlides.length <= 1) return;
+    if (!isCurrentSlideLoaded) return;
+
     const timer = setInterval(() => {
       setActiveSlide((prev) => (prev + 1) % heroSlides.length);
     }, 6000);
     return () => clearInterval(timer);
-  }, [activeSlide, heroSlides.length]);
+  }, [activeSlide, heroSlides, imagesLoaded, isCurrentSlideLoaded, heroBannerReady]);
 
   const handlePrevSlide = () => {
     setActiveSlide((prev) => (prev - 1 + heroSlides.length) % heroSlides.length);
@@ -214,17 +302,21 @@ export default function Home() {
         try {
           const raw = localStorage.getItem('zenphire_homepage_config');
           if (raw) localBackup = JSON.parse(raw);
-        } catch (e) {}
+        } catch (e) { }
 
         const merged = hpData || localBackup
           ? {
-              ...localBackup,
-              ...hpData,
-              hero_image_url_2: hpData?.hero_image_url_2 || localBackup?.hero_image_url_2 || null,
-            }
+            ...localBackup,
+            ...hpData,
+            hero_image_url_2: hpData?.hero_image_url_2 || localBackup?.hero_image_url_2 || null,
+          }
           : null;
 
         if (merged) {
+          if (merged.hero_image_url && merged.hero_image_url.includes(':::')) {
+            const parts = merged.hero_image_url.split(':::');
+            merged.hero_image_url_2 = parts[1] || merged.hero_image_url_2;
+          }
           dataCache.set('homepage_config', merged);
           setHomepageConfig(merged);
         }
@@ -302,11 +394,29 @@ export default function Home() {
 
       {/* ── 1. HERO SLIDER ── */}
       <section
-        className="relative bg-bg-subtle h-[75vh] md:h-[80vh] flex flex-col md:flex-row items-stretch overflow-hidden border-b border-border group/hero select-none"
+        className="relative bg-[#001510] h-[75vh] md:h-[80vh] flex flex-col md:flex-row items-stretch overflow-hidden border-b border-border group/hero select-none"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
+        {/* Diamond Loader Overlay — active until Slide 1 image is fully fetched & decoded */}
+        <AnimatePresence>
+          {!heroBannerReady && (
+            <motion.div
+              key="hero-diamond-loader"
+              initial={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.45, ease: [0.4, 0, 0.2, 1] }}
+              className="absolute inset-0 z-40 bg-[#001510] flex flex-col items-center justify-center pointer-events-none"
+            >
+              <div className="preloader-diamond-container mb-4">
+                <div className="preloader-diamond" />
+                <div className="preloader-diamond-inner" />
+              </div>
+              <div className="preloader-text">Zenphire</div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <div className="absolute inset-0 md:relative md:w-1/2 flex flex-col justify-end md:justify-center px-6 pb-14 pt-16 md:px-16 lg:px-24 bg-transparent md:bg-bg-subtle z-20">
           <div className="max-w-md hero-content text-left relative min-h-[250px] flex flex-col justify-center">
@@ -316,8 +426,8 @@ export default function Home() {
                 <div
                   key={slide.id}
                   className={`transition-all duration-1000 ease-out space-y-4 md:space-y-8 ${isActive
-                      ? 'opacity-100 translate-y-0 relative z-20 pointer-events-auto'
-                      : 'opacity-0 translate-y-6 absolute inset-0 z-0 pointer-events-none'
+                    ? 'opacity-100 translate-y-0 relative z-20 pointer-events-auto'
+                    : 'opacity-0 translate-y-6 absolute inset-0 z-0 pointer-events-none'
                     }`}
                 >
                   <h1 className="text-3xl md:text-6xl lg:text-7xl font-sans uppercase font-extralight tracking-tight leading-[1.05] text-white md:text-text-primary">
@@ -348,17 +458,19 @@ export default function Home() {
             <div className="flex items-center gap-2">
               {heroSlides.map((_, idx) => {
                 const isActive = idx === activeSlide;
+                const isSlideReady = !heroSlides[idx]?.image || !!imagesLoaded[heroSlides[idx]?.id];
+
                 return (
                   <button
                     key={idx}
                     onClick={() => setActiveSlide(idx)}
                     aria-label={`Go to slide ${idx + 1}`}
                     className={`h-1.5 rounded-full transition-all duration-500 cursor-pointer overflow-hidden relative ${isActive
-                        ? 'w-8 bg-accent'
-                        : 'w-2 bg-white/40 md:bg-text-secondary/30 hover:bg-white/70 md:hover:bg-text-secondary/60'
+                      ? 'w-8 bg-accent'
+                      : 'w-2 bg-white/40 md:bg-text-secondary/30 hover:bg-white/70 md:hover:bg-text-secondary/60'
                       }`}
                   >
-                    {isActive && heroSlides.length > 1 && (
+                    {isActive && heroSlides.length > 1 && isSlideReady && heroBannerReady && (
                       <span
                         key={`prog-${activeSlide}`}
                         className="absolute inset-0 bg-white/60 animate-[progress_6s_linear_infinite]"
@@ -398,9 +510,10 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="absolute inset-0 md:relative md:w-1/2 flex justify-center overflow-hidden z-0 self-stretch">
+        <div className="absolute inset-0 md:relative md:w-1/2 flex justify-center overflow-hidden z-0 self-stretch bg-[#001510]">
           {heroSlides.map((slide, index) => {
             const isActive = index === activeSlide;
+
             return (
               <div
                 key={slide.id}
@@ -414,12 +527,16 @@ export default function Home() {
                     fetchPriority={index === 0 ? "high" : "low"}
                     loading={index === 0 ? "eager" : "lazy"}
                     decoding="async"
-                    className={`w-full h-full object-cover transition-transform duration-[6000ms] ease-out ${isActive ? 'scale-105' : 'scale-100'
-                      }`}
-                    style={{ objectPosition: slide.position }}
+                    onLoad={() => setImagesLoaded((prev) => ({ ...prev, [slide.id]: true }))}
+                    className={`w-full h-full object-cover transition-transform ease-out ${
+                      isActive ? 'scale-105' : 'scale-100'
+                    }`}
+                    style={{
+                      objectPosition: slide.position,
+                      transitionProperty: 'transform',
+                      transitionDuration: isActive ? '6000ms' : '1000ms'
+                    }}
                   />
-                ) : configLoading ? (
-                  <div className="w-full h-full animate-pulse bg-gradient-to-br from-zinc-100 via-zinc-200 to-zinc-100" />
                 ) : (
                   <div className="w-full h-full bg-gradient-to-br from-[#001510] via-[#063A2C] to-[#00221A]" />
                 )}
@@ -623,7 +740,7 @@ export default function Home() {
                   <button
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleWishlist(product.id); }}
                     aria-label="Toggle Wishlist"
-                    className={`wishlist-btn absolute top-3 right-3 p-2 bg-bg/90 border border-border/80 rounded-full shadow-xs z-10 transition-transform ${heartId === product.id ? 'anim-heart-pop' : ''}`}
+                    className={`wishlist-btn absolute top-3 right-3 min-w-[36px] min-h-[36px] flex items-center justify-center p-2 bg-bg/90 border border-border/80 rounded-full shadow-xs z-10 transition-transform ${heartId === product.id ? 'anim-heart-pop' : ''}`}
                   >
                     <Heart size={14} className={isWishlisted(product.id) ? 'fill-sale stroke-sale' : 'stroke-text-primary'} />
                   </button>
@@ -719,24 +836,24 @@ export default function Home() {
             />
 
             {/* MOBILE: 2-column grid */}
-            <div className="grid grid-cols-2 gap-x-4 gap-y-6 md:hidden px-4">
+            <div className="grid grid-cols-2 gap-3.5 sm:gap-4 md:hidden px-4">
               {bestSellers.map((product: any) => (
                 <Link
                   key={product.id}
                   to={`/product/${product.slug}`}
-                  className="group product-card block w-full"
+                  className="group product-card block w-full bg-bg-subtle border border-border overflow-hidden transition-all duration-300 hover:shadow-md"
                 >
-                  <div className="w-full bg-bg-subtle overflow-hidden border border-border relative">
+                  <div className="aspect-[3/4] w-full bg-bg-subtle overflow-hidden relative">
                     {product.product_images?.[0]?.url ? (
                       <img
                         src={imgCard(product.product_images[0].url)}
                         alt={product.name}
                         loading="lazy"
                         decoding="async"
-                        className="card-img w-full h-auto block relative z-10"
+                        className="card-img w-full h-full object-cover object-top block relative z-10 transition-transform duration-500 group-hover:scale-105"
                       />
                     ) : (
-                      <div className="aspect-[3/4] w-full flex items-center justify-center bg-bg-subtle">
+                      <div className="w-full h-full flex items-center justify-center bg-bg-subtle">
                         <Image size={20} className="text-text-secondary/20" />
                       </div>
                     )}
@@ -744,15 +861,15 @@ export default function Home() {
                     <button
                       onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleWishlist(product.id); }}
                       aria-label="Toggle Wishlist"
-                      className={`wishlist-btn absolute top-2.5 right-2.5 p-1.5 bg-white/90 border border-border/60 rounded-full z-10 ${heartId === product.id ? 'anim-heart-pop' : ''}`}
+                      className={`wishlist-btn absolute top-2.5 right-2.5 min-w-[36px] min-h-[36px] flex items-center justify-center p-2 bg-white/90 border border-border/60 rounded-full z-10 shadow-xs transition-transform ${heartId === product.id ? 'anim-heart-pop' : ''}`}
                     >
-                      <Heart size={13} className={isWishlisted(product.id) ? 'fill-sale stroke-sale' : 'stroke-text-primary'} />
+                      <Heart size={14} className={isWishlisted(product.id) ? 'fill-sale stroke-sale' : 'stroke-text-primary'} />
                     </button>
                   </div>
-                  <div className="mt-2.5 space-y-0.5">
+                  <div className="p-3.5 space-y-1">
                     <p className="text-[9px] uppercase tracking-widest text-text-secondary font-bold">Zenphire</p>
-                    <h3 className="text-sm font-medium text-text-primary group-hover:underline underline-offset-2 truncate">{product.name}</h3>
-                    <p className="text-sm font-semibold text-text-primary">₹{Number(product.base_price || 0).toFixed(2)}</p>
+                    <h3 className="text-xs font-medium text-text-primary group-hover:text-accent-gold transition-colors duration-200 truncate">{product.name}</h3>
+                    <p className="text-xs font-semibold text-text-primary">₹{Number(product.base_price || 0).toFixed(2)}</p>
                   </div>
                 </Link>
               ))}
@@ -761,7 +878,7 @@ export default function Home() {
             {/* DESKTOP: horizontal scroll */}
             <div
               ref={bestSellersScrollRef}
-              className="hidden md:flex overflow-x-auto custom-scrollbar gap-0 pl-4 sm:pl-6 lg:pl-8 pb-5 scroll-smooth"
+              className="hidden md:flex overflow-x-auto custom-scrollbar gap-0 pl-4 sm:pl-6 lg:px-8 pb-5 scroll-smooth"
             >
               {bestSellers.map((product: any) => (
                 <Link
@@ -770,17 +887,17 @@ export default function Home() {
                   className="group product-card flex-shrink-0 flex flex-col pr-4 md:pr-6"
                   style={{ width: 'clamp(200px, 26vw, 300px)' }}
                 >
-                  <div className="w-full bg-bg-subtle overflow-hidden border border-border relative">
+                  <div className="aspect-[3/4] w-full bg-bg-subtle overflow-hidden border border-border relative">
                     {product.product_images?.[0]?.url ? (
                       <img
                         src={imgCard(product.product_images[0].url)}
                         alt={product.name}
                         loading="lazy"
                         decoding="async"
-                        className="card-img w-full h-auto block relative z-10"
+                        className="card-img w-full h-full object-cover object-top block relative z-10 transition-transform duration-500 group-hover:scale-105"
                       />
                     ) : (
-                      <div className="aspect-[3/4] w-full flex items-center justify-center bg-bg-subtle">
+                      <div className="w-full h-full flex items-center justify-center bg-bg-subtle">
                         <Image size={20} className="text-text-secondary/20" />
                       </div>
                     )}
@@ -788,15 +905,15 @@ export default function Home() {
                     <button
                       onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleWishlist(product.id); }}
                       aria-label="Toggle Wishlist"
-                      className={`wishlist-btn absolute top-2.5 right-2.5 p-1.5 bg-white/90 border border-border/60 rounded-full z-10 ${heartId === product.id ? 'anim-heart-pop' : ''}`}
+                      className={`wishlist-btn absolute top-2.5 right-2.5 min-w-[36px] min-h-[36px] flex items-center justify-center p-2 bg-white/90 border border-border/60 rounded-full z-10 shadow-xs ${heartId === product.id ? 'anim-heart-pop' : ''}`}
                     >
-                      <Heart size={13} className={isWishlisted(product.id) ? 'fill-sale stroke-sale' : 'stroke-text-primary'} />
+                      <Heart size={14} className={isWishlisted(product.id) ? 'fill-sale stroke-sale' : 'stroke-text-primary'} />
                     </button>
                   </div>
-                  <div className="mt-2.5 space-y-0.5">
+                  <div className="p-3.5 space-y-1">
                     <p className="text-[9px] uppercase tracking-widest text-text-secondary font-bold">Zenphire</p>
-                    <h3 className="text-sm font-medium text-text-primary group-hover:underline underline-offset-2 truncate">{product.name}</h3>
-                    <p className="text-sm font-semibold text-text-primary">₹{Number(product.base_price || 0).toFixed(2)}</p>
+                    <h3 className="text-xs font-medium text-text-primary group-hover:text-accent-gold transition-colors duration-200 truncate">{product.name}</h3>
+                    <p className="text-xs font-semibold text-text-primary">₹{Number(product.base_price || 0).toFixed(2)}</p>
                   </div>
                 </Link>
               ))}

@@ -14,6 +14,7 @@ import { ErrorState } from "../components/ui/ErrorState";
 import type { GridProduct } from "../hooks/useCategoryProducts";
 import { imgCard } from "../lib/imgTransform";
 import { motion, AnimatePresence } from "framer-motion";
+import { usePageSEO } from "../hooks/usePageSEO";
 
 // --- Image card with proper loading / error states ---------------------------
 
@@ -132,21 +133,21 @@ function Pagination({
       <button
         onClick={onPrev}
         disabled={page === 0}
-        className="btn flex items-center gap-1.5 px-4 py-2 border border-border text-xs font-semibold uppercase tracking-wider disabled:opacity-30 disabled:cursor-not-allowed hover:bg-bg-subtle transition-colors"
+        className="btn flex items-center gap-1.5 min-h-[44px] px-5 py-2.5 border border-border text-xs font-semibold uppercase tracking-wider disabled:opacity-30 disabled:cursor-not-allowed hover:bg-bg-subtle transition-colors"
       >
-        <ChevronLeft size={13} />
+        <ChevronLeft size={14} />
         Previous
       </button>
-      <span className="text-xs text-text-secondary font-medium">
+      <span className="text-xs text-text-secondary font-medium px-2">
         Page {page + 1}
       </span>
       <button
         onClick={onNext}
         disabled={!hasMore}
-        className="btn flex items-center gap-1.5 px-4 py-2 border border-border text-xs font-semibold uppercase tracking-wider disabled:opacity-30 disabled:cursor-not-allowed hover:bg-bg-subtle transition-colors"
+        className="btn flex items-center gap-1.5 min-h-[44px] px-5 py-2.5 border border-border text-xs font-semibold uppercase tracking-wider disabled:opacity-30 disabled:cursor-not-allowed hover:bg-bg-subtle transition-colors"
       >
         Next
-        <ChevronRight size={13} />
+        <ChevronRight size={14} />
       </button>
     </div>
   );
@@ -161,6 +162,18 @@ export default function Shop() {
   const activeCategory = searchParams.get("category") || "all";
   const activeGender = searchParams.get("gender") || "all";
   const activeOccasion = searchParams.get("occasion") || "";
+
+  const shopTitle = useMemo(() => {
+    if (activeGender !== 'all') return `${activeGender.charAt(0).toUpperCase() + activeGender.slice(1)}'s Collection`;
+    if (activeCategory !== 'all') return `${activeCategory.charAt(0).toUpperCase() + activeCategory.slice(1)} Collection`;
+    if (activeOccasion) return `${activeOccasion.charAt(0).toUpperCase() + activeOccasion.slice(1)} Selection`;
+    return 'Complete Collection';
+  }, [activeGender, activeCategory, activeOccasion]);
+
+  usePageSEO({
+    title: shopTitle,
+    description: `Browse Zenphire's ${shopTitle.toLowerCase()} featuring luxury craftsmanship, premium fabrics, and sculpted silhouettes.`
+  });
 
   // -- Occasion product IDs (fetched from occasion_products when ?occasion= is set) --
   // null = no occasion filter, ["__occasion_loading__"] = still fetching
@@ -392,11 +405,11 @@ export default function Shop() {
         <button
           onClick={() => setIsMobileFilterOpen(true)}
           title="Filters"
-          className="relative btn-icon w-8 h-8 flex items-center justify-center rounded hover:bg-border transition-colors text-text-secondary hover:text-text-primary md:hidden"
+          className="relative btn-icon min-w-[44px] min-h-[44px] flex items-center justify-center rounded hover:bg-border transition-colors text-text-secondary hover:text-text-primary md:hidden"
         >
-          <SlidersHorizontal size={15} />
+          <SlidersHorizontal size={16} />
           {(selectedSizes.length > 0 || activeCategory !== "all") && (
-            <span className="absolute -top-1 -right-1 bg-accent text-white text-[8px] font-bold w-3.5 h-3.5 flex items-center justify-center rounded-full leading-none">
+            <span className="absolute top-1 right-1 bg-accent text-white text-[8px] font-bold w-3.5 h-3.5 flex items-center justify-center rounded-full leading-none">
               {selectedSizes.length + (activeCategory !== "all" ? 1 : 0)}
             </span>
           )}
@@ -430,7 +443,7 @@ export default function Shop() {
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
               title="Sort"
-              className="appearance-none bg-transparent border-none text-[10px] uppercase tracking-wider font-semibold py-1.5 pl-0 pr-6 focus:outline-none cursor-pointer text-text-secondary hover:text-text-primary transition-colors duration-150"
+              className="appearance-none bg-transparent border-none text-[10px] uppercase tracking-wider font-semibold py-2 pl-0 pr-6 focus:outline-none cursor-pointer text-text-secondary hover:text-text-primary transition-colors duration-150 min-h-[44px]"
             >
               <option value="newest">New Arrivals</option>
               <option value="price-asc">Price ↑</option>
@@ -534,17 +547,17 @@ export default function Shop() {
 
           {/* -- State machine rendering ----------------------------------- */}
 
-          {/* Loading � genuine first fetch */}
+          {/* Loading ─ genuine first fetch */}
           {queryState.status === "loading" && (
             <SkeletonGrid count={PAGE_SIZE} />
           )}
 
-          {/* Slow network � skeleton + banner */}
+          {/* Slow network ─ skeleton + banner */}
           {queryState.status === "slow" && (
             <>
               <div className="flex items-center gap-2 text-xs text-text-secondary bg-bg-subtle border border-border px-4 py-3 mb-6 rounded-sm anim-fade-in">
                 <WifiOff size={13} className="shrink-0 text-text-secondary/60" />
-                <span>Still loading � your connection seems slow. Hang tight�</span>
+                <span>Still loading ─ your connection seems slow. Hang tight…</span>
               </div>
               <SkeletonGrid count={PAGE_SIZE} />
             </>
@@ -568,14 +581,14 @@ export default function Shop() {
                   : "No active products found. Please try again later."
               }
               action={
-                activeCategory !== "all"
-                  ? { label: "Browse all", onClick: resetFilters }
+                activeCategory !== "all" || selectedSizes.length > 0 || maxPrice < 15000
+                  ? { label: "View all collections", onClick: resetFilters }
                   : undefined
               }
             />
           )}
 
-          {/* Success */}
+          {/* Filtered empty */}
           {queryState.status === "success" && filteredProducts.length === 0 && (
             <EmptyState
               title="No products match"
@@ -586,7 +599,7 @@ export default function Shop() {
 
           {queryState.status === "success" && filteredProducts.length > 0 && (
             <>
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-y-8 gap-x-4 md:gap-x-6 anim-stagger">
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-y-8 gap-x-3.5 sm:gap-x-4 md:gap-x-6 anim-stagger">
                 {filteredProducts.map((product, idx) => (
                   <Link
                     key={product.id}
@@ -622,11 +635,11 @@ export default function Shop() {
                           handleWishlist(product.id);
                         }}
                         aria-label="Toggle Wishlist"
-                        className={`wishlist-btn absolute top-2.5 right-2.5 p-1.5 bg-white/90 border border-border/60 rounded-full z-10 ${heartId === product.id ? "anim-heart-pop" : ""
+                        className={`wishlist-btn absolute top-2.5 right-2.5 min-w-[36px] min-h-[36px] flex items-center justify-center p-2 bg-white/90 border border-border/60 rounded-full z-10 shadow-xs ${heartId === product.id ? "anim-heart-pop" : ""
                           }`}
                       >
                         <Heart
-                          size={13}
+                          size={14}
                           className={
                             isWishlisted(product.id)
                               ? "fill-sale stroke-sale"
@@ -639,10 +652,10 @@ export default function Shop() {
                       <p className="text-[9px] uppercase tracking-widest text-text-secondary font-bold">
                         Zenphire
                       </p>
-                      <h3 className="text-sm font-medium text-text-primary group-hover:underline underline-offset-2 truncate">
+                      <h3 className="text-xs font-medium text-text-primary group-hover:text-accent-gold transition-colors duration-200 truncate">
                         {product.name}
                       </h3>
-                      <p className="text-sm font-semibold text-text-primary">
+                      <p className="text-xs font-semibold text-text-primary">
                         ₹{Number(product.base_price || 0).toFixed(2)}
                       </p>
                     </div>
@@ -688,9 +701,10 @@ export default function Shop() {
               </h2>
               <button
                 onClick={() => setIsMobileFilterOpen(false)}
-                className="btn-icon p-1.5 hover:bg-bg-subtle rounded-full"
+                aria-label="Close filters"
+                className="btn-icon min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-bg-subtle rounded-full"
               >
-                <X size={18} />
+                <X size={20} />
               </button>
             </div>
 

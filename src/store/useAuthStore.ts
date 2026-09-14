@@ -29,15 +29,13 @@ export const useAuthStore = create<AuthState>((set) => ({
   profile: null,
   loading: true,
   initialize: async () => {
-    console.warn("[Auth] Initializing store...");
     try {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       if (sessionError) {
-        console.error("[Auth] getSession error:", sessionError);
+        console.error('[Auth] Session initialization failed.');
       }
 
       if (session) {
-        console.warn("[Auth] Session found for user:", session.user.email);
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('*')
@@ -45,20 +43,17 @@ export const useAuthStore = create<AuthState>((set) => ({
           .single();
           
         if (profileError) {
-          console.error("[Auth] Profile fetch error:", profileError);
+          console.error('[Auth] Profile fetch failed.');
         }
-        console.warn("[Auth] Profile loaded:", profile);
         set({ session, user: session.user, profile: profile as Profile || null, loading: false });
         useWishlistStore.getState().fetchWishlist(session.user.id);
       } else {
-        console.warn("[Auth] No initial session found.");
         set({ session: null, user: null, profile: null, loading: false });
         useWishlistStore.getState().clearWishlist();
       }
 
       // Set up auth state change listener
       supabase.auth.onAuthStateChange(async (event, session) => {
-        console.warn("[Auth] onAuthStateChange event:", event, "Session exists:", !!session);
         if (session) {
           const { data: profile, error: profileError } = await supabase
             .from('profiles')
@@ -67,9 +62,8 @@ export const useAuthStore = create<AuthState>((set) => ({
             .single();
             
           if (profileError) {
-            console.error("[Auth] Profile select error on event:", profileError);
+            console.error('[Auth] Profile refresh failed on auth event:', event);
           }
-          console.warn("[Auth] Profile updated on event:", profile);
           set({ session, user: session.user, profile: profile as Profile || null, loading: false });
           useWishlistStore.getState().fetchWishlist(session.user.id);
         } else {
@@ -78,7 +72,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         }
       });
     } catch (error) {
-      console.error('[Auth] Error in initialize:', error);
+      console.error('[Auth] Unexpected error during initialization.');
       set({ loading: false });
     }
   },
@@ -88,10 +82,11 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ session: null, user: null, profile: null });
       useWishlistStore.getState().clearWishlist();
     } catch (error) {
-      console.error('Error signing out:', error);
+      console.error('[Auth] Sign out failed.');
     }
   },
   updateProfile: (profileData) => set((state) => ({
     profile: state.profile ? { ...state.profile, ...profileData } : null
   }))
 }));
+

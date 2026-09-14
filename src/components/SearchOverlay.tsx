@@ -115,6 +115,9 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
     <AnimatePresence>
       <motion.div
         key="search-overlay"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Search Catalog"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -142,9 +145,9 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
               <button
                 onClick={onClose}
                 aria-label="Close search"
-                className="w-8 h-8 flex items-center justify-center rounded-full text-[#B8975A]/60 hover:text-[#B8975A] hover:bg-white/8 transition-all duration-200"
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-[#B8975A]/60 hover:text-[#B8975A] hover:bg-white/8 transition-all duration-200"
               >
-                <X size={18} strokeWidth={1.5} />
+                <X size={20} strokeWidth={1.5} />
               </button>
             </div>
 
@@ -182,9 +185,10 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
               {query && (
                 <button
                   onClick={() => setQuery('')}
-                  className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full hover:bg-white/10 text-white/40 hover:text-white/70 transition-all"
+                  aria-label="Clear search input"
+                  className="flex-shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-full hover:bg-white/10 text-white/40 hover:text-white/70 transition-all"
                 >
-                  <X size={13} />
+                  <X size={15} />
                 </button>
               )}
             </div>
@@ -196,14 +200,14 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                   <button
                     key={term}
                     onClick={() => handleSuggestion(term)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] tracking-[0.15em] uppercase font-medium transition-all duration-200 hover:scale-105"
+                    className="flex items-center gap-1.5 px-3.5 py-2 min-h-[36px] rounded-full text-[10px] tracking-[0.15em] uppercase font-medium transition-all duration-200 hover:scale-105"
                     style={{
                       background: 'rgba(184,151,90,0.08)',
                       border: '1px solid rgba(184,151,90,0.2)',
                       color: 'rgba(184,151,90,0.7)',
                     }}
                   >
-                    <Sparkles size={9} />
+                    <Sparkles size={10} />
                     {term}
                   </button>
                 ))}

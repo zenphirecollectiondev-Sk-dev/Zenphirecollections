@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, ShieldCheck, MapPin, CheckCircle, Tag, AlertCircle, RefreshCw, X } from 'lucide-react';
 import { useCartStore } from '../store/useCartStore';
 import { useAuthStore } from '../store/useAuthStore';
-import { validateCoupon } from '../lib/coupons';
 import { supabase } from '../lib/supabase';
 
 type CheckoutStep = 'SHIPPING' | 'REVIEW' | 'SUCCESS';
@@ -195,19 +194,10 @@ export default function Checkout() {
         return;
       }
     } catch (_) {
-      // Supabase query failed — fall through to mock
-    }
-
-    // 2. Fallback: validate against local mock coupons
-    const result = validateCoupon(couponCode, subtotal);
-    if (!result.isValid) {
-      setCouponError(result.error || 'Invalid or expired coupon code.');
+      // Supabase is unreachable — do not fall back to any local codes
+      setCouponError('Unable to validate coupon. Please check your connection and try again.');
       setAppliedCoupon(null);
       setCouponDiscount(0);
-    } else {
-      setAppliedCoupon(result.coupon);
-      setCouponDiscount(result.discountAmount);
-      setCouponSuccess(`Coupon "${result.coupon?.code}" applied! Saved ₹${result.discountAmount.toFixed(2)}.`);
     }
   };
 
@@ -220,8 +210,34 @@ export default function Checkout() {
     setCouponError(null);
   };
 
-  // Trigger Payment Simulator (Razorpay checkout)
-  const triggerPayment = () => {
+  // Trigger Payment Simulator (Razorpay checkout) — validates real-time stock availability first
+  const triggerPayment = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const variantIds = items.map((i) => i.variantId).filter(Boolean);
+      if (variantIds.length > 0) {
+        const { data: variants } = await supabase
+          .from('product_variants')
+          .select('id, stock_qty')
+          .in('id', variantIds);
+
+        if (variants && variants.length > 0) {
+          for (const item of items) {
+            const variant = variants.find((v: any) => v.id === item.variantId);
+            if (variant && variant.stock_qty < item.quantity) {
+              setError(`Sorry, "${item.name}" (${item.size || 'selected size'}) is out of stock or exceeds available inventory. Please update your cart.`);
+              setLoading(false);
+              return;
+            }
+          }
+        }
+      }
+    } catch (stockErr) {
+      console.warn('Pre-payment stock check warning:', stockErr);
+    } finally {
+      setLoading(false);
+    }
     setShowPaymentModal(true);
   };
 
@@ -436,7 +452,7 @@ export default function Checkout() {
             {/* Form for new address */}
             {selectedAddressId === 'new' && (
               <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <label htmlFor="recipient_name" className="block text-xs font-heading font-bold uppercase tracking-wider text-text-primary mb-2">
                       Recipient Name
@@ -499,7 +515,7 @@ export default function Checkout() {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <label htmlFor="city" className="block text-xs font-heading font-bold uppercase tracking-wider text-text-primary mb-2">
                       City

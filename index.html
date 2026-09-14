@@ -1,97 +1,142 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ZENPHIRE</title>
-    <style>
-      /* Ultra-premium instant preloader */
-      #zenphire-preloader {
-        position: fixed;
-        inset: 0;
-        z-index: 99999;
-        background-color: #001510; /* Dark ambient header deep */
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.8s;
-      }
-      #zenphire-preloader.fade-out {
-        opacity: 0;
-        visibility: hidden;
-      }
-      
-      .preloader-diamond-container {
-        position: relative;
-        width: 60px;
-        height: 60px;
-        margin-bottom: 2rem;
-      }
 
-      .preloader-diamond {
-        position: absolute;
-        inset: 0;
-        border: 1px solid rgba(184, 151, 90, 0.3); /* Gold */
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ZENPHIRE — Luxury Essentials & Modern Clothing Collection</title>
+  <meta name="description" content="Discover Zenphire's curated collection of luxury apparel, versatile essentials, and sculpted cuts engineered for everyday elegance." />
+  <meta name="keywords" content="Zenphire, luxury clothing, luxury fashion, modern apparel, streetwear, premium shirts, linen shirt" />
+  <link rel="canonical" href="https://zenphire.com/" />
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://zenphire.com/" />
+  <meta property="og:title" content="ZENPHIRE — Luxury Essentials & Modern Clothing Collection" />
+  <meta property="og:description" content="Discover Zenphire's curated collection of luxury apparel, versatile essentials, and sculpted cuts engineered for everyday elegance." />
+  <meta property="og:image" content="https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=1200&auto=format&fit=crop" />
+  <meta property="og:site_name" content="ZENPHIRE" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="ZENPHIRE — Luxury Essentials & Modern Clothing Collection" />
+  <meta name="twitter:description" content="Discover Zenphire's curated collection of luxury apparel, versatile essentials, and sculpted cuts engineered for everyday elegance." />
+  <meta name="twitter:image" content="https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=1200&auto=format&fit=crop" />
+  <style>
+    /* Ultra-premium instant preloader */
+    #zenphire-preloader {
+      position: fixed;
+      inset: 0;
+      z-index: 99999;
+      background-color: #001510;
+      /* Dark ambient header deep */
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.8s;
+    }
+
+    #zenphire-preloader.fade-out {
+      opacity: 0;
+      visibility: hidden;
+    }
+
+    .preloader-diamond-container {
+      position: relative;
+      width: 60px;
+      height: 60px;
+      margin-bottom: 2rem;
+    }
+
+    .preloader-diamond {
+      position: absolute;
+      inset: 0;
+      border: 1px solid rgba(184, 151, 90, 0.3);
+      /* Gold */
+      transform: rotate(45deg);
+      animation: pulseDiamond 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+
+    .preloader-diamond-inner {
+      position: absolute;
+      inset: 15px;
+      border: 1px solid rgba(184, 151, 90, 0.8);
+      transform: rotate(45deg);
+      animation: spinDiamond 3s linear infinite;
+    }
+
+    .preloader-text {
+      font-family: 'Cinzel', serif;
+      /* Use a serif fallback closely matching brand */
+      font-size: 14px;
+      letter-spacing: 0.4em;
+      color: #B8975A;
+      text-transform: uppercase;
+      animation: textGlow 2s ease-in-out infinite alternate;
+    }
+
+    @keyframes spinDiamond {
+      0% {
         transform: rotate(45deg);
-        animation: pulseDiamond 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-      }
-      
-      .preloader-diamond-inner {
-        position: absolute;
-        inset: 15px;
-        border: 1px solid rgba(184, 151, 90, 0.8);
-        transform: rotate(45deg);
-        animation: spinDiamond 3s linear infinite;
       }
 
-      .preloader-text {
-        font-family: 'Cinzel', serif; /* Use a serif fallback closely matching brand */
-        font-size: 14px;
-        letter-spacing: 0.4em;
-        color: #B8975A;
-        text-transform: uppercase;
-        animation: textGlow 2s ease-in-out infinite alternate;
+      100% {
+        transform: rotate(405deg);
+      }
+    }
+
+    @keyframes pulseDiamond {
+
+      0%,
+      100% {
+        transform: rotate(45deg) scale(0.9);
+        opacity: 0.5;
       }
 
-      @keyframes spinDiamond {
-        0% { transform: rotate(45deg); }
-        100% { transform: rotate(405deg); }
+      50% {
+        transform: rotate(45deg) scale(1.1);
+        opacity: 1;
+      }
+    }
+
+    @keyframes textGlow {
+      0% {
+        opacity: 0.4;
+        text-shadow: 0 0 10px rgba(184, 151, 90, 0);
       }
 
-      @keyframes pulseDiamond {
-        0%, 100% { transform: rotate(45deg) scale(0.9); opacity: 0.5; }
-        50% { transform: rotate(45deg) scale(1.1); opacity: 1; }
+      100% {
+        opacity: 1;
+        text-shadow: 0 0 20px rgba(184, 151, 90, 0.4);
       }
+    }
+  </style>
+</head>
 
-      @keyframes textGlow {
-        0% { opacity: 0.4; text-shadow: 0 0 10px rgba(184, 151, 90, 0); }
-        100% { opacity: 1; text-shadow: 0 0 20px rgba(184, 151, 90, 0.4); }
-      }
-    </style>
-  </head>
-  <body>
-    <!-- Premium Preloader -->
-    <div id="zenphire-preloader">
-      <div class="preloader-diamond-container">
-        <div class="preloader-diamond"></div>
-        <div class="preloader-diamond-inner"></div>
-      </div>
-      <div class="preloader-text">Zenphire</div>
+<body>
+  <!-- Premium Preloader -->
+  <div id="zenphire-preloader">
+    <div class="preloader-diamond-container">
+      <div class="preloader-diamond"></div>
+      <div class="preloader-diamond-inner"></div>
     </div>
+    <div class="preloader-text">Zenphire</div>
+  </div>
 
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-    <script>
-      // Global function for React to call when ready
-      window.hideZenphirePreloader = function() {
-        const preloader = document.getElementById('zenphire-preloader');
-        if (preloader) {
-          preloader.classList.add('fade-out');
-          setTimeout(() => preloader.remove(), 800); // Remove from DOM after fade
-        }
-      };
-    </script>
-  </body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+  <script>
+    // Global function for React to call when ready
+    window.hideZenphirePreloader = function () {
+      const preloader = document.getElementById('zenphire-preloader');
+      if (preloader) {
+        preloader.classList.add('fade-out');
+        setTimeout(() => preloader.remove(), 800); // Remove from DOM after fade
+      }
+    };
+  </script>
+</body>
+
 </html>

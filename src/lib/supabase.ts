@@ -48,7 +48,7 @@ export async function getActiveProducts(): Promise<ProductWithDetails[]> {
     .limit(100);
 
   if (error) {
-    console.error('Error fetching active products:', error);
+    console.error('Error fetching active products.');
     throw error;
   }
 
@@ -79,7 +79,7 @@ export async function getProductDetails(identifier: string, isSlug = true): Prom
     : query.eq('id', identifier).maybeSingle());
 
   if (error) {
-    console.error('Error fetching product details:', error);
+    console.error('Error fetching product details.');
     throw error;
   }
   if (!data) return null;
@@ -104,7 +104,7 @@ export async function getCategories(): Promise<CategoryRow[]> {
     .order('name', { ascending: true });
 
   if (error) {
-    console.error('Error fetching categories:', error);
+    console.error('Error fetching categories.');
     throw error;
   }
 
@@ -140,7 +140,7 @@ export async function getUserCart(userId: string) {
     .eq('user_id', userId);
 
   if (error) {
-    console.error('Error fetching user cart:', error);
+    console.error('Error fetching user cart.');
     throw error;
   }
 
@@ -168,7 +168,7 @@ export async function getUserWishlist(userId: string) {
     .eq('user_id', userId);
 
   if (error) {
-    console.error('Error fetching user wishlist:', error);
+    console.error('Error fetching user wishlist.');
     throw error;
   }
 
@@ -186,7 +186,7 @@ export async function getUserAddresses(userId: string): Promise<AddressRow[]> {
     .order('is_default', { ascending: false });
 
   if (error) {
-    console.error('Error fetching user addresses:', error);
+    console.error('Error fetching user addresses.');
     throw error;
   }
 
@@ -232,7 +232,7 @@ export async function getUserOrders(userId: string) {
     .order('created_at', { ascending: false });
 
   if (error) {
-    console.error('Error fetching user orders:', error);
+    console.error('Error fetching user orders.');
     throw error;
   }
 
@@ -254,7 +254,7 @@ export async function getProductsByIds(ids: string[]): Promise<ProductWithDetail
     .in('id', ids);
 
   if (error) {
-    console.error('Error fetching products by ids:', error);
+    console.error('Error fetching products by ids.');
     throw error;
   }
   return (data || []) as ProductWithDetails[];
