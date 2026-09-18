@@ -1617,7 +1617,7 @@ export default function Admin() {
   const handleBulkRestockAllVariants = async () => {
     if (!confirm('Restock all products and size variants in the catalog to 50 units each?')) return;
     try {
-      const allVariantIds = products.flatMap(p => p.product_variants.map(v => v.id)).filter(Boolean);
+      const allVariantIds = products.flatMap(p => p.product_variants.map(v => v.id)).filter((id): id is string => typeof id === 'string');
       if (allVariantIds.length > 0) {
         const { error } = await supabase
           .from('product_variants')

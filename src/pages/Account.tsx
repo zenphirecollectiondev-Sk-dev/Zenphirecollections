@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { supabase, getUserAddresses, getUserOrders } from '../lib/supabase';
 import type { AddressRow } from '../lib/supabase';
@@ -18,8 +18,7 @@ import {
   Check,
   Package,
   AlertCircle,
-  Copy,
-  ExternalLink
+  Copy
 } from 'lucide-react';
 
 interface OrderItem {
@@ -41,12 +40,6 @@ interface OrderWithItems {
   id: string;
   status: string;
   total: number;
-  subtotal: number | null;
-  discount_amount: number | null;
-  coupon_code: string | null;
-  shipping_cost: number | null;
-  courier_name: string | null;
-  courier_tracking_url: string | null;
   tracking_id: string | null;
   created_at: string;
   order_items: OrderItem[];
@@ -66,10 +59,20 @@ const addressSchema = z.object({
 
 export default function Account() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, profile, updateProfile, signOut } = useAuthStore();
 
-  // Tabs
-  const [activeTab, setActiveTab] = useState<'profile' | 'orders'>('profile');
+  // Tabs - initialized from query param ?tab=orders
+  const [activeTab, setActiveTab] = useState<'profile' | 'orders'>(() => {
+    return searchParams.get('tab') === 'orders' ? 'orders' : 'profile';
+  });
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam === 'orders') {
+      setActiveTab('orders');
+    }
+  }, [searchParams]);
 
   // Loading States
   const [loadingProfile, setLoadingProfile] = useState(false);
@@ -108,6 +111,7 @@ export default function Account() {
 
   // Orders State
   const [orders, setOrders] = useState<OrderWithItems[]>([]);
+  const [copiedOrderId, setCopiedOrderId] = useState<string | null>(null);
 
   // Pre-fill profile state on mount/update
   useEffect(() => {
@@ -386,45 +390,47 @@ export default function Account() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-12 md:py-16">
-      {/* Title & Banner */}
-      <div className="border border-border/80 p-6 md:p-8 bg-white mb-10 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <div className="max-w-6xl mx-auto px-4 py-10 md:py-14">
+      {/* Title & Banner Header */}
+      <div className="bg-white border border-border/60 rounded-2xl p-6 md:p-8 mb-8 shadow-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <span className="text-[10px] uppercase tracking-widest bg-bg-subtle border border-border text-text-secondary font-black px-2.5 py-1">
+          <span className="text-xs uppercase tracking-widest bg-bg-subtle border border-border/70 text-text-secondary font-semibold px-3 py-1 rounded-full">
             Customer Dashboard
           </span>
-          <h1 className="text-2xl md:text-3xl font-heading font-black tracking-wide uppercase mt-3 text-text-primary">
+          <h1 className="text-2xl md:text-3xl font-heading font-black tracking-tight uppercase mt-3 text-text-primary">
             Welcome, {profile?.name || 'Guest'}
           </h1>
-          <p className="text-xs text-text-secondary mt-1 flex items-center gap-1.5">
-            <Mail size={12} /> {user?.email}
+          <p className="text-xs text-text-secondary mt-1 flex items-center gap-1.5 font-medium">
+            <Mail size={13} /> {user?.email}
           </p>
         </div>
         <button
           onClick={handleSignOut}
-          className="border border-border bg-white text-text-primary px-5 py-2.5 text-xs font-bold uppercase tracking-widest hover:bg-sale hover:text-white hover:border-sale transition-colors flex items-center gap-2"
+          className="rounded-xl border border-border/80 bg-white text-text-primary px-5 py-2.5 text-xs font-bold uppercase tracking-wider hover:bg-sale hover:text-white hover:border-sale transition-all flex items-center gap-2 shadow-2xs"
         >
-          <LogOut size={13} /> Log Out
+          <LogOut size={14} /> Log Out
         </button>
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b border-border mb-8">
+      {/* Modern Rounded Tab Selector */}
+      <div className="flex bg-bg-subtle p-1.5 rounded-2xl border border-border/60 mb-8 max-w-md">
         <button
           onClick={() => setActiveTab('profile')}
-          className={`py-3.5 px-6 text-xs font-bold tracking-widest uppercase border-b-2 transition-all ${activeTab === 'profile'
-              ? 'border-accent text-text-primary'
-              : 'border-transparent text-text-secondary hover:text-text-primary'
-            }`}
+          className={`flex-1 py-3 px-4 text-xs font-bold tracking-wider uppercase rounded-xl transition-all ${
+            activeTab === 'profile'
+              ? 'bg-white text-text-primary shadow-xs'
+              : 'text-text-secondary hover:text-text-primary'
+          }`}
         >
           Profile & Addresses
         </button>
         <button
           onClick={() => setActiveTab('orders')}
-          className={`py-3.5 px-6 text-xs font-bold tracking-widest uppercase border-b-2 transition-all ${activeTab === 'orders'
-              ? 'border-accent text-text-primary'
-              : 'border-transparent text-text-secondary hover:text-text-primary'
-            }`}
+          className={`flex-1 py-3 px-4 text-xs font-bold tracking-wider uppercase rounded-xl transition-all ${
+            activeTab === 'orders'
+              ? 'bg-white text-text-primary shadow-xs'
+              : 'text-text-secondary hover:text-text-primary'
+          }`}
         >
           Order History ({orders.length})
         </button>
@@ -434,19 +440,19 @@ export default function Account() {
       {activeTab === 'profile' ? (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
 
-          {/* Left Column: Personal Profile */}
-          <div className="lg:col-span-5 bg-white border border-border/80 p-6 md:p-8 shadow-[0_4px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_24px_rgba(0,0,0,0.06)] transition-all">
+          {/* Left Column: Personal Profile Card */}
+          <div className="lg:col-span-5 bg-white border border-border/60 rounded-2xl p-6 md:p-7 shadow-xs hover:shadow-sm transition-all">
 
             {!isEditingProfile ? (
               /* VIEW MODE */
               <div className="space-y-6">
-                <div className="flex justify-between items-center border-b border-border pb-4">
+                <div className="flex justify-between items-center border-b border-border/60 pb-4">
                   <div>
-                    <h2 className="text-sm font-heading font-black uppercase tracking-wider text-text-primary">
+                    <h2 className="text-base font-heading font-bold uppercase tracking-wider text-text-primary">
                       Personal Profile
                     </h2>
-                    <p className="text-[11px] text-text-secondary mt-0.5">
-                      Your personal account profile details.
+                    <p className="text-xs text-text-secondary mt-0.5">
+                      Your personal account details and info.
                     </p>
                   </div>
                   <button
@@ -454,56 +460,56 @@ export default function Account() {
                       setProfileError(null);
                       setIsEditingProfile(true);
                     }}
-                    className="border border-border text-text-primary bg-white px-3.5 py-1.5 text-[10px] font-black uppercase tracking-wider hover:bg-bg-subtle transition-colors flex items-center gap-1.5 shadow-sm"
+                    className="rounded-lg border border-border/80 text-text-primary bg-white px-3.5 py-2 text-xs font-bold uppercase tracking-wider hover:bg-bg-subtle transition-all flex items-center gap-1.5 shadow-2xs"
                   >
-                    <Edit2 size={11} /> Edit
+                    <Edit2 size={12} /> Edit
                   </button>
                 </div>
 
                 {profileSuccess && (
-                  <div className="p-3 bg-green-50 border border-green-200 text-green-800 text-xs flex items-center gap-2">
+                  <div className="p-3 bg-green-50 border border-green-200 text-green-800 text-xs rounded-lg flex items-center gap-2 font-medium">
                     <Check size={14} className="flex-shrink-0" />
                     Profile updated successfully.
                   </div>
                 )}
 
-                <div className="space-y-4">
+                <div className="space-y-3.5">
                   {/* Full Name */}
-                  <div className="bg-bg-subtle p-3.5 border-l-[3px] border-[#B8975A]">
-                    <span className="text-[9px] uppercase tracking-widest text-text-secondary font-bold block mb-1">
+                  <div className="bg-bg-subtle/70 border border-border/50 rounded-xl p-4">
+                    <span className="text-xs uppercase tracking-wider text-text-secondary font-semibold block mb-0.5">
                       Full Name
                     </span>
-                    <span className="text-xs font-semibold text-text-primary">
+                    <span className="text-sm font-bold text-text-primary">
                       {profile?.name || 'Not provided'}
                     </span>
                   </div>
 
                   {/* Phone Number */}
-                  <div className="bg-bg-subtle p-3.5 border-l-[3px] border-[#B8975A]">
-                    <span className="text-[9px] uppercase tracking-widest text-text-secondary font-bold block mb-1">
+                  <div className="bg-bg-subtle/70 border border-border/50 rounded-xl p-4">
+                    <span className="text-xs uppercase tracking-wider text-text-secondary font-semibold block mb-0.5">
                       Phone Number
                     </span>
-                    <span className="text-xs font-semibold text-text-primary">
+                    <span className="text-sm font-bold text-text-primary">
                       {profile?.phone || 'Not provided'}
                     </span>
                   </div>
 
                   {/* Date of Birth */}
-                  <div className="bg-bg-subtle p-3.5 border-l-[3px] border-[#B8975A]">
-                    <span className="text-[9px] uppercase tracking-widest text-text-secondary font-bold block mb-1">
+                  <div className="bg-bg-subtle/70 border border-border/50 rounded-xl p-4">
+                    <span className="text-xs uppercase tracking-wider text-text-secondary font-semibold block mb-0.5">
                       Date of Birth
                     </span>
-                    <span className="text-xs font-semibold text-text-primary">
+                    <span className="text-sm font-bold text-text-primary">
                       {profile?.dob ? formatDate(profile.dob) : 'Not provided'}
                     </span>
                   </div>
 
                   {/* Gender */}
-                  <div className="bg-bg-subtle p-3.5 border-l-[3px] border-[#B8975A]">
-                    <span className="text-[9px] uppercase tracking-widest text-text-secondary font-bold block mb-1">
+                  <div className="bg-bg-subtle/70 border border-border/50 rounded-xl p-4">
+                    <span className="text-xs uppercase tracking-wider text-text-secondary font-semibold block mb-0.5">
                       Gender
                     </span>
-                    <span className="text-xs font-semibold text-text-primary uppercase tracking-wider">
+                    <span className="text-sm font-bold text-text-primary uppercase tracking-wide">
                       {profile?.gender || 'Not provided'}
                     </span>
                   </div>
@@ -512,17 +518,17 @@ export default function Account() {
             ) : (
               /* EDIT MODE */
               <div className="space-y-6">
-                <div className="border-b border-border pb-4">
-                  <h2 className="text-sm font-heading font-black uppercase tracking-wider text-text-primary">
+                <div className="border-b border-border/60 pb-4">
+                  <h2 className="text-base font-heading font-bold uppercase tracking-wider text-text-primary">
                     Edit Profile
                   </h2>
-                  <p className="text-[11px] text-text-secondary mt-0.5">
-                    Update your account info and personal details.
+                  <p className="text-xs text-text-secondary mt-0.5">
+                    Update your account details below.
                   </p>
                 </div>
 
                 {profileError && (
-                  <div className="p-3 bg-sale/10 border border-sale text-sale text-xs flex items-center gap-2">
+                  <div className="p-3 bg-sale/10 border border-sale/30 text-sale text-xs rounded-lg flex items-center gap-2 font-medium">
                     <AlertCircle size={14} className="flex-shrink-0" />
                     {profileError}
                   </div>
@@ -531,8 +537,8 @@ export default function Account() {
                 <form onSubmit={handleProfileSave} className="space-y-4">
                   {/* Full Name */}
                   <div>
-                    <label htmlFor="p-name" className="block text-[10px] font-heading font-bold uppercase tracking-wider text-text-primary mb-1.5 flex items-center gap-1.5">
-                      <User size={12} className="text-text-secondary" /> Full Name
+                    <label htmlFor="p-name" className="block text-xs font-bold uppercase tracking-wider text-text-primary mb-1.5 flex items-center gap-1.5">
+                      <User size={13} className="text-text-secondary" /> Full Name
                     </label>
                     <input
                       id="p-name"
@@ -540,49 +546,49 @@ export default function Account() {
                       required
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      className="w-full px-3 py-2.5 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent"
+                      className="w-full px-3.5 py-2.5 rounded-lg border border-border bg-white text-text-primary text-sm focus:outline-none focus:border-accent shadow-2xs"
                     />
                   </div>
 
                   {/* Phone Number */}
                   <div>
-                    <label htmlFor="p-phone" className="block text-[10px] font-heading font-bold uppercase tracking-wider text-text-primary mb-1.5 flex items-center gap-1.5">
-                      <Phone size={12} className="text-text-secondary" /> Phone Number
+                    <label htmlFor="p-phone" className="block text-xs font-bold uppercase tracking-wider text-text-primary mb-1.5 flex items-center gap-1.5">
+                      <Phone size={13} className="text-text-secondary" /> Phone Number
                     </label>
                     <input
                       id="p-phone"
                       type="tel"
-                      placeholder="e.g. +91 99999 99999"
+                      placeholder="e.g. 9999999999"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      className="w-full px-3 py-2.5 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent"
+                      className="w-full px-3.5 py-2.5 rounded-lg border border-border bg-white text-text-primary text-sm focus:outline-none focus:border-accent shadow-2xs"
                     />
                   </div>
 
                   {/* Date of Birth */}
                   <div>
-                    <label htmlFor="p-dob" className="block text-[10px] font-heading font-bold uppercase tracking-wider text-text-primary mb-1.5 flex items-center gap-1.5">
-                      <Calendar size={12} className="text-text-secondary" /> Date of Birth
+                    <label htmlFor="p-dob" className="block text-xs font-bold uppercase tracking-wider text-text-primary mb-1.5 flex items-center gap-1.5">
+                      <Calendar size={13} className="text-text-secondary" /> Date of Birth
                     </label>
                     <input
                       id="p-dob"
                       type="date"
                       value={dob}
                       onChange={(e) => setDob(e.target.value)}
-                      className="w-full px-3 py-2.5 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent"
+                      className="w-full px-3.5 py-2.5 rounded-lg border border-border bg-white text-text-primary text-sm focus:outline-none focus:border-accent shadow-2xs"
                     />
                   </div>
 
                   {/* Gender */}
                   <div>
-                    <label htmlFor="p-gender" className="block text-[10px] font-heading font-bold uppercase tracking-wider text-text-primary mb-1.5 flex items-center gap-1.5">
-                      <User size={12} className="text-text-secondary" /> Gender
+                    <label htmlFor="p-gender" className="block text-xs font-bold uppercase tracking-wider text-text-primary mb-1.5 flex items-center gap-1.5">
+                      <User size={13} className="text-text-secondary" /> Gender
                     </label>
                     <select
                       id="p-gender"
                       value={gender}
                       onChange={(e) => setGender(e.target.value)}
-                      className="w-full px-3 py-2.5 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2020%2020%22%20fill%3D%22none%22%3E%3Cpath%20d%3D%22M7%209l3%203%203-3%22%20stroke%3D%22%25234A5568%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E')] bg-[length:20px_20px] bg-[right_8px_center] bg-no-repeat pr-8 uppercase tracking-wide font-semibold"
+                      className="w-full px-3.5 py-2.5 rounded-lg border border-border bg-white text-text-primary text-sm focus:outline-none focus:border-accent appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2020%2020%22%20fill%3D%22none%22%3E%3Cpath%20d%3D%22M7%209l3%203%203-3%22%20stroke%3D%22%25234A5568%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E')] bg-[length:20px_20px] bg-[right_10px_center] bg-no-repeat pr-8 uppercase tracking-wide font-semibold shadow-2xs"
                     >
                       <option value="">Select Gender</option>
                       <option value="male">Male</option>
@@ -593,11 +599,10 @@ export default function Account() {
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="flex gap-3 pt-4 border-t border-border">
+                  <div className="flex gap-3 pt-4 border-t border-border/60">
                     <button
                       type="button"
                       onClick={() => {
-                        // Reset forms to DB defaults and close editor
                         if (profile) {
                           setName(profile.name || '');
                           setPhone(profile.phone || '');
@@ -607,17 +612,17 @@ export default function Account() {
                         setProfileError(null);
                         setIsEditingProfile(false);
                       }}
-                      className="w-1/2 border border-border bg-white text-text-primary py-3 font-bold uppercase text-[10px] tracking-widest hover:bg-bg-subtle transition-colors text-center"
+                      className="w-1/2 rounded-xl border border-border bg-white text-text-primary py-3 font-bold uppercase text-xs tracking-wider hover:bg-bg-subtle transition-colors text-center"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
                       disabled={loadingProfile}
-                      className="btn btn-primary w-1/2 py-3 font-bold uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 disabled:opacity-50"
+                      className="btn btn-primary w-1/2 rounded-xl py-3 font-bold uppercase text-xs tracking-wider flex items-center justify-center gap-2 disabled:opacity-50"
                     >
                       {loadingProfile ? (
-                        <Loader2 size={13} className="animate-spin" />
+                        <Loader2 size={14} className="animate-spin" />
                       ) : 'Save Details'}
                     </button>
                   </div>
@@ -626,38 +631,38 @@ export default function Account() {
             )}
           </div>
 
-          {/* Right Column: Address Book */}
+          {/* Right Column: Address Book Card */}
           <div className="lg:col-span-7 space-y-6">
-            <div className="bg-white border border-border/80 p-6 md:p-8 shadow-[0_4px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_24px_rgba(0,0,0,0.06)] transition-all">
-              <div className="flex justify-between items-center border-b border-border pb-4 mb-6">
+            <div className="bg-white border border-border/60 rounded-2xl p-6 md:p-7 shadow-xs hover:shadow-sm transition-all">
+              <div className="flex justify-between items-center border-b border-border/60 pb-4 mb-6">
                 <div>
-                  <h2 className="text-sm font-heading font-black uppercase tracking-wider text-text-primary">
+                  <h2 className="text-base font-heading font-bold uppercase tracking-wider text-text-primary">
                     Address Book
                   </h2>
-                  <p className="text-[11px] text-text-secondary mt-0.5">
-                    Manage your billing and delivery destinations.
+                  <p className="text-xs text-text-secondary mt-0.5">
+                    Manage your billing and shipping destinations.
                   </p>
                 </div>
                 {!addressFormOpen && (
                   <button
                     onClick={handleOpenAddForm}
-                    className="border border-border text-text-primary bg-white px-3.5 py-2 text-[10px] font-black uppercase tracking-wider hover:bg-bg-subtle transition-colors flex items-center gap-1.5 shadow-sm"
+                    className="rounded-lg border border-border/80 text-text-primary bg-white px-3.5 py-2 text-xs font-bold uppercase tracking-wider hover:bg-bg-subtle transition-all flex items-center gap-1.5 shadow-2xs"
                   >
-                    <Plus size={12} /> Add Address
+                    <Plus size={13} /> Add Address
                   </button>
                 )}
               </div>
 
               {/* Address Form (Inline toggled) */}
               {addressFormOpen && (
-                <div className="border border-border p-5 bg-bg-subtle mb-6 space-y-4 shadow-sm">
+                <div className="rounded-xl border border-border/80 p-5 bg-bg-subtle/70 mb-6 space-y-4 shadow-2xs">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-text-primary">
                     {editingAddressId ? 'Edit Saved Address' : 'Add New Address'}
                   </h3>
 
                   {addressError && (
-                    <div className="p-2.5 bg-sale/10 border border-sale text-sale text-xs flex items-center gap-2">
-                      <AlertCircle size={13} className="flex-shrink-0" />
+                    <div className="p-3 bg-sale/10 border border-sale/30 text-sale text-xs rounded-lg flex items-center gap-2 font-medium">
+                      <AlertCircle size={14} className="flex-shrink-0" />
                       {addressError}
                     </div>
                   )}
@@ -665,7 +670,7 @@ export default function Account() {
                   <form onSubmit={handleAddressSubmit} className="space-y-4">
                     {/* Recipient Name */}
                     <div>
-                      <label htmlFor="addr-name" className="block text-[9px] font-bold uppercase tracking-wide text-text-secondary mb-1">
+                      <label htmlFor="addr-name" className="block text-xs font-bold uppercase tracking-wider text-text-secondary mb-1">
                         Recipient Name
                       </label>
                       <input
@@ -674,18 +679,18 @@ export default function Account() {
                         placeholder="Name of the person receiving the delivery"
                         value={recipientName}
                         onChange={(e) => setRecipientName(e.target.value)}
-                        className={`w-full px-3 py-2 border bg-white text-text-primary text-xs focus:outline-none focus:border-accent ${validationErrors.recipient_name ? 'border-sale' : 'border-border'
+                        className={`w-full px-3.5 py-2.5 rounded-lg border bg-white text-text-primary text-sm focus:outline-none focus:border-accent shadow-2xs ${validationErrors.recipient_name ? 'border-sale' : 'border-border'
                           }`}
                       />
                       {validationErrors.recipient_name && (
-                        <p className="text-[10px] text-sale font-medium mt-1">{validationErrors.recipient_name}</p>
+                        <p className="text-xs text-sale font-medium mt-1">{validationErrors.recipient_name}</p>
                       )}
                     </div>
 
                     {/* Mobile Numbers */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div>
-                        <label htmlFor="addr-phone1" className="block text-[9px] font-bold uppercase tracking-wide text-text-secondary mb-1">
+                        <label htmlFor="addr-phone1" className="block text-xs font-bold uppercase tracking-wider text-text-secondary mb-1">
                           Mobile Number
                         </label>
                         <input
@@ -694,15 +699,15 @@ export default function Account() {
                           placeholder="10-digit mobile number"
                           value={phonePrimary}
                           onChange={(e) => setPhonePrimary(e.target.value)}
-                          className={`w-full px-3 py-2 border bg-white text-text-primary text-xs focus:outline-none focus:border-accent ${validationErrors.phone_primary ? 'border-sale' : 'border-border'
+                          className={`w-full px-3.5 py-2.5 rounded-lg border bg-white text-text-primary text-sm focus:outline-none focus:border-accent shadow-2xs ${validationErrors.phone_primary ? 'border-sale' : 'border-border'
                             }`}
                         />
                         {validationErrors.phone_primary && (
-                          <p className="text-[10px] text-sale font-medium mt-1">{validationErrors.phone_primary}</p>
+                          <p className="text-xs text-sale font-medium mt-1">{validationErrors.phone_primary}</p>
                         )}
                       </div>
                       <div>
-                        <label htmlFor="addr-phone2" className="block text-[9px] font-bold uppercase tracking-wide text-text-secondary mb-1">
+                        <label htmlFor="addr-phone2" className="block text-xs font-bold uppercase tracking-wider text-text-secondary mb-1">
                           Alternate Mobile (Optional)
                         </label>
                         <input
@@ -711,18 +716,18 @@ export default function Account() {
                           placeholder="Alternate 10-digit mobile"
                           value={phoneSecondary}
                           onChange={(e) => setPhoneSecondary(e.target.value)}
-                          className={`w-full px-3 py-2 border bg-white text-text-primary text-xs focus:outline-none focus:border-accent ${validationErrors.phone_secondary ? 'border-sale' : 'border-border'
+                          className={`w-full px-3.5 py-2.5 rounded-lg border bg-white text-text-primary text-sm focus:outline-none focus:border-accent shadow-2xs ${validationErrors.phone_secondary ? 'border-sale' : 'border-border'
                             }`}
                         />
                         {validationErrors.phone_secondary && (
-                          <p className="text-[10px] text-sale font-medium mt-1">{validationErrors.phone_secondary}</p>
+                          <p className="text-xs text-sale font-medium mt-1">{validationErrors.phone_secondary}</p>
                         )}
                       </div>
                     </div>
 
                     {/* Street Address */}
                     <div>
-                      <label htmlFor="addr-line1" className="block text-[9px] font-bold uppercase tracking-wide text-text-secondary mb-1">
+                      <label htmlFor="addr-line1" className="block text-xs font-bold uppercase tracking-wider text-text-secondary mb-1">
                         Street Address / Line 1
                       </label>
                       <input
@@ -731,18 +736,18 @@ export default function Account() {
                         placeholder="Flat/House No, Building, Street Name"
                         value={line1}
                         onChange={(e) => setLine1(e.target.value)}
-                        className={`w-full px-3 py-2 border bg-white text-text-primary text-xs focus:outline-none focus:border-accent ${validationErrors.line1 ? 'border-sale' : 'border-border'
+                        className={`w-full px-3.5 py-2.5 rounded-lg border bg-white text-text-primary text-sm focus:outline-none focus:border-accent shadow-2xs ${validationErrors.line1 ? 'border-sale' : 'border-border'
                           }`}
                       />
                       {validationErrors.line1 && (
-                        <p className="text-[10px] text-sale font-medium mt-1">{validationErrors.line1}</p>
+                        <p className="text-xs text-sale font-medium mt-1">{validationErrors.line1}</p>
                       )}
                     </div>
 
                     {/* City, State, Pincode */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div>
-                        <label htmlFor="addr-city" className="block text-[9px] font-bold uppercase tracking-wide text-text-secondary mb-1">
+                        <label htmlFor="addr-city" className="block text-xs font-bold uppercase tracking-wider text-text-secondary mb-1">
                           City
                         </label>
                         <input
@@ -751,15 +756,15 @@ export default function Account() {
                           placeholder="e.g. Mumbai"
                           value={city}
                           onChange={(e) => setCity(e.target.value)}
-                          className={`w-full px-3 py-2 border bg-white text-text-primary text-xs focus:outline-none focus:border-accent ${validationErrors.city ? 'border-sale' : 'border-border'
+                          className={`w-full px-3.5 py-2.5 rounded-lg border bg-white text-text-primary text-sm focus:outline-none focus:border-accent shadow-2xs ${validationErrors.city ? 'border-sale' : 'border-border'
                             }`}
                         />
                         {validationErrors.city && (
-                          <p className="text-[10px] text-sale font-medium mt-1">{validationErrors.city}</p>
+                          <p className="text-xs text-sale font-medium mt-1">{validationErrors.city}</p>
                         )}
                       </div>
                       <div>
-                        <label htmlFor="addr-state" className="block text-[9px] font-bold uppercase tracking-wide text-text-secondary mb-1">
+                        <label htmlFor="addr-state" className="block text-xs font-bold uppercase tracking-wider text-text-secondary mb-1">
                           State
                         </label>
                         <input
@@ -768,15 +773,15 @@ export default function Account() {
                           placeholder="e.g. Maharashtra"
                           value={state}
                           onChange={(e) => setState(e.target.value)}
-                          className={`w-full px-3 py-2 border bg-white text-text-primary text-xs focus:outline-none focus:border-accent ${validationErrors.state ? 'border-sale' : 'border-border'
+                          className={`w-full px-3.5 py-2.5 rounded-lg border bg-white text-text-primary text-sm focus:outline-none focus:border-accent shadow-2xs ${validationErrors.state ? 'border-sale' : 'border-border'
                             }`}
                         />
                         {validationErrors.state && (
-                          <p className="text-[10px] text-sale font-medium mt-1">{validationErrors.state}</p>
+                          <p className="text-xs text-sale font-medium mt-1">{validationErrors.state}</p>
                         )}
                       </div>
                       <div>
-                        <label htmlFor="addr-pincode" className="block text-[9px] font-bold uppercase tracking-wide text-text-secondary mb-1">
+                        <label htmlFor="addr-pincode" className="block text-xs font-bold uppercase tracking-wider text-text-secondary mb-1">
                           Pincode
                         </label>
                         <input
@@ -785,11 +790,11 @@ export default function Account() {
                           placeholder="6-digit pincode"
                           value={pincode}
                           onChange={(e) => setPincode(e.target.value)}
-                          className={`w-full px-3 py-2 border bg-white text-text-primary text-xs focus:outline-none focus:border-accent ${validationErrors.pincode ? 'border-sale' : 'border-border'
+                          className={`w-full px-3.5 py-2.5 rounded-lg border bg-white text-text-primary text-sm focus:outline-none focus:border-accent shadow-2xs ${validationErrors.pincode ? 'border-sale' : 'border-border'
                             }`}
                         />
                         {validationErrors.pincode && (
-                          <p className="text-[10px] text-sale font-medium mt-1">{validationErrors.pincode}</p>
+                          <p className="text-xs text-sale font-medium mt-1">{validationErrors.pincode}</p>
                         )}
                       </div>
                     </div>
@@ -802,25 +807,25 @@ export default function Account() {
                         checked={isDefault}
                         onChange={(e) => setIsDefault(e.target.checked)}
                         disabled={addresses.length === 0 || (editingAddressId !== null && addresses.find(a => a.id === editingAddressId)?.is_default)}
-                        className="rounded-none border-border text-accent focus:ring-0 focus:ring-offset-0 cursor-pointer h-3.5 w-3.5"
+                        className="rounded border-border text-accent focus:ring-0 cursor-pointer h-4 w-4"
                       />
-                      <label htmlFor="addr-default" className="text-[10px] font-bold uppercase tracking-wider text-text-primary select-none cursor-pointer">
+                      <label htmlFor="addr-default" className="text-xs font-bold uppercase tracking-wider text-text-primary select-none cursor-pointer">
                         Set as Default Shipping Address
                       </label>
                     </div>
 
                     {/* Form Controls */}
-                    <div className="flex justify-end gap-2 pt-2 border-t border-border">
+                    <div className="flex justify-end gap-2 pt-2 border-t border-border/60">
                       <button
                         type="button"
                         onClick={() => setAddressFormOpen(false)}
-                        className="px-4 py-2.5 min-h-[40px] border border-border bg-white text-text-primary text-[10px] font-bold uppercase tracking-wider hover:bg-bg-subtle transition-colors"
+                        className="rounded-lg px-4 py-2.5 min-h-[40px] border border-border bg-white text-text-primary text-xs font-bold uppercase tracking-wider hover:bg-bg-subtle transition-colors"
                       >
                         Cancel
                       </button>
                       <button
                         type="submit"
-                        className="btn btn-primary px-4 py-2.5 min-h-[40px] text-[10px] font-bold uppercase tracking-wider"
+                        className="btn btn-primary rounded-lg px-4 py-2.5 min-h-[40px] text-xs font-bold uppercase tracking-wider"
                       >
                         {editingAddressId ? 'Update Address' : 'Save Address'}
                       </button>
@@ -836,19 +841,19 @@ export default function Account() {
                 </div>
               ) : addresses.length === 0 ? (
                 /* POLISHED EMPTY STATE */
-                <div className="border border-dashed border-border/80 bg-bg-subtle/50 py-16 px-6 text-center flex flex-col items-center justify-center">
-                  <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-border mb-3">
+                <div className="border border-dashed border-border/80 rounded-2xl bg-bg-subtle/50 py-16 px-6 text-center flex flex-col items-center justify-center">
+                  <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-xs border border-border mb-3">
                     <MapPin size={20} className="text-text-secondary stroke-[1.5]" />
                   </div>
-                  <p className="text-xs text-text-primary font-heading font-black uppercase tracking-wider">
+                  <p className="text-xs text-text-primary font-heading font-bold uppercase tracking-wider">
                     No addresses saved yet
                   </p>
-                  <p className="text-[11px] text-text-secondary mt-1 max-w-xs leading-relaxed">
-                    Add a new shipping destination below to make checkout faster next time.
+                  <p className="text-xs text-text-secondary mt-1 max-w-xs leading-relaxed">
+                    Add a shipping destination to speed up your checkout.
                   </p>
                   <button
                     onClick={handleOpenAddForm}
-                    className="btn btn-primary mt-4 px-5 py-2.5 text-[10px] font-bold uppercase tracking-widest shadow-sm min-h-[44px]"
+                    className="btn btn-primary mt-4 rounded-xl px-5 py-2.5 text-xs font-bold uppercase tracking-widest shadow-xs min-h-[44px]"
                   >
                     Add your first address
                   </button>
@@ -859,30 +864,30 @@ export default function Account() {
                   {addresses.map((addr) => (
                     <div
                       key={addr.id}
-                      className={`border p-5 bg-white relative transition-all shadow-[0_2px_12px_rgba(0,0,0,0.02)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.05)] ${addr.is_default
-                          ? 'border-accent shadow-sm ring-1 ring-accent'
-                          : 'border-border hover:border-text-secondary'
+                      className={`border rounded-xl p-5 bg-white relative transition-all shadow-2xs hover:shadow-xs ${addr.is_default
+                          ? 'border-accent ring-1 ring-accent/30'
+                          : 'border-border/70 hover:border-text-secondary'
                         }`}
                     >
                       {addr.is_default && (
-                        <span className="absolute top-4 right-4 bg-accent text-white font-heading font-black text-[8px] uppercase tracking-widest px-2 py-0.5">
+                        <span className="absolute top-4 right-4 bg-accent text-white font-bold text-[9px] uppercase tracking-wider px-2.5 py-0.5 rounded-full">
                           Default
                         </span>
                       )}
 
-                      <div className="flex items-start gap-2 mb-3">
-                        <MapPin size={14} className="text-text-secondary mt-0.5 flex-shrink-0" />
-                        <div className="space-y-1.5">
-                          <p className="text-xs text-text-primary font-black uppercase tracking-wider pr-14">
+                      <div className="flex items-start gap-2.5 mb-3">
+                        <MapPin size={15} className="text-text-secondary mt-0.5 flex-shrink-0" />
+                        <div className="space-y-1">
+                          <p className="text-xs text-text-primary font-bold uppercase tracking-wider pr-14">
                             {addr.recipient_name || 'No Name'}
                           </p>
-                          <p className="text-xs text-text-primary leading-relaxed pr-10">
+                          <p className="text-xs text-text-primary leading-relaxed pr-8 font-medium">
                             {addr.line1}
                           </p>
-                          <p className="text-xs text-text-secondary">
+                          <p className="text-xs text-text-secondary font-medium">
                             {addr.city}, {addr.state} — {addr.pincode}
                           </p>
-                          <div className="text-[10px] text-text-secondary pt-1 leading-normal border-t border-border/50">
+                          <div className="text-xs text-text-secondary pt-2 leading-normal border-t border-border/50">
                             <span className="font-semibold text-text-primary">Phone:</span> {addr.phone_primary}
                             {addr.phone_secondary && (
                               <>
@@ -894,17 +899,17 @@ export default function Account() {
                         </div>
                       </div>
 
-                      <div className="flex justify-between items-center mt-6 pt-3 border-t border-border">
+                      <div className="flex justify-between items-center mt-5 pt-3 border-t border-border/60">
                         {!addr.is_default ? (
                           <button
                             onClick={() => handleSetDefaultAddress(addr.id)}
-                            className="text-[9px] font-bold uppercase tracking-wider text-text-secondary hover:text-accent transition-colors min-h-[36px] flex items-center"
+                            className="text-xs font-bold uppercase tracking-wider text-text-secondary hover:text-accent transition-colors min-h-[36px] flex items-center"
                           >
                             Set Default
                           </button>
                         ) : (
-                          <span className="text-[9px] font-bold uppercase tracking-wider text-green-700 flex items-center gap-1 min-h-[36px]">
-                            <Check size={10} /> Active Default
+                          <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 flex items-center gap-1 min-h-[36px]">
+                            <Check size={12} /> Active Default
                           </span>
                         )}
 
@@ -912,16 +917,16 @@ export default function Account() {
                           <button
                             onClick={() => handleOpenEditForm(addr)}
                             aria-label="Edit address"
-                            className="text-text-secondary hover:text-accent p-2 min-w-[36px] min-h-[36px] flex items-center justify-center transition-colors rounded"
+                            className="text-text-secondary hover:text-accent p-2 min-w-[36px] min-h-[36px] flex items-center justify-center transition-colors rounded-lg hover:bg-bg-subtle"
                           >
-                            <Edit2 size={13} />
+                            <Edit2 size={14} />
                           </button>
                           <button
                             onClick={() => handleDeleteAddress(addr.id)}
                             aria-label="Delete address"
-                            className="text-text-secondary hover:text-sale p-2 min-w-[36px] min-h-[36px] flex items-center justify-center transition-colors rounded"
+                            className="text-text-secondary hover:text-sale p-2 min-w-[36px] min-h-[36px] flex items-center justify-center transition-colors rounded-lg hover:bg-bg-subtle"
                           >
-                            <Trash2 size={13} />
+                            <Trash2 size={14} />
                           </button>
                         </div>
                       </div>
@@ -934,13 +939,13 @@ export default function Account() {
         </div>
       ) : (
         /* Tab 2: Orders History */
-        <div className="bg-white border border-border/80 p-6 md:p-8 shadow-[0_4px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_24px_rgba(0,0,0,0.06)] transition-all">
-          <div className="border-b border-border pb-4 mb-8">
-            <h2 className="text-sm font-heading font-black uppercase tracking-wider text-text-primary">
+        <div className="bg-white border border-border/60 rounded-2xl p-6 md:p-8 shadow-xs hover:shadow-sm transition-all">
+          <div className="border-b border-border/60 pb-4 mb-6">
+            <h2 className="text-base font-heading font-bold uppercase tracking-wider text-text-primary">
               Order Transactions
             </h2>
-            <p className="text-[11px] text-text-secondary mt-0.5">
-              Review your purchase logs and check delivery milestones.
+            <p className="text-xs text-text-secondary mt-0.5">
+              Review your purchase logs and delivery milestones.
             </p>
           </div>
 
@@ -949,56 +954,74 @@ export default function Account() {
               <Loader2 size={28} className="animate-spin text-text-secondary" />
             </div>
           ) : orders.length === 0 ? (
-            <div className="border border-dashed border-border py-16 text-center">
-              <Package size={32} className="mx-auto text-text-secondary stroke-[1.2] mb-3" />
-              <p className="text-xs text-text-secondary uppercase tracking-widest font-black">No purchase logs found</p>
-              <p className="text-[10px] text-text-secondary mt-1">Start shopping our collection of minimalist apparel.</p>
+            <div className="border border-dashed border-border/80 rounded-2xl py-16 text-center">
+              <Package size={36} className="mx-auto text-text-secondary stroke-[1.2] mb-3" />
+              <p className="text-xs text-text-secondary uppercase tracking-wider font-bold">No purchase logs found</p>
+              <p className="text-xs text-text-secondary mt-1">Start shopping our collection of minimalist apparel.</p>
               <button
                 onClick={() => navigate('/shop')}
-                className="btn btn-primary mt-5 px-5 py-2.5 text-[10px] font-bold uppercase tracking-widest"
+                className="btn btn-primary mt-5 rounded-xl px-5 py-2.5 text-xs font-bold uppercase tracking-widest shadow-2xs"
               >
                 Go to Shop
               </button>
             </div>
           ) : (
-            <div className="space-y-8">
+            <div className="space-y-6">
               {orders.map((order) => {
                 const { steps, activeIndex, isCancelled } = getTimelineInfo(order.status);
 
                 return (
-                  <div key={order.id} className="border border-border/80 bg-white hover:shadow-md shadow-[0_2px_12px_rgba(0,0,0,0.02)] transition-all">
+                  <div key={order.id} className="border border-border/60 bg-white rounded-2xl overflow-hidden shadow-2xs hover:shadow-xs transition-all">
                     {/* Order summary header */}
-                    <div className="border-b border-border p-4 md:p-5 bg-bg-subtle flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
-                      <div className="grid grid-cols-2 md:flex md:items-center gap-x-4 gap-y-1">
+                    <div className="border-b border-border/60 p-4 md:p-5 bg-bg-subtle/70 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                      <div className="grid grid-cols-2 md:flex md:items-center gap-x-6 gap-y-2">
                         <div>
-                          <p className="text-[9px] font-heading font-bold uppercase tracking-wider text-text-secondary">
+                          <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
                             Order Placed
                           </p>
                           <p className="text-xs text-text-primary font-bold mt-0.5">
                             {formatDate(order.created_at)}
                           </p>
                         </div>
-                        <div className="md:border-l border-border md:pl-4">
-                          <p className="text-[9px] font-heading font-bold uppercase tracking-wider text-text-secondary">
-                            Reference ID
+                        <div className="md:border-l border-border/60 md:pl-5">
+                          <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
+                            Order Reference ID
                           </p>
-                          <p className="text-xs text-text-primary font-mono font-medium mt-0.5 select-all uppercase">
-                            {order.id.slice(0, 8)}...
-                          </p>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="text-xs text-text-primary font-mono font-bold select-all uppercase">
+                              #{order.tracking_id || `ZP-${new Date(order.created_at).getFullYear()}-${order.id.slice(0, 6).toUpperCase()}`}
+                            </span>
+                            <button
+                              onClick={() => {
+                                const idToCopy = order.tracking_id || `ZP-${new Date(order.created_at).getFullYear()}-${order.id.slice(0, 6).toUpperCase()}`;
+                                navigator.clipboard.writeText(idToCopy);
+                                setCopiedOrderId(order.id);
+                                setTimeout(() => setCopiedOrderId(null), 2000);
+                              }}
+                              className="text-text-secondary hover:text-text-primary p-0.5 rounded transition-colors"
+                              title="Copy Order ID"
+                            >
+                              {copiedOrderId === order.id ? (
+                                <Check size={12} className="text-emerald-600" />
+                              ) : (
+                                <Copy size={12} />
+                              )}
+                            </button>
+                          </div>
                         </div>
-                        <div className="md:border-l border-border md:pl-4">
-                          <p className="text-[9px] font-heading font-bold uppercase tracking-wider text-text-secondary">
+                        <div className="md:border-l border-border/60 md:pl-5">
+                          <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
                             Total Value
                           </p>
-                          <p className="text-xs text-text-primary font-black mt-0.5">
+                          <p className="text-xs text-text-primary font-bold mt-0.5">
                             ₹{Number(order.total).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                           </p>
                         </div>
                       </div>
 
                       {/* Status Badging */}
-                      <span className={`text-[9px] font-heading font-black uppercase tracking-widest px-2.5 py-1 border ${order.status.toLowerCase() === 'delivered'
-                          ? 'bg-green-50 text-green-700 border-green-200'
+                      <span className={`text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full border ${order.status.toLowerCase() === 'delivered'
+                          ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                           : order.status.toLowerCase() === 'cancelled'
                             ? 'bg-red-50 text-sale border-red-200'
                             : order.status.toLowerCase() === 'shipped'
@@ -1015,11 +1038,11 @@ export default function Account() {
                     <div className="p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8">
                       {/* Left: Items list */}
                       <div className="lg:col-span-7 space-y-4">
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-text-secondary border-b border-border pb-1.5">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-text-secondary border-b border-border/60 pb-2">
                           Ordered Items
                         </h4>
 
-                        <div className="space-y-3">
+                        <div className="space-y-3.5">
                           {order.order_items?.map((item) => {
                             const product = item.product_variants?.products;
                             const image = product?.product_images?.[0]?.url;
@@ -1027,7 +1050,7 @@ export default function Account() {
                             return (
                               <div key={item.id} className="flex gap-4 items-center">
                                 {/* Thumbnail */}
-                                <div className="w-12 h-16 bg-bg-subtle flex-shrink-0 overflow-hidden border border-border flex items-center justify-center">
+                                <div className="w-12 h-16 bg-bg-subtle flex-shrink-0 rounded-lg overflow-hidden border border-border/60 flex items-center justify-center">
                                   {image ? (
                                     <img
                                       src={image}
@@ -1041,13 +1064,13 @@ export default function Account() {
 
                                 {/* Info */}
                                 <div className="flex-grow">
-                                  <h5 className="text-xs font-semibold text-text-primary uppercase tracking-wide leading-snug">
+                                  <h5 className="text-xs font-bold text-text-primary uppercase tracking-wide leading-snug">
                                     {product?.name || 'Unknown Product'}
                                   </h5>
-                                  <p className="text-[10px] text-text-secondary mt-0.5 uppercase tracking-wider">
+                                  <p className="text-xs text-text-secondary mt-0.5 uppercase tracking-wider">
                                     Size: {item.product_variants?.size || 'N/A'} │ Color: {item.product_variants?.color || 'N/A'}
                                   </p>
-                                  <p className="text-[10px] text-text-secondary mt-0.5">
+                                  <p className="text-xs text-text-secondary mt-0.5">
                                     Qty: {item.quantity} × ₹{Number(item.price_at_purchase).toLocaleString('en-IN')}
                                   </p>
                                 </div>
@@ -1062,73 +1085,58 @@ export default function Account() {
                           })}
                         </div>
 
-                        {/* If a coupon was applied to this order */}
-                        {order.coupon_code && (
-                          <div className="mt-4 pt-4 border-t border-border flex justify-between items-center text-xs text-text-secondary">
-                            <span>Coupon Used: <strong className="text-emerald-700 font-bold uppercase">{order.coupon_code}</strong></span>
-                            <span>Discount: <strong className="text-emerald-600 font-bold">-₹{Number(order.discount_amount || 0).toFixed(2)}</strong></span>
-                          </div>
-                        )}
-
-                        {/* Courier Partner & tracking info */}
-                        {(order.courier_name || order.tracking_id) && (
-                          <div className="mt-4 p-4 border border-border bg-bg-subtle space-y-3">
-                            <p className="text-[10px] uppercase tracking-wider text-text-secondary font-bold pb-2 border-b border-border">
-                              Shipment Tracking
+                        {/* Courier Tracking (Manually set by shop on dispatch) */}
+                        <div className="mt-4 p-4 rounded-xl border border-border/60 bg-bg-subtle/50 space-y-2">
+                          <p className="text-xs uppercase tracking-wider text-text-secondary font-bold pb-2 border-b border-border/60">
+                            Courier Tracking
+                          </p>
+                          {order.tracking_id ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-mono font-bold text-text-primary bg-white border border-border/80 px-3 py-2 select-all flex-1 break-all rounded-lg shadow-2xs">
+                                {order.tracking_id}
+                              </span>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(order.tracking_id || '');
+                                  setCopiedOrderId(order.id);
+                                  setTimeout(() => setCopiedOrderId(null), 2000);
+                                }}
+                                className="px-3.5 py-2 border border-border bg-white hover:bg-bg-subtle text-text-primary text-xs font-bold uppercase tracking-wider transition-all flex-shrink-0 flex items-center gap-1.5 rounded-lg shadow-2xs"
+                                title="Copy Tracking ID"
+                              >
+                                {copiedOrderId === order.id ? (
+                                  <><Check size={13} className="text-emerald-600" /><span className="text-emerald-600 text-xs">Copied</span></>
+                                ) : (
+                                  <><Copy size={13} /><span className="text-xs">Copy AWB</span></>
+                                )}
+                              </button>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-text-secondary font-medium flex items-center gap-2">
+                              <Package size={14} className="flex-shrink-0 text-text-secondary/70" />
+                              Tracking number will be updated here once your order is dispatched.
                             </p>
+                          )}
+                        </div>
 
-                            {/* Tracking website link */}
-                            {order.courier_tracking_url && (
-                              <div>
-                                <p className="text-[10px] text-text-secondary font-semibold uppercase tracking-wider mb-1.5">Courier Partner</p>
-                                <a
-                                  href={order.courier_tracking_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-2 px-3 py-2 border border-accent text-accent text-xs font-bold uppercase tracking-wider hover:bg-accent hover:text-white transition-all group"
-                                >
-                                  <ExternalLink size={11} className="group-hover:translate-x-0.5 transition-transform" />
-                                  {order.courier_name || 'Open Tracking Website'}
-                                </a>
-                              </div>
-                            )}
-
-                            {/* Tracking ID + copy */}
-                            {order.tracking_id && (
-                              <div>
-                                <p className="text-[10px] text-text-secondary font-semibold uppercase tracking-wider mb-1.5">Your Tracking ID</p>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xs font-mono font-bold text-text-primary bg-white border border-border px-2.5 py-1.5 select-all flex-1 break-all">
-                                    {order.tracking_id}
-                                  </span>
-                                  <button
-                                    onClick={() => {
-                                      navigator.clipboard.writeText(order.tracking_id || '');
-                                      alert('Tracking ID copied! Paste it on the courier website to track your package.');
-                                    }}
-                                    className="p-2 border border-border bg-white hover:bg-bg-subtle text-text-secondary hover:text-text-primary transition-all flex-shrink-0"
-                                    title="Copy Tracking ID"
-                                  >
-                                    <Copy size={12} />
-                                  </button>
-                                </div>
-                                <p className="text-[10px] text-text-secondary mt-1.5 leading-relaxed">
-                                  → Open the courier website above, paste this ID to track your order.
-                                </p>
-                              </div>
-                            )}
+                        {/* Customer Support Reference Note */}
+                        <div className="mt-3.5 p-3.5 rounded-xl bg-bg-subtle/80 border border-border/60 text-xs text-text-secondary flex items-start gap-2.5">
+                          <AlertCircle size={15} className="text-accent flex-shrink-0 mt-0.5" />
+                          <div>
+                            <span className="font-semibold text-text-primary block">Need Support with this Order?</span>
+                            Share Order Reference ID <span className="font-mono font-bold text-text-primary">ZP-{new Date(order.created_at).getFullYear()}-{order.id.slice(0, 6).toUpperCase()}</span> with our customer care team.
                           </div>
-                        )}
+                        </div>
                       </div>
 
                       {/* Right: Graphical Delivery Tracking Timeline */}
-                      <div className="lg:col-span-5 border-t lg:border-t-0 lg:border-l border-border pt-6 lg:pt-0 lg:pl-8 space-y-6">
-                        <div className="flex justify-between items-center border-b border-border pb-1.5">
-                          <h4 className="text-[10px] font-black uppercase tracking-widest text-text-secondary">
+                      <div className="lg:col-span-5 border-t lg:border-t-0 lg:border-l border-border/60 pt-6 lg:pt-0 lg:pl-8 space-y-6">
+                        <div className="flex justify-between items-center border-b border-border/60 pb-2">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-text-secondary">
                             Delivery Timeline
                           </h4>
                           {order.tracking_id && (
-                            <span className="text-[9px] font-mono bg-bg-subtle px-2 py-0.5 text-text-secondary border border-border">
+                            <span className="text-xs font-mono bg-bg-subtle px-2.5 py-1 text-text-secondary border border-border/60 rounded-md">
                               TRK: {order.tracking_id}
                             </span>
                           )}
@@ -1137,7 +1145,7 @@ export default function Account() {
                         {/* Visual timeline */}
                         <div className="relative pl-6 space-y-6 py-2">
                           {/* Timeline vertical bar */}
-                          <div className="absolute left-2.5 top-2.5 bottom-2.5 w-[2px] bg-border"></div>
+                          <div className="absolute left-2.5 top-2.5 bottom-2.5 w-[2px] bg-border/60"></div>
 
                           {steps.map((step, idx) => {
                             const isCompleted = idx <= activeIndex;
@@ -1146,7 +1154,7 @@ export default function Account() {
                             return (
                               <div key={step} className="relative flex items-center gap-3">
                                 {/* Timeline Dot */}
-                                <div className={`absolute -left-[19.5px] w-3 h-3 rounded-full border-2 transition-all flex items-center justify-center ${isCancelled && idx === 1
+                                <div className={`absolute -left-[19.5px] w-3.5 h-3.5 rounded-full border-2 transition-all flex items-center justify-center ${isCancelled && idx === 1
                                     ? 'bg-sale border-sale scale-110'
                                     : isCompleted
                                       ? 'bg-accent border-accent scale-110'
@@ -1167,7 +1175,7 @@ export default function Account() {
                                     {step}
                                   </p>
                                   {isActive && !isCancelled && (
-                                    <p className="text-[9px] text-text-secondary mt-0.5 leading-relaxed">
+                                    <p className="text-xs text-text-secondary mt-0.5 leading-relaxed font-medium">
                                       {idx === 0 && 'Your order has been recorded successfully.'}
                                       {idx === 1 && 'Our operations team is prepping your packaging.'}
                                       {idx === 2 && 'Package handed over to local sorting hub.'}
@@ -1175,7 +1183,7 @@ export default function Account() {
                                     </p>
                                   )}
                                   {isCancelled && idx === 1 && (
-                                    <p className="text-[9px] text-sale mt-0.5 leading-relaxed">
+                                    <p className="text-xs text-sale mt-0.5 leading-relaxed font-medium">
                                       This transaction has been voided.
                                     </p>
                                   )}

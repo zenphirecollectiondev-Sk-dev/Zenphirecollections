@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowRight, ShieldCheck, MapPin, CheckCircle, Tag, AlertCircle, RefreshCw, X } from 'lucide-react';
+import { ArrowRight, ShieldCheck, MapPin, CheckCircle, Tag, AlertCircle, RefreshCw, X, Copy, Check, Truck, Package } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { useCartStore } from '../store/useCartStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { supabase } from '../lib/supabase';
@@ -26,6 +27,7 @@ export default function Checkout() {
   const [step, setStep] = useState<CheckoutStep>('SHIPPING');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copiedTrackId, setCopiedTrackId] = useState(false);
 
   // Address State
   const [addressForm, setAddressForm] = useState<AddressForm>({
@@ -252,7 +254,7 @@ export default function Checkout() {
     setLoading(true);
     setError(null);
 
-    const trackingId = `ZP-${Math.floor(100000 + Math.random() * 900000)}-IN`;
+    const orderRefId = `ZP-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
 
     // Construct address info
     let finalAddressText = '';
@@ -302,12 +304,8 @@ export default function Checkout() {
               user_id: user.id,
               status: 'processing',
               total: total,
-              subtotal: subtotal,
-              shipping_cost: shipping,
-              coupon_code: appliedCoupon ? appliedCoupon.code : null,
-              discount_amount: discount,
               address_id: dbAddressId,
-              tracking_id: trackingId
+              tracking_id: null
             })
             .select()
             .single();
@@ -352,7 +350,7 @@ export default function Checkout() {
 
       // 3. Set payment receipt context
       setPaymentSuccessData({
-        trackingId,
+        trackingId: orderRefId,
         total,
         itemsCount: items.reduce((acc, curr) => acc + curr.quantity, 0),
         address: finalAddressText,
@@ -773,70 +771,140 @@ export default function Checkout() {
           STEP 3: SUCCESS PAYMENT CONFIRMATION RECEIPT
          ------------------------------------------------------------- */}
       {step === 'SUCCESS' && paymentSuccessData && (
-        <div className="max-w-2xl mx-auto py-12 px-4">
-          <div className="bg-white border border-border p-8 md:p-10 space-y-8 text-center">
-            <div className="w-16 h-16 bg-emerald-100 text-emerald-600 flex items-center justify-center rounded-full mx-auto">
-              <CheckCircle size={36} className="stroke-[1.5]" />
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: 'easeOut' }}
+          className="max-w-2xl mx-auto py-10 px-4"
+        >
+          <div className="bg-white border border-border shadow-2xl p-8 md:p-12 text-center space-y-8 relative overflow-hidden">
+            {/* Ambient Background Accent Glow */}
+            <div className="absolute -top-24 -left-24 w-60 h-60 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-24 -right-24 w-60 h-60 bg-accent/5 rounded-full blur-3xl pointer-events-none" />
+
+            {/* Premium Animated Tick Icon */}
+            <div className="relative flex items-center justify-center mx-auto">
+              <motion.div
+                initial={{ scale: 0.6, opacity: 0 }}
+                animate={{ scale: [0.6, 1.15, 1], opacity: 1 }}
+                transition={{ duration: 0.6, ease: [0.175, 0.885, 0.32, 1.275] }}
+                className="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center relative shadow-lg shadow-emerald-500/10 border border-emerald-200/80"
+              >
+                {/* Ripple ring animation */}
+                <motion.div
+                  initial={{ scale: 0.8, opacity: 0.8 }}
+                  animate={{ scale: 1.5, opacity: 0 }}
+                  transition={{ duration: 1.5, repeat: Infinity, ease: 'easeOut' }}
+                  className="absolute inset-0 rounded-full border border-emerald-400"
+                />
+
+                <svg className="w-10 h-10 stroke-emerald-600" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <motion.path
+                    d="M20 6L9 17l-5-5"
+                    initial={{ pathLength: 0 }}
+                    animate={{ pathLength: 1 }}
+                    transition={{ duration: 0.5, delay: 0.2, ease: 'easeInOut' }}
+                  />
+                </svg>
+              </motion.div>
             </div>
 
+            {/* Header Content */}
             <div className="space-y-2">
-              <span className="text-[10px] uppercase tracking-widest bg-emerald-100 text-emerald-800 font-bold px-2.5 py-1">
-                Payment Success
+              <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.25em] bg-emerald-100/80 text-emerald-900 font-bold px-3 py-1 rounded-full border border-emerald-200">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                Payment Confirmed & Verified
               </span>
-              <h2 className="text-2xl md:text-3xl font-heading font-black uppercase text-text-primary mt-3">
-                Thank you for your order!
+              <h2 className="text-3xl md:text-4xl font-heading font-black uppercase text-text-primary pt-2 tracking-tight">
+                Order Successful!
               </h2>
-              <p className="text-sm text-text-secondary">
-                Your order has been received and is being processed by our minimal atelier.
+              <p className="text-sm text-text-secondary max-w-md mx-auto leading-relaxed">
+                Thank you for your order! Our team is preparing your minimal collection pieces with care.
               </p>
             </div>
 
-            {/* Receipt details */}
-            <div className="bg-bg-subtle border border-border p-6 text-left space-y-3 text-sm">
-              <div className="flex justify-between border-b border-border pb-2.5 text-xs uppercase tracking-wider font-bold text-text-secondary">
-                <span>Receipt Summary</span>
+            {/* Official Order ID Copy Banner */}
+            <div className="bg-bg-subtle border border-border/80 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-left">
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wider text-text-secondary block mb-1">
+                  Official Order Reference ID
+                </span>
+                <span className="font-mono text-lg font-bold text-text-primary tracking-wider">
+                  #{paymentSuccessData.trackingId}
+                </span>
+                <p className="text-xs text-text-secondary mt-1 font-medium">
+                  Keep this Order ID to track your order or quote it when contacting customer support.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  if (paymentSuccessData.trackingId) {
+                    navigator.clipboard.writeText(paymentSuccessData.trackingId);
+                    setCopiedTrackId(true);
+                    setTimeout(() => setCopiedTrackId(false), 2000);
+                  }
+                }}
+                className="btn border border-border bg-white text-text-primary px-4 py-2.5 text-xs font-bold uppercase tracking-wider hover:border-accent flex items-center gap-1.5 shadow-2xs rounded-lg transition-all flex-shrink-0"
+              >
+                {copiedTrackId ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+                {copiedTrackId ? 'Copied ID' : 'Copy Order ID'}
+              </button>
+            </div>
+
+            {/* Estimated Delivery Status Pill */}
+            <div className="bg-emerald-50/50 border border-emerald-200/60 p-4 rounded-lg flex items-center gap-3 text-left">
+              <div className="w-10 h-10 bg-white border border-emerald-200 rounded-full flex items-center justify-center text-emerald-700 flex-shrink-0 shadow-xs">
+                <Truck size={20} />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-950">Estimated Dispatch & Delivery</h4>
+                <p className="text-xs text-emerald-800 font-medium">Standard Express Delivery (3 &ndash; 5 Business Days)</p>
+              </div>
+            </div>
+
+            {/* Detailed Receipt Breakdown */}
+            <div className="bg-bg-subtle border border-border/80 rounded-lg p-5 text-left space-y-3.5 text-xs">
+              <div className="flex justify-between border-b border-border pb-3 uppercase tracking-wider font-bold text-text-secondary text-[11px]">
+                <span>Order Summary</span>
                 <span>Details</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-text-secondary">Order ID / tracking:</span>
-                <span className="font-mono font-semibold text-text-primary">{paymentSuccessData.trackingId}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-text-secondary">Transaction Date:</span>
+                <span className="text-text-secondary font-medium">Transaction Date</span>
                 <span className="font-semibold text-text-primary">{paymentSuccessData.date}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-text-secondary">Items Quantity:</span>
-                <span className="font-semibold text-text-primary">{paymentSuccessData.itemsCount} units</span>
+                <span className="text-text-secondary font-medium">Total Quantity</span>
+                <span className="font-semibold text-text-primary">{paymentSuccessData.itemsCount} {paymentSuccessData.itemsCount === 1 ? 'Item' : 'Items'}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-text-secondary">Total Paid:</span>
-                <span className="font-bold text-text-primary">₹{paymentSuccessData.total.toFixed(2)}</span>
+              <div className="flex justify-between border-t border-border/50 pt-2.5">
+                <span className="text-text-primary font-bold">Total Paid</span>
+                <span className="font-bold text-base text-text-primary">₹{paymentSuccessData.total.toFixed(2)}</span>
               </div>
-              <div className="border-t border-border pt-3 mt-1">
-                <span className="block text-xs uppercase tracking-wider font-bold text-text-secondary mb-1">
-                  Shipping Destination:
+              <div className="border-t border-border pt-3">
+                <span className="block text-[10px] uppercase tracking-wider font-bold text-text-secondary mb-1">
+                  Delivery Address:
                 </span>
                 <p className="text-xs text-text-primary leading-relaxed">{paymentSuccessData.address}</p>
               </div>
             </div>
 
-            <div className="pt-4 flex flex-col sm:flex-row gap-3 justify-center">
+            {/* CTA Buttons */}
+            <div className="pt-2 flex flex-col sm:flex-row gap-3.5 justify-center">
               <Link
-                to="/shop"
-                className="btn btn-primary px-8 py-3.5 text-xs font-bold uppercase tracking-widest text-center"
+                to="/account?tab=orders"
+                className="btn btn-primary px-8 py-4 text-xs font-bold uppercase tracking-widest text-center flex items-center justify-center gap-2 shadow-md"
               >
-                Continue Shopping
+                <Package size={15} /> Track Order
               </Link>
               <Link
-                to="/account"
-                className="border border-border bg-white text-text-primary px-8 py-3.5 text-xs font-bold uppercase tracking-wider hover:bg-bg-subtle transition-colors text-center"
+                to="/shop"
+                className="border border-border bg-white text-text-primary px-8 py-4 text-xs font-bold uppercase tracking-widest hover:border-text-primary transition-all text-center flex items-center justify-center gap-2"
               >
-                Track Orders
+                Continue Shopping <ArrowRight size={14} />
               </Link>
             </div>
           </div>
-        </div>
+        </motion.div>
       )}
 
       {/* -------------------------------------------------------------

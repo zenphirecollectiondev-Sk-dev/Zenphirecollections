@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Heart, ShoppingBag, ChevronRight, ChevronLeft, Check, AlertCircle, X, ZoomIn, Image } from 'lucide-react';
+import { Heart, ShoppingBag, ChevronRight, ChevronLeft, Check, AlertCircle, X, ZoomIn, Image, Zap } from 'lucide-react';
 import { useCartStore } from '../store/useCartStore';
 import { useWishlistStore } from '../store/useWishlistStore';
 import { getProductDetails, supabase } from '../lib/supabase';
@@ -21,6 +21,8 @@ export default function ProductDetail() {
   const [lightboxIdx, setLightboxIdx] = useState(0);
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  // variantsReady: false until we've confirmed the product has its real variant rows
+  const [variantsReady, setVariantsReady] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -34,6 +36,10 @@ export default function ProductDetail() {
         if (!cancelled) {
           setDbProduct(cached);
           setLoading(false);
+          // If cache has real variants (from a previous getProductDetails call), mark ready immediately
+          if (cached.product_variants && cached.product_variants.length > 0) {
+            setVariantsReady(true);
+          }
         }
         // Fire size guide + recommendations in parallel in the background.
         // Both are non-blocking — product is already visible.
@@ -73,6 +79,8 @@ export default function ProductDetail() {
         if (data) {
           dataCache.set(`product:${id}`, data);
           setDbProduct(data);
+          if (!cancelled) setVariantsReady(true);
+
 
           // Fire size guide + recommendations in parallel now that we have the product
           const [sizeGuideRes, recsRes] = await Promise.allSettled([
@@ -109,7 +117,7 @@ export default function ProductDetail() {
       }
     }
     loadProduct();
-    return () => { cancelled = true; };
+    return () => { cancelled = true; setVariantsReady(false); };
   }, [id]);
 
   useEffect(() => { window.scrollTo(0, 0); }, [id]);
@@ -121,7 +129,9 @@ export default function ProductDetail() {
       product_images: dbProduct.product_images || [],
       product_variants: dbProduct.product_variants || [],
     };
-  "  const parsedSizeGuide = useMemo(() => {
+  }, [dbProduct]);
+
+  const parsedSizeGuide = useMemo(() => {
     let raw = product?.custom_size_guide_html || categorySizeGuide || '';
 
     if (raw.startsWith('SIZE_GUIDE_IMG::')) {
@@ -157,9 +167,12 @@ export default function ProductDetail() {
   const [selectedColor, setSelectedColor] = useState<string>('');
   const [activeImageIdx, setActiveImageIdx] = useState<number>(0);
   const [isAdded, setIsAdded] = useState(false);
-  const [viewBag, setViewBag] = useState(false);
+  const [_viewBag, setViewBag] = useState(false);
   const [heartAnim, setHeartAnim] = useState(false);
-  const [sizeError, setSizeError] = useState(false);
+  const [_sizeError, setSizeError] = useState(false);
+  const [isBuyModalOpen, setIsBuyModalOpen] = useState(false);
+  const [modalAction, setModalAction] = useState<'buy_now' | 'add_to_bag'>('buy_now');
+  const [modalSizeError, setModalSizeError] = useState(false);
   const navigate = useNavigate();
   const addItem = useCartStore((state) => state.addItem);
 
@@ -167,13 +180,8 @@ export default function ProductDetail() {
     if (product?.product_variants && product.product_variants.length > 0) {
       return product.product_variants;
     }
-    // Auto-fallback stock variants (S, M, L, XL with 50 stock) for products missing DB variant rows
-    return [
-      { id: `${product?.id}-s`, size: 'S', color: 'Default', stock_qty: 50, sku: `${product?.slug}-S` },
-      { id: `${product?.id}-m`, size: 'M', color: 'Default', stock_qty: 50, sku: `${product?.slug}-M` },
-      { id: `${product?.id}-l`, size: 'L', color: 'Default', stock_qty: 50, sku: `${product?.slug}-L` },
-      { id: `${product?.id}-xl`, size: 'XL', color: 'Default', stock_qty: 50, sku: `${product?.slug}-XL` }
-    ];
+    // No variants in DB — return empty array so no sizes are shown
+    return [];
   }, [product]);
 
   useEffect(() => {
@@ -290,7 +298,7 @@ export default function ProductDetail() {
 
   const availableVariantsForColor: any[] = productVariants.filter((v: any) => v.color === selectedColor);
   const availableColors: string[] = Array.from(new Set(productVariants.map((v: any) => v.color))) as string[];
-  const selectedVariant = productVariants.find((v: any) => v.color === selectedColor && v.size === selectedSize);"e === selectedSize);
+  const selectedVariant = productVariants.find((v: any) => v.color === selectedColor && v.size === selectedSize);
   const isOutOfStock = selectedSize
     ? selectedVariant?.stock_qty === 0
     : availableVariantsForColor.every((v: any) => v.stock_qty === 0);
@@ -319,6 +327,38 @@ export default function ProductDetail() {
       setIsAdded(true);
       setViewBag(false);
       setTimeout(() => { setIsAdded(false); setViewBag(true); }, 1500);
+    }
+  };
+
+  const handleBuyNowClick = () => {
+    if (isOutOfStock) return;
+    if (selectedSize && selectedVariant && selectedVariant.stock_qty > 0) {
+      addItem({
+        id: `${product.id}-${selectedVariant.id}`,
+        productId: product.id,
+        variantId: selectedVariant.id,
+        name: product.name,
+        size: selectedVariant.size,
+        color: selectedVariant.color,
+        price: product.base_price,
+        image: product.product_images[0]?.url || '',
+      });
+      navigate('/checkout');
+    } else {
+      setModalAction('buy_now');
+      setModalSizeError(false);
+      setIsBuyModalOpen(true);
+    }
+  };
+
+  const handleAddToCartClick = () => {
+    if (isOutOfStock) return;
+    if (selectedSize && selectedVariant) {
+      handleAddToCart();
+    } else {
+      setModalAction('add_to_bag');
+      setModalSizeError(false);
+      setIsBuyModalOpen(true);
     }
   };
 
@@ -368,6 +408,23 @@ export default function ProductDetail() {
                 <Image size={36} className="text-text-secondary/20" />
               </div>
             )}
+            {/* Top-Left Wishlist Heart Floating Badge */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleWishlistToggle();
+              }}
+              aria-label="Toggle Wishlist"
+              className={`absolute top-4 left-4 z-20 w-11 h-11 rounded-full bg-white/90 backdrop-blur-md border border-border/80 shadow-md flex items-center justify-center transition-all duration-200 hover:scale-110 hover:bg-white ${
+                heartAnim ? 'anim-heart-pop' : ''
+              }`}
+            >
+              <Heart
+                size={19}
+                className={isWishlisted(product.id) ? 'fill-sale stroke-sale' : 'stroke-text-primary hover:stroke-sale'}
+              />
+            </button>
+
             {/* Zoom hint */}
             <div className="absolute bottom-3 right-3 bg-white/80 border border-border/60 p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-150">
               <ZoomIn size={14} className="text-text-secondary" />
@@ -427,95 +484,100 @@ export default function ProductDetail() {
               </div>
             )}
 
-              {/* Size */}
-            <div>
-              <div className="flex justify-between items-center mb-3">
-                <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-primary">Select Size</h3>
-                <button onClick={() => setIsSizeGuideOpen(true)} className="btn text-[10px] text-text-secondary underline underline-offset-4 hover:text-text-primary">
-                  Size Guide
-                </button>
+            {/* Available Sizes Badges (Informative Stock Display) */}
+            {!variantsReady ? (
+              /* Skeleton while real variants are loading from DB */
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <div className="h-2.5 w-24 bg-bg-subtle animate-pulse rounded" />
+                  <div className="h-2.5 w-16 bg-bg-subtle animate-pulse rounded" />
+                </div>
+                <div className="flex gap-2">
+                  {[44, 44, 44, 48].map((w, i) => (
+                    <div key={i} className="h-10 bg-bg-subtle animate-pulse rounded border border-border" style={{ width: w }} />
+                  ))}
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <div className="flex-1 h-[50px] bg-bg-subtle animate-pulse rounded" />
+                  <div className="w-36 h-[50px] bg-bg-subtle animate-pulse rounded border border-border" />
+                </div>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {/* Derive sizes from actual variants in DB — no hardcoded list */}
-                {Array.from(new Set(availableVariantsForColor.map((v: any) => v.size))).map((size) => {
-                  const variant = availableVariantsForColor.find((v: any) => v.size === size);
-                  const available = variant ? variant.stock_qty > 0 : false;
-                  return (
-                    <button
-                      key={size}
-                      disabled={!available}
-                      onClick={() => {
-                        if (!available) return;
-                        setSelectedSize(size as string);
-                      }}
-                      className={`size-btn min-w-[44px] min-h-[44px] w-12 h-12 border text-xs font-bold flex items-center justify-center transition-all ${
-                        !available
-                          ? 'opacity-40 cursor-not-allowed bg-bg-subtle text-text-secondary line-through border-border'
-                          : selectedSize === size
-                            ? 'ambient-green-gradient text-white border-transparent selected'
-                            : 'bg-white border-border text-text-primary hover:border-accent'
-                      }`}
-                    >
-                      {size}
+            ) : (
+              <>
+                {/* Available Sizes Badges */}
+                <div>
+                  <div className="flex justify-between items-center mb-3">
+                    <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-primary">Available Sizes</h3>
+                    <button onClick={() => setIsSizeGuideOpen(true)} className="btn text-[10px] text-text-secondary underline underline-offset-4 hover:text-text-primary">
+                      Size Guide
                     </button>
-                  );
-                })}
-              </div>
-            </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {/* Derive sizes from actual variants in DB — non-clickable stock pills */}
+                    {Array.from(new Set(availableVariantsForColor.map((v: any) => v.size))).map((size) => {
+                      const variant = availableVariantsForColor.find((v: any) => v.size === size);
+                      const available = variant ? variant.stock_qty > 0 : false;
+                      return (
+                        <div
+                          key={size}
+                          className={`min-w-[48px] h-10 px-3.5 border text-xs font-bold flex items-center justify-center rounded select-none transition-colors ${
+                            !available
+                              ? 'opacity-40 bg-bg-subtle text-text-secondary line-through border-border cursor-not-allowed'
+                              : selectedSize === size
+                                ? 'ambient-green-gradient text-white border-transparent'
+                                : 'bg-white border-border text-text-primary cursor-default'
+                          }`}
+                        >
+                          {size}
+                          {available && variant?.stock_qty <= 4 && (
+                            <span className={`ml-1 text-[9px] font-bold ${selectedSize === size ? 'text-emerald-100' : 'text-sale'}`}>({variant.stock_qty} left)</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {availableVariantsForColor.length === 0 && (
+                      <p className="text-xs text-text-secondary font-medium py-1">No sizes available for this product yet.</p>
+                    )}
+                  </div>
+                </div>
 
-            {/* Stock feedback */}
-            {selectedSize && (
-              <div className="text-[11px] flex items-center gap-1.5 anim-fade-in">
-                {isOutOfStock ? (
-                  <span className="text-sale font-bold flex items-center gap-1.5"><AlertCircle size={13} /> Sold out in this size</span>
-                ) : selectedVariant?.stock_qty <= 4 ? (
-                  <span className="text-sale font-bold flex items-center gap-1.5"><AlertCircle size={13} /> Only {selectedVariant.stock_qty} left</span>
-                ) : (
-                  <span className="text-accent-gold font-semibold flex items-center gap-1.5"><Check size={13} /> In Stock &middot; Ready to ship</span>
+                {/* Selected size feedback if chosen */}
+                {selectedSize && (
+                  <div className="text-[11px] flex items-center gap-1.5 anim-fade-in">
+                    {isOutOfStock ? (
+                      <span className="text-sale font-bold flex items-center gap-1.5"><AlertCircle size={13} /> Sold out in this size</span>
+                    ) : selectedVariant?.stock_qty <= 4 ? (
+                      <span className="text-sale font-bold flex items-center gap-1.5"><AlertCircle size={13} /> Selected Size: {selectedSize} &middot; Only {selectedVariant.stock_qty} left</span>
+                    ) : (
+                      <span className="text-accent-gold font-semibold flex items-center gap-1.5"><Check size={13} /> Selected Size: {selectedSize} &middot; In Stock</span>
+                    )}
+                  </div>
                 )}
-              </div>
-            )}
 
-            {/* Size error — shown when Add to Cart clicked without size */}
-            {sizeError && (
-              <div className="text-[11px] flex items-center gap-1.5 text-sale font-bold anim-fade-in">
-                <AlertCircle size={13} /> Please select a size to continue
-              </div>
-            )}
-
-            {/* CTA */}
-            <div className="flex gap-3 pt-2">
-              {viewBag ? (
-                <button
-                  onClick={() => navigate('/cart')}
-                  className="btn btn-primary flex-1 min-h-[48px] py-4 font-bold uppercase text-[10px] tracking-widest flex items-center justify-center gap-2"
-                >
-                  <ShoppingBag size={15} /> View Bag
-                </button>
-              ) : (
-                <button
-                  disabled={isOutOfStock}
-                  onClick={handleAddToCart}
-                  className={`btn btn-primary flex-1 min-h-[48px] py-4 font-bold uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 ${isAdded
-                    ? '!bg-[#00221A] !border-[#063A2C]'
-                    : isOutOfStock
-                      ? '!bg-border !text-text-secondary cursor-not-allowed opacity-50'
-                      : ''
+                {/* Main CTAs */}
+                <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                  <button
+                    disabled={isOutOfStock && availableVariantsForColor.length > 0}
+                    onClick={handleBuyNowClick}
+                    className={`btn btn-primary flex-1 min-h-[50px] py-4 font-bold uppercase text-xs tracking-widest flex items-center justify-center gap-2 shadow-md ${
+                      isOutOfStock && availableVariantsForColor.length > 0 ? '!bg-border !text-text-secondary cursor-not-allowed opacity-50' : ''
                     }`}
-                >
-                  <ShoppingBag size={15} />
-                  {isAdded ? 'Added ✓' : isOutOfStock ? 'Sold Out' : selectedSize ? 'Add to Cart' : 'Select Size'}
-                </button>
-              )}
+                  >
+                    <Zap size={16} className="fill-current" />
+                    {isOutOfStock && availableVariantsForColor.length > 0 ? 'Sold Out' : 'Buy Now'}
+                  </button>
 
-              <button
-                onClick={handleWishlistToggle}
-                aria-label="Toggle Wishlist"
-                className={`wishlist-btn btn btn-secondary min-w-[48px] min-h-[48px] px-5 flex items-center justify-center ${heartAnim ? 'anim-heart-pop' : ''}`}
-              >
-                <Heart size={18} className={isWishlisted(product.id) ? 'fill-sale stroke-sale' : 'stroke-text-primary'} />
-              </button>
-            </div>
+                  <button
+                    disabled={isOutOfStock && availableVariantsForColor.length > 0}
+                    onClick={handleAddToCartClick}
+                    className="btn border border-border bg-white text-text-primary hover:border-accent min-h-[50px] py-4 px-6 font-bold uppercase text-xs tracking-widest flex items-center justify-center gap-2 flex-1 sm:flex-none"
+                  >
+                    <ShoppingBag size={16} />
+                    {isAdded ? 'Added ✓' : 'Add to Bag'}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </section>
@@ -733,6 +795,165 @@ export default function ProductDetail() {
               </div>
             )}
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── SIZE SELECTION POPUP UI MODAL ── */}
+      <AnimatePresence>
+        {isBuyModalOpen && (
+          <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 sm:p-6">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsBuyModalOpen(false)}
+              className="fixed inset-0 bg-black/70 backdrop-blur-sm"
+            />
+
+            {/* Modal Box */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="relative w-full max-w-md bg-white border border-border shadow-2xl p-6 sm:p-7 rounded-xl space-y-6 z-10 text-left overflow-hidden"
+            >
+              {/* Top Header */}
+              <div className="flex justify-between items-center border-b border-border pb-4">
+                <div>
+                  <h3 className="text-sm font-heading font-black uppercase tracking-wider text-text-primary">
+                    Select Your Size
+                  </h3>
+                  <p className="text-xs text-text-secondary mt-0.5">
+                    {modalAction === 'buy_now' ? 'Choose size to proceed directly to checkout' : 'Choose size to add to your bag'}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsBuyModalOpen(false)}
+                  className="p-2 rounded-full hover:bg-bg-subtle text-text-secondary hover:text-text-primary transition-colors"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Product Info Summary */}
+              <div className="flex gap-3.5 bg-bg-subtle p-3.5 rounded-lg border border-border/70 items-center">
+                <img
+                  src={imgThumb(product.product_images?.[0]?.url || '')}
+                  alt={product.name}
+                  className="w-14 h-16 object-cover object-top rounded border border-border bg-white flex-shrink-0"
+                />
+                <div className="flex-1 min-w-0 space-y-0.5">
+                  <h4 className="text-xs font-bold uppercase truncate text-text-primary">{product.name}</h4>
+                  <p className="text-xs font-semibold text-text-primary">₹{Number(product.base_price || 0).toFixed(2)}</p>
+                  {selectedColor && (
+                    <span className="text-[10px] uppercase tracking-wider text-text-secondary font-medium block">
+                      Color: {selectedColor}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Interactive Size Grid */}
+              <div className="space-y-2.5">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold uppercase tracking-wider text-text-primary">Sizes Available</span>
+                  <button
+                    onClick={() => {
+                      setIsBuyModalOpen(false);
+                      setIsSizeGuideOpen(true);
+                    }}
+                    className="text-[11px] text-text-secondary underline hover:text-text-primary transition-colors"
+                  >
+                    Size Measurement Guide
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-4 gap-2.5 pt-1">
+                  {Array.from(new Set(availableVariantsForColor.map((v: any) => v.size))).map((size) => {
+                    const variant = availableVariantsForColor.find((v: any) => v.size === size);
+                    const available = variant ? variant.stock_qty > 0 : false;
+                    const isSelected = selectedSize === size;
+                    return (
+                      <button
+                        key={size}
+                        disabled={!available}
+                        onClick={() => {
+                          if (!available) return;
+                          setSelectedSize(size as string);
+                          setModalSizeError(false);
+                        }}
+                        className={`h-12 border text-xs font-bold rounded-lg flex flex-col items-center justify-center transition-all ${
+                          !available
+                            ? 'opacity-30 bg-bg-subtle text-text-secondary line-through border-border cursor-not-allowed'
+                            : isSelected
+                              ? 'ambient-green-gradient text-white border-transparent ring-2 ring-emerald-500/50 shadow-md scale-[1.02]'
+                              : 'bg-white border-border text-text-primary hover:border-accent hover:bg-bg-subtle'
+                        }`}
+                      >
+                        <span>{size}</span>
+                        {available && variant?.stock_qty <= 4 && (
+                          <span className={`text-[8px] font-medium ${isSelected ? 'text-emerald-100' : 'text-sale'}`}>
+                            {variant.stock_qty} left
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {modalSizeError && (
+                  <p className="text-xs font-bold text-sale flex items-center gap-1.5 pt-1 anim-fade-in">
+                    <AlertCircle size={13} /> Please select a size to continue.
+                  </p>
+                )}
+              </div>
+
+              {/* Action Button inside Modal */}
+              <div className="pt-2">
+                <button
+                  onClick={() => {
+                    if (!selectedSize) {
+                      setModalSizeError(true);
+                      return;
+                    }
+                    const variant = availableVariantsForColor.find((v: any) => v.size === selectedSize);
+                    if (variant) {
+                      addItem({
+                        id: `${product.id}-${variant.id}`,
+                        productId: product.id,
+                        variantId: variant.id,
+                        name: product.name,
+                        size: variant.size,
+                        color: variant.color,
+                        price: product.base_price,
+                        image: product.product_images?.[0]?.url || '',
+                      });
+                      setIsBuyModalOpen(false);
+                      if (modalAction === 'buy_now') {
+                        navigate('/checkout');
+                      } else {
+                        setIsAdded(true);
+                        setViewBag(true);
+                      }
+                    }
+                  }}
+                  className="btn btn-primary w-full py-4 text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg"
+                >
+                  {modalAction === 'buy_now' ? (
+                    <>
+                      <Zap size={16} className="fill-current" /> Proceed to Checkout
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingBag size={16} /> Confirm & Add to Bag
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>

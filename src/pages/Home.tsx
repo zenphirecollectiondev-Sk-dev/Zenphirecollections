@@ -43,10 +43,29 @@ export default function Home() {
 
   // Hero Slider State
   const [activeSlide, setActiveSlide] = useState(0);
-  const [imagesLoaded, setImagesLoaded] = useState<Record<number, boolean>>({});
+  const [imagesLoaded, setImagesLoaded] = useState<Record<number, boolean>>(() => {
+    // Kick off slide-1 image download immediately on mount — synchronously, before any render.
+    // On repeat visits the URL is in localStorage/cache so this starts downloading right away.
+    try {
+      const cfg = dataCache.get<any>('homepage_config') || (() => {
+        const raw = localStorage.getItem('zenphire_homepage_config');
+        return raw ? JSON.parse(raw) : null;
+      })();
+      let url = cfg?.hero_image_url || null;
+      if (url?.includes(':::')) url = url.split(':::')[0];
+      if (url) {
+        const img = new window.Image();
+        img.src = url;
+        // If the browser already has it cached, mark slide 1 as loaded immediately
+        if (img.complete && img.naturalWidth > 0) return { 1: true } as Record<number, boolean>;
+      }
+    } catch (_) {}
+    return {} as Record<number, boolean>;
+  });
   const [heroBannerReady, setHeroBannerReady] = useState(false);
   const touchStartX = useRef<number | null>(null);
   const touchEndX = useRef<number | null>(null);
+
 
   const heroSlides = useMemo(() => {
     let slide1Image = homepageConfig?.hero_image_url || null;
@@ -98,67 +117,76 @@ export default function Home() {
     return slides;
   }, [homepageConfig]);
 
-  // Preload hero slide images so we know exact readiness state (Slide 1 unblocks view, Slide 2+ preload in background)
+  // Hero image preload + banner-ready gate:
+  // Diamond loader always shows for exactly 6 seconds minimum.
+  // Both the 6s timer AND image load must complete before dismissing.
+  // Image is preloaded in background so it's ready the moment loader fades out.
   useEffect(() => {
-    let mounted = true;
+    let cancelled = false;
+    let imageReady = false;
+    let timerDone = false;
+
+    const tryReveal = () => {
+      if (cancelled || !imageReady || !timerDone) return;
+      // Both conditions met — dismiss the loader
+      requestAnimationFrame(() => {
+        if (!cancelled) setHeroBannerReady(true);
+      });
+    };
+
+    // Fixed 6-second loader duration
+    const sixSecondTimer = setTimeout(() => {
+      if (!cancelled) { timerDone = true; tryReveal(); }
+    }, 6000);
+
     const firstSlide = heroSlides[0];
 
-    // Safety fallback timer: ensure banner transitions within 4.0s even on complete network stall
-    const fallbackTimer = setTimeout(() => {
-      if (mounted) setHeroBannerReady(true);
-    }, 4000);
-
     if (!firstSlide || !firstSlide.image) {
-      if (mounted) {
-        setHeroBannerReady(true);
-        if (firstSlide) setImagesLoaded((prev) => ({ ...prev, [firstSlide.id]: true }));
-      }
-      return () => {
-        mounted = false;
-        clearTimeout(fallbackTimer);
-      };
+      // No image configured — image is "ready" immediately, just wait for timer
+      if (firstSlide) setImagesLoaded((prev) => ({ ...prev, [firstSlide.id]: true }));
+      imageReady = true;
+      return () => { cancelled = true; clearTimeout(sixSecondTimer); };
     }
 
-    heroSlides.forEach((slide, index) => {
-      if (!slide.image) {
-        if (mounted) {
-          setImagesLoaded((prev) => ({ ...prev, [slide.id]: true }));
-          if (index === 0) setHeroBannerReady(true);
-        }
-        return;
-      }
-      const imgUrl = typeof slide.image === 'string' && (slide.image.startsWith('http') || slide.image.startsWith('data:'))
-        ? imgHero(slide.image)
-        : slide.image;
+    const imgUrl =
+      typeof firstSlide.image === 'string' &&
+      (firstSlide.image.startsWith('http') || firstSlide.image.startsWith('data:'))
+        ? imgHero(firstSlide.image)
+        : firstSlide.image;
 
-      const img = new window.Image();
-      img.src = imgUrl;
+    const img = new window.Image();
+    img.src = imgUrl;
 
-      const handleSuccess = () => {
-        if (!mounted) return;
-        setImagesLoaded((prev) => ({ ...prev, [slide.id]: true }));
-        if (index === 0) setHeroBannerReady(true);
-      };
+    const onImageReady = () => {
+      if (cancelled) return;
+      setImagesLoaded((prev) => ({ ...prev, [firstSlide.id]: true }));
+      imageReady = true;
+      tryReveal();
+    };
 
-      const handleError = () => {
-        if (!mounted) return;
-        setImagesLoaded((prev) => ({ ...prev, [slide.id]: true }));
-        if (index === 0) setHeroBannerReady(true);
-      };
+    if (img.complete && img.naturalWidth > 0) {
+      onImageReady();
+    } else {
+      img.onload = onImageReady;
+      img.onerror = onImageReady; // On error, still mark ready so timer can dismiss
+    }
 
-      if (img.complete) {
-        handleSuccess();
-      } else {
-        img.onload = handleSuccess;
-        img.onerror = handleError;
-      }
+    // Preload remaining slides silently in the background (non-blocking)
+    heroSlides.slice(1).forEach((slide) => {
+      if (!slide.image) return;
+      const sUrl =
+        typeof slide.image === 'string' &&
+        (slide.image.startsWith('http') || slide.image.startsWith('data:'))
+          ? imgHero(slide.image)
+          : slide.image;
+      const sImg = new window.Image();
+      sImg.src = sUrl;
+      sImg.onload = () => setImagesLoaded((prev) => ({ ...prev, [slide.id]: true }));
     });
 
-    return () => {
-      mounted = false;
-      clearTimeout(fallbackTimer);
-    };
+    return () => { cancelled = true; clearTimeout(sixSecondTimer); };
   }, [heroSlides]);
+
 
   const isCurrentSlideLoaded = !heroSlides[activeSlide]?.image || !!imagesLoaded[heroSlides[activeSlide]?.id];
 
@@ -528,13 +556,13 @@ export default function Home() {
                     loading={index === 0 ? "eager" : "lazy"}
                     decoding="async"
                     onLoad={() => setImagesLoaded((prev) => ({ ...prev, [slide.id]: true }))}
-                    className={`w-full h-full object-cover transition-transform ease-out ${
+                    className={`w-full h-full object-cover transition-all ease-out ${
                       isActive ? 'scale-105' : 'scale-100'
-                    }`}
+                    } ${imagesLoaded[slide.id] ? 'opacity-100' : 'opacity-0'}`}
                     style={{
                       objectPosition: slide.position,
-                      transitionProperty: 'transform',
-                      transitionDuration: isActive ? '6000ms' : '1000ms'
+                      transitionProperty: 'transform, opacity',
+                      transitionDuration: isActive ? '6000ms, 600ms' : '1000ms, 600ms'
                     }}
                   />
                 ) : (
