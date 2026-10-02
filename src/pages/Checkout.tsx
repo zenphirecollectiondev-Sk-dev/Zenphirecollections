@@ -50,9 +50,9 @@ export default function Checkout() {
   const [couponError, setCouponError] = useState<string | null>(null);
   const [couponSuccess, setCouponSuccess] = useState<string | null>(null);
 
-  // Simulated Razorpay Modal State
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  // Payment state — no simulated modal, real Razorpay SDK
   const [paymentSuccessData, setPaymentSuccessData] = useState<any>(null);
+  const [paymentLoading, setPaymentLoading] = useState(false);
 
   // Fetch saved addresses from Supabase if logged in
   useEffect(() => {
@@ -145,7 +145,7 @@ export default function Checkout() {
     }
   };
 
-  // Handle Coupon Apply — tries Supabase coupons table first, falls back to mock
+  // Handle Coupon Apply — validates against DB (checks is_active + expiry + min_order)
   const handleApplyCoupon = async (e: React.FormEvent) => {
     e.preventDefault();
     setCouponError(null);
@@ -158,45 +158,38 @@ export default function Checkout() {
 
     const normalizedCode = couponCode.trim().toUpperCase();
 
-    // 1. Try Supabase coupons table
     try {
-      const { data: dbCoupon } = await supabase
+      const { data: dbCoupon, error: couponErr } = await supabase
         .from('coupons' as any)
         .select('*')
         .eq('code', normalizedCode)
+        .eq('is_active', true)           // only admin-activated coupons
         .maybeSingle();
 
-      if (dbCoupon) {
-        // Validate expiry
-        if (new Date() > new Date((dbCoupon as any).expiry)) {
-          setCouponError('This coupon code has expired.');
-          setAppliedCoupon(null);
-          setCouponDiscount(0);
-          return;
-        }
-        // Validate minimum order
-        if (subtotal < ((dbCoupon as any).min_order_value || 0)) {
-          setCouponError(`Minimum order value of ₹${Number((dbCoupon as any).min_order_value).toFixed(2)} is required.`);
-          setAppliedCoupon(null);
-          setCouponDiscount(0);
-          return;
-        }
-        // Calculate discount
-        let discountAmount = 0;
-        if ((dbCoupon as any).discount_type === 'percentage') {
-          discountAmount = (subtotal * (dbCoupon as any).value) / 100;
-        } else {
-          discountAmount = (dbCoupon as any).value;
-        }
-        discountAmount = Math.min(discountAmount, subtotal);
-        const couponObj = { code: normalizedCode, discountType: (dbCoupon as any).discount_type, value: (dbCoupon as any).value };
-        setAppliedCoupon(couponObj);
-        setCouponDiscount(discountAmount);
-        setCouponSuccess(`Coupon "${normalizedCode}" applied! Saved ₹${discountAmount.toFixed(2)}.`);
+      if (couponErr) throw couponErr;
+
+      if (!dbCoupon) {
+        setCouponError('Invalid coupon code or coupon has been deactivated.');
         return;
       }
+      if (new Date() > new Date((dbCoupon as any).expiry)) {
+        setCouponError('This coupon code has expired.');
+        return;
+      }
+      if (subtotal < ((dbCoupon as any).min_order_value || 0)) {
+        setCouponError(`Minimum order value of ₹${Number((dbCoupon as any).min_order_value).toFixed(2)} is required.`);
+        return;
+      }
+
+      let discountAmount = (dbCoupon as any).discount_type === 'percentage'
+        ? (subtotal * (dbCoupon as any).value) / 100
+        : (dbCoupon as any).value;
+      discountAmount = Math.min(discountAmount, subtotal);
+
+      setAppliedCoupon({ code: normalizedCode, discountType: (dbCoupon as any).discount_type, value: (dbCoupon as any).value });
+      setCouponDiscount(discountAmount);
+      setCouponSuccess(`Coupon "${normalizedCode}" applied! You save ₹${discountAmount.toFixed(2)}.`);
     } catch (_) {
-      // Supabase is unreachable — do not fall back to any local codes
       setCouponError('Unable to validate coupon. Please check your connection and try again.');
       setAppliedCoupon(null);
       setCouponDiscount(0);
@@ -212,158 +205,189 @@ export default function Checkout() {
     setCouponError(null);
   };
 
-  // Trigger Payment Simulator (Razorpay checkout) — validates real-time stock availability first
-  const triggerPayment = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const variantIds = items.map((i) => i.variantId).filter(Boolean);
-      if (variantIds.length > 0) {
-        const { data: variants } = await supabase
-          .from('product_variants')
-          .select('id, stock_qty')
-          .in('id', variantIds);
-
-        if (variants && variants.length > 0) {
-          for (const item of items) {
-            const variant = variants.find((v: any) => v.id === item.variantId);
-            if (variant && variant.stock_qty < item.quantity) {
-              setError(`Sorry, "${item.name}" (${item.size || 'selected size'}) is out of stock or exceeds available inventory. Please update your cart.`);
-              setLoading(false);
-              return;
-            }
-          }
-        }
-      }
-    } catch (stockErr) {
-      console.warn('Pre-payment stock check warning:', stockErr);
-    } finally {
-      setLoading(false);
+  // Build address text for success screen
+  const buildAddressText = () => {
+    if (selectedAddressId !== 'new') {
+      const sel = savedAddresses.find((a) => a.id === selectedAddressId);
+      return sel ? `${sel.line1}, ${sel.city}, ${sel.state} - ${sel.pincode}` : '';
     }
-    setShowPaymentModal(true);
+    return `${addressForm.line1}, ${addressForm.city}, ${addressForm.state} - ${addressForm.pincode}`;
   };
 
-  // Finalize order writing to Supabase
-  const finalizeOrder = async (isSuccess: boolean) => {
-    setShowPaymentModal(false);
-    if (!isSuccess) {
-      setError('Payment cancelled or failed. Please try again.');
+  // Save new address to DB and return its ID (or null on failure)
+  const saveAddressIfNew = async (): Promise<string | null> => {
+    if (selectedAddressId !== 'new') return selectedAddressId;
+    if (!user) return null;
+    try {
+      const { data } = await supabase
+        .from('addresses')
+        .insert({
+          user_id: user.id,
+          recipient_name: addressForm.recipient_name,
+          phone_primary: addressForm.phone_primary,
+          phone_secondary: addressForm.phone_secondary || null,
+          line1: addressForm.line1,
+          city: addressForm.city,
+          state: addressForm.state,
+          pincode: addressForm.pincode,
+          is_default: addressForm.is_default,
+        })
+        .select()
+        .single();
+      return data?.id ?? null;
+    } catch {
+      return null; // non-critical — order proceeds without saved address
+    }
+  };
+
+  // ─── REAL RAZORPAY INTEGRATION ───────────────────────────────
+  // Step 1: Call /api/create-razorpay-order to get server-verified total
+  // Step 2: Open Razorpay checkout modal (real SDK)
+  // Step 3: On success, call /api/verify-razorpay-payment (HMAC check + DB write)
+  const initializePayment = async () => {
+    if (!user) {
+      setError('Please sign in to complete your purchase.');
       return;
     }
-
     setLoading(true);
     setError(null);
 
-    const orderRefId = `ZP-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
-
-    // Construct address info
-    let finalAddressText = '';
-    if (selectedAddressId !== 'new') {
-      const selected = savedAddresses.find((a) => a.id === selectedAddressId);
-      finalAddressText = selected
-        ? `${selected.line1}, ${selected.city}, ${selected.state} - ${selected.pincode}`
-        : '';
-    } else {
-      finalAddressText = `${addressForm.line1}, ${addressForm.city}, ${addressForm.state} - ${addressForm.pincode}`;
-    }
-
     try {
-      // 1. Try to write address to Supabase if it's a new address and user is logged in
-      let dbAddressId = null;
-      if (selectedAddressId === 'new' && user) {
-        try {
-          const { data: addressData } = await supabase
-            .from('addresses')
-            .insert({
-              user_id: user.id,
-              recipient_name: addressForm.recipient_name,
-              phone_primary: addressForm.phone_primary,
-              phone_secondary: addressForm.phone_secondary || null,
-              line1: addressForm.line1,
-              city: addressForm.city,
-              state: addressForm.state,
-              pincode: addressForm.pincode,
-              is_default: addressForm.is_default
-            })
-            .select()
-            .single();
-          if (addressData) dbAddressId = addressData.id;
-        } catch (addrErr) {
-          console.warn('Address write warning:', addrErr);
-        }
-      } else if (selectedAddressId !== 'new') {
-        dbAddressId = selectedAddressId;
-      }
-
-      // 2. Try to write order to Supabase
-      if (user) {
-        try {
-          const { data: orderData, error: orderErr } = await supabase
-            .from('orders' as any)
-            .insert({
-              user_id: user.id,
-              status: 'processing',
-              total: total,
-              address_id: dbAddressId,
-              tracking_id: null
-            })
-            .select()
-            .single();
-
-          if (orderErr) throw orderErr;
-
-          if (orderData && items.length > 0) {
-            // Write order items
-            const orderItemsInsert = items.map((item) => ({
-              order_id: (orderData as any).id,
-              variant_id: item.variantId,
-              quantity: item.quantity,
-              price_at_purchase: item.price
-            }));
-
-            await supabase.from('order_items').insert(orderItemsInsert);
-
-            // Decrement stock for each variant (non-blocking — best effort)
-            for (const item of items) {
-              try {
-                const { data: variantData } = await supabase
-                  .from('product_variants')
-                  .select('stock_qty')
-                  .eq('id', item.variantId)
-                  .single();
-                if (variantData) {
-                  const newQty = Math.max(0, variantData.stock_qty - item.quantity);
-                  await supabase
-                    .from('product_variants')
-                    .update({ stock_qty: newQty })
-                    .eq('id', item.variantId);
-                }
-              } catch (stockErr) {
-                console.warn('Stock decrement failed for variant', item.variantId, stockErr);
-              }
-            }
-          }
-        } catch (dbErr) {
-          console.warn('Database order write fell back to local memory (Placeholder key or connection issue):', dbErr);
-        }
-      }
-
-      // 3. Set payment receipt context
-      setPaymentSuccessData({
-        trackingId: orderRefId,
-        total,
-        itemsCount: items.reduce((acc, curr) => acc + curr.quantity, 0),
-        address: finalAddressText,
-        date: new Date().toLocaleDateString()
+      // Call server — server re-validates stock, coupon, and computes true total
+      const res = await fetch('/api/create-razorpay-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cart_items: items.map((i) => ({ variant_id: i.variantId, quantity: i.quantity })),
+          coupon_code: appliedCoupon?.code ?? null,
+        }),
       });
 
-      // Clear the cart
+      let orderData: any;
+      const text = await res.text();
+      try {
+        orderData = JSON.parse(text);
+      } catch {
+        throw new Error(text || `Server returned ${res.status}: Failed to initialize order.`);
+      }
+      if (!res.ok) throw new Error(orderData?.error || 'Could not create payment order.');
+
+      const {
+        razorpay_order_id,
+        amount_paise,
+        key_id,
+        verified_subtotal,
+        discount_amount,
+        shipping_cost,
+        verified_total,
+        coupon_code: serverCouponCode,
+      } = orderData;
+
+      setLoading(false);
+
+      // Open the REAL Razorpay checkout modal
+      const rzp = new (window as any).Razorpay({
+        key: key_id,
+        order_id: razorpay_order_id,
+        amount: amount_paise,
+        currency: 'INR',
+        name: 'Zenphire Collections',
+        description: `${items.length} item${items.length > 1 ? 's' : ''}`,
+        image: '/favicon.svg',
+        theme: { color: '#2B2B2B' },
+        modal: {
+          ondismiss: () => {
+            setError('Payment cancelled. Your cart is saved — you can try again anytime.');
+          },
+        },
+        handler: async (response: any) => {
+          // Called by Razorpay after successful payment
+          await handlePaymentSuccess(response, {
+            razorpay_order_id,
+            verified_subtotal,
+            discount_amount,
+            shipping_cost,
+            verified_total,
+            server_coupon_code: serverCouponCode,
+          });
+        },
+      });
+
+      rzp.open();
+    } catch (err: any) {
+      setLoading(false);
+      setError(err.message || 'Could not initialize payment. Please try again.');
+    }
+  };
+
+  // Step 3: Called by Razorpay SDK after user completes payment
+  const handlePaymentSuccess = async (
+    rzpResponse: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string },
+    meta: { razorpay_order_id: string; verified_subtotal: number; discount_amount: number; shipping_cost: number; verified_total: number; server_coupon_code: string | null },
+  ) => {
+    setPaymentLoading(true);
+    setError(null);
+
+    try {
+      const addressId = await saveAddressIfNew();
+
+      // Verify signature + write order atomically on server
+      const res = await fetch('/api/verify-razorpay-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          razorpay_order_id: rzpResponse.razorpay_order_id,
+          razorpay_payment_id: rzpResponse.razorpay_payment_id,
+          razorpay_signature: rzpResponse.razorpay_signature,
+          user_id: user!.id,
+          address_id: addressId,
+          cart_items: items.map((i) => ({
+            variant_id: i.variantId,
+            quantity: i.quantity,
+            price: i.price,
+          })),
+          coupon_code: meta.server_coupon_code,
+          subtotal: meta.verified_subtotal,
+          discount_amount: meta.discount_amount,
+          shipping_cost: meta.shipping_cost,
+          total: meta.verified_total,
+        }),
+      });
+
+      let result: any;
+      const verifyText = await res.text();
+      try {
+        result = JSON.parse(verifyText);
+      } catch {
+        result = { success: false, error: verifyText || `Server returned ${res.status}: Failed to verify payment.` };
+      }
+
+      if (!res.ok || !result.success) {
+        // Payment was real but DB write failed — show payment ID for support
+        setError(
+          result.error ||
+            `Order could not be saved. Please contact support with Payment ID: ${rzpResponse.razorpay_payment_id}`,
+        );
+        setPaymentLoading(false);
+        return;
+      }
+
+      // All good — show success screen
+      setPaymentSuccessData({
+        trackingId: result.order_ref,
+        paymentId: rzpResponse.razorpay_payment_id,
+        total: meta.verified_total,
+        itemsCount: items.reduce((acc, i) => acc + i.quantity, 0),
+        address: buildAddressText(),
+        date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
+      });
+
       clearCart();
       setStep('SUCCESS');
     } catch (err: any) {
-      setError(err.message || 'Failed to process order. Please try again.');
+      setError(err.message || 'Payment confirmed but order save failed. Please contact support.');
     } finally {
-      setLoading(false);
+      setPaymentLoading(false);
     }
   };
 
@@ -757,10 +781,15 @@ export default function Checkout() {
               </div>
 
               <button
-                onClick={triggerPayment}
-                className="btn btn-primary w-full py-4 font-bold uppercase text-xs tracking-widest flex items-center justify-center gap-2"
+                onClick={initializePayment}
+                disabled={loading || paymentLoading}
+                className="btn btn-primary w-full py-4 font-bold uppercase text-xs tracking-widest flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Proceed to Payment
+                {loading || paymentLoading ? (
+                  <><RefreshCw size={14} className="animate-spin" /> Preparing Payment...</>
+                ) : (
+                  'Proceed to Payment'
+                )}
               </button>
             </div>
           </div>
@@ -906,69 +935,12 @@ export default function Checkout() {
           </div>
         </motion.div>
       )}
-
-      {/* -------------------------------------------------------------
-          RAZORPAY SIMULATED PAYMENT MODAL DIALOG
-         ------------------------------------------------------------- */}
-      {showPaymentModal && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
-          {/* Backdrop */}
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm"></div>
-
-          {/* Dialog Panel */}
-          <div className="relative w-full max-w-sm bg-[#111116] text-white border border-[#22222a] p-6 shadow-2xl space-y-6">
-            <div className="flex justify-between items-center border-b border-[#22222a] pb-4">
-              <div className="flex items-center gap-2">
-                <span className="text-xs uppercase tracking-wider font-bold bg-blue-600 text-white px-2 py-0.5">
-                  Razorpay
-                </span>
-                <span className="text-xs font-semibold text-gray-400">Checkout Security</span>
-              </div>
-              <button
-                onClick={() => finalizeOrder(false)}
-                className="text-gray-400 hover:text-white transition-colors"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              <span className="text-[10px] uppercase tracking-wider text-gray-400">Merchant Payment</span>
-              <h3 className="text-lg font-bold">Zenphire Collections</h3>
-              <div className="flex justify-between items-baseline pt-2 border-t border-[#22222a]">
-                <span className="text-xs text-gray-400">Amount Payable:</span>
-                <span className="text-xl font-bold text-blue-400">₹{total.toFixed(2)}</span>
-              </div>
-            </div>
-
-            <div className="bg-[#1c1c24] border border-[#2a2a38] p-4 text-xs space-y-2 text-gray-300">
-              <p className="font-semibold text-white">Select Simulated Status:</p>
-              <p className="leading-relaxed">
-                Click **Authorize** to mock a successful payment, or **Refuse** to mock payment rejection.
-              </p>
-            </div>
-
-            <div className="flex gap-3 pt-2">
-              <button
-                disabled={loading}
-                onClick={() => finalizeOrder(false)}
-                className="flex-1 bg-transparent hover:bg-white/5 border border-gray-600 hover:border-white text-gray-300 hover:text-white py-3 text-xs font-bold uppercase tracking-wider transition-colors text-center"
-              >
-                Refuse
-              </button>
-              <button
-                disabled={loading}
-                onClick={() => finalizeOrder(true)}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 text-xs font-bold uppercase tracking-wider transition-colors text-center flex items-center justify-center gap-1.5"
-              >
-                {loading ? (
-                  <RefreshCw size={12} className="animate-spin" />
-                ) : (
-                  'Authorize'
-                )}
-              </button>
-            </div>
-          </div>
+      {/* Payment processing overlay — shown while verifying payment server-side */}
+      {paymentLoading && (
+        <div className="fixed inset-0 z-[400] flex flex-col items-center justify-center bg-black/70 backdrop-blur-sm">
+          <RefreshCw size={32} className="animate-spin text-white mb-4" />
+          <p className="text-white text-sm font-semibold tracking-wider uppercase">Verifying Payment…</p>
+          <p className="text-white/60 text-xs mt-2">Please do not close this tab</p>
         </div>
       )}
     </div>
