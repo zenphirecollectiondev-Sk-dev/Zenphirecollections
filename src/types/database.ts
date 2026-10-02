@@ -332,27 +332,48 @@ export interface Database {
           id: string
           user_id: string | null
           status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
+          payment_status: 'unpaid' | 'paid' | 'failed' | 'refunded'
+          subtotal: number | null
+          discount_amount: number | null
+          coupon_code: string | null
+          shipping_cost: number | null
           total: number
           address_id: string | null
           tracking_id: string | null
+          razorpay_order_id: string | null
+          razorpay_payment_id: string | null
           created_at: string
         }
         Insert: {
           id?: string
           user_id?: string | null
           status?: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
+          payment_status?: 'unpaid' | 'paid' | 'failed' | 'refunded'
+          subtotal?: number | null
+          discount_amount?: number | null
+          coupon_code?: string | null
+          shipping_cost?: number | null
           total: number
           address_id?: string | null
           tracking_id?: string | null
+          razorpay_order_id?: string | null
+          razorpay_payment_id?: string | null
           created_at?: string
         }
         Update: {
           id?: string
           user_id?: string | null
           status?: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
+          payment_status?: 'unpaid' | 'paid' | 'failed' | 'refunded'
+          subtotal?: number | null
+          discount_amount?: number | null
+          coupon_code?: string | null
+          shipping_cost?: number | null
           total?: number
           address_id?: string | null
           tracking_id?: string | null
+          razorpay_order_id?: string | null
+          razorpay_payment_id?: string | null
           created_at?: string
         }
         Relationships: [
@@ -419,6 +440,7 @@ export interface Database {
           value: number
           expiry: string
           min_order_value: number
+          is_active: boolean
           created_at: string
         }
         Insert: {
@@ -428,6 +450,7 @@ export interface Database {
           value: number
           expiry: string
           min_order_value?: number
+          is_active?: boolean
           created_at?: string
         }
         Update: {
@@ -437,6 +460,7 @@ export interface Database {
           value?: number
           expiry?: string
           min_order_value?: number
+          is_active?: boolean
           created_at?: string
         }
         Relationships: []
@@ -491,6 +515,14 @@ export interface Database {
       is_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean
+      }
+      decrement_stock: {
+        Args: { p_variant_id: string; p_qty: number }
+        Returns: void
+      }
+      increment_stock: {
+        Args: { p_variant_id: string; p_qty: number }
+        Returns: number
       }
     }
     Enums: {

@@ -113,6 +113,9 @@
       }
     }
   </style>
+  <!-- Razorpay Checkout SDK — must be CDN, not npm (PCI-DSS requirement) -->
+  <!-- Works on vercel.app subdomain and any custom domain (GoDaddy etc.) -->
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 </head>
 
 <body>

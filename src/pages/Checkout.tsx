@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowRight, ShieldCheck, MapPin, CheckCircle, Tag, AlertCircle, RefreshCw, X, Copy, Check, Truck, Package } from 'lucide-react';
+import { ArrowRight, ShieldCheck, MapPin, CheckCircle, Tag, AlertCircle, RefreshCw, Copy, Check, Truck, Package } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useCartStore } from '../store/useCartStore';
 import { useAuthStore } from '../store/useAuthStore';

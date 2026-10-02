@@ -179,9 +179,13 @@ export default function Admin() {
   const [isUploadingCategory, setIsUploadingCategory] = useState(false);
   const [isUploadingProductImage, setIsUploadingProductImage] = useState(false);
 
-  // Inventory inline edit state
+  // Inventory inline edit state (SET absolute value)
   const [inlineEditStock, setInlineEditStock] = useState<Record<string, number>>({});
   const [savingStockIds, setSavingStockIds] = useState<Record<string, boolean>>({});
+
+  // Quick-add stock state (ADD to existing value — additive, never overwrites)
+  const [quickAddStock, setQuickAddStock] = useState<Record<string, string>>({});
+  const [quickAddSaving, setQuickAddSaving] = useState<Record<string, boolean>>({});
 
   // Order Management states
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
@@ -1613,22 +1617,47 @@ export default function Admin() {
     }
   };
 
-  // Bulk Restock all product variants to 50 stock units
-  const handleBulkRestockAllVariants = async () => {
-    if (!confirm('Restock all products and size variants in the catalog to 50 units each?')) return;
+  // Quick-add stock to a single variant (ADDITIVE — never overwrites)
+  const handleQuickAddStock = async (variantId: string, productName: string, _currentQty: number) => {
+    const rawVal = quickAddStock[variantId];
+    const addQty = parseInt(rawVal || '0', 10);
+    if (!addQty || addQty <= 0) {
+      triggerNotification('Enter a quantity greater than 0 to add.', true);
+      return;
+    }
+
+    setQuickAddSaving(prev => ({ ...prev, [variantId]: true }));
     try {
-      const allVariantIds = products.flatMap(p => p.product_variants.map(v => v.id)).filter((id): id is string => typeof id === 'string');
-      if (allVariantIds.length > 0) {
-        const { error } = await supabase
-          .from('product_variants')
-          .update({ stock_qty: 50 })
-          .in('id', allVariantIds);
-        if (error) throw error;
-      }
-      triggerNotification('All catalog variants restocked to 50 units!');
-      fetchData();
+      // Use atomic DB function — adds to existing stock, not overwrites
+      const { data: newQty, error } = await supabase.rpc('increment_stock', {
+        p_variant_id: variantId,
+        p_qty: addQty
+      });
+      if (error) throw error;
+
+      triggerNotification(`+${addQty} units added to ${productName}. New stock: ${newQty}`);
+
+      // Update local state immediately — no full fetch needed
+      setProducts(prev => prev.map(p => ({
+        ...p,
+        product_variants: p.product_variants.map(v =>
+          v.id === variantId ? { ...v, stock_qty: newQty as number } : v
+        )
+      })));
+
+      // Update low stock count
+      const newLowCount = products
+        .flatMap(p => p.product_variants)
+        .filter(v => (v.id === variantId ? (newQty as number) : v.stock_qty) < 10)
+        .length;
+      setLowStockCount(newLowCount);
+
+      // Clear the quick-add input for this variant
+      setQuickAddStock(prev => { const n = { ...prev }; delete n[variantId]; return n; });
     } catch (err: any) {
-      triggerNotification(err.message || 'Error executing bulk restock', true);
+      triggerNotification(err.message || 'Failed to add stock.', true);
+    } finally {
+      setQuickAddSaving(prev => ({ ...prev, [variantId]: false }));
     }
   };
 
@@ -2257,25 +2286,22 @@ export default function Admin() {
             animate={{ opacity: 1, y: 0 }}
             className="space-y-6"
           >
-            {/* Header controls: Search & Bulk Restock */}
+            {/* Header controls: Search — bulk overwrite removed (too destructive) */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
               <div className="relative max-w-md flex-1">
                 <Search size={14} className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-text-secondary" />
                 <input
                   type="text"
-                  placeholder="Search variant ledger by SKU or product name..."
+                  placeholder="Search by SKU or product name..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-10 pr-4 py-2.5 border border-border/80 bg-white text-xs focus:outline-none focus:border-accent shadow-xs"
                 />
               </div>
-
-              <button
-                onClick={handleBulkRestockAllVariants}
-                className="btn btn-primary px-4 py-2.5 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 flex-shrink-0 shadow-sm"
-              >
-                <RefreshCw size={14} /> Bulk Restock All (50 Units)
-              </button>
+              <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-4 py-2.5 rounded-sm text-[10px] text-emerald-800 font-semibold">
+                <Package size={13} />
+                Use <strong className="mx-1">+ Quick Add</strong> per row to add stock. Set exact value via inline edit.
+              </div>
             </div>
 
             {/* Inventory table */}
@@ -2284,65 +2310,134 @@ export default function Admin() {
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="border-b border-border bg-bg-subtle text-[9px] uppercase tracking-wider text-text-secondary">
-                      <th className="py-3.5 pl-6">Product Details</th>
-                      <th className="py-3.5">Variant Specs</th>
-                      <th className="py-3.5 font-mono">SKU ID Code</th>
-                      <th className="py-3.5 w-44">Stock Count (Inline Edit)</th>
-                      <th className="py-3.5 pr-6 text-right">Status Alert</th>
+                      <th className="py-3.5 pl-6">Product / Variant</th>
+                      <th className="py-3.5 font-mono">SKU</th>
+                      <th className="py-3.5 w-36 text-center">Current Stock</th>
+                      <th className="py-3.5 w-52">Set Exact</th>
+                      <th className="py-3.5 w-52">+ Quick Add</th>
+                      <th className="py-3.5 pr-6 text-right">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
                     {products.flatMap(p =>
                       p.product_variants
                         .filter(v => {
-                          const matchSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            v.sku.toLowerCase().includes(searchQuery.toLowerCase());
-                          return matchSearch;
+                          const q = searchQuery.toLowerCase();
+                          return p.name.toLowerCase().includes(q) || v.sku.toLowerCase().includes(q);
                         })
                         .map(v => {
-                          const currentVal = inlineEditStock[v.id || ''] !== undefined
-                            ? inlineEditStock[v.id || '']
+                          const varId = v.id || '';
+                          const currentSetVal = inlineEditStock[varId] !== undefined
+                            ? inlineEditStock[varId]
                             : v.stock_qty;
-                          const isSaving = savingStockIds[v.id || ''];
-                          const hasChanged = inlineEditStock[v.id || ''] !== undefined && inlineEditStock[v.id || ''] !== v.stock_qty;
+                          const isSaving = savingStockIds[varId];
+                          const hasChanged = inlineEditStock[varId] !== undefined && inlineEditStock[varId] !== v.stock_qty;
+                          const quickVal = quickAddStock[varId] || '';
+                          const isQuickSaving = quickAddSaving[varId];
 
                           return (
-                            <tr key={v.id} className="hover:bg-bg-subtle">
+                            <tr key={varId} className="hover:bg-bg-subtle/50 transition-colors">
+
+                              {/* Product + Variant */}
                               <td className="py-4 pl-6">
-                                <span className="font-bold text-text-primary text-xs uppercase tracking-wide">{p.name}</span>
-                              </td>
-                              <td className="py-4">
-                                <span className="text-text-secondary text-xs uppercase tracking-wider">
-                                  Size: {v.size} │ Color: {v.color}
+                                <span className="font-bold text-text-primary text-xs block">{p.name}</span>
+                                <span className="text-[10px] text-text-secondary uppercase tracking-wider">
+                                  Size: {v.size} &bull; {v.color}
                                 </span>
                               </td>
-                              <td className="py-4 font-mono text-text-primary font-medium">{v.sku}</td>
+
+                              {/* SKU */}
+                              <td className="py-4 font-mono text-[10px] text-text-primary">{v.sku}</td>
+
+                              {/* Current Stock — large, clear */}
+                              <td className="py-4 text-center">
+                                <span className={`text-lg font-black tabular-nums ${
+                                  v.stock_qty === 0
+                                    ? 'text-sale'
+                                    : v.stock_qty < 10
+                                    ? 'text-yellow-600'
+                                    : 'text-emerald-700'
+                                }`}>
+                                  {v.stock_qty}
+                                </span>
+                                <span className="text-[9px] text-text-secondary block">units</span>
+                              </td>
+
+                              {/* Set Exact (inline edit — absolute value) */}
                               <td className="py-4">
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1.5">
                                   <input
                                     type="number"
                                     min="0"
-                                    value={currentVal}
+                                    value={currentSetVal}
+                                    title="Set exact stock count"
                                     onChange={(e) => {
                                       const n = parseInt(e.target.value);
                                       setInlineEditStock(prev => ({
                                         ...prev,
-                                        [v.id || '']: isNaN(n) ? 0 : n
+                                        [varId]: isNaN(n) ? 0 : n
                                       }));
                                     }}
-                                    className="w-20 px-2 py-1 border border-border text-center text-xs focus:outline-none focus:border-accent"
+                                    className="w-20 px-2 py-1.5 border border-border text-center text-xs focus:outline-none focus:border-accent rounded-sm"
                                   />
                                   {hasChanged && (
                                     <button
                                       disabled={isSaving}
-                                      onClick={() => handleInlineStockSave(v.id || '', v.stock_qty)}
-                                      className="p-1 text-emerald-700 hover:bg-emerald-50 rounded-sm transition-colors border border-emerald-200"
+                                      title={`Set stock to ${currentSetVal}`}
+                                      onClick={() => handleInlineStockSave(varId, v.stock_qty)}
+                                      className="flex items-center gap-1 px-2 py-1.5 text-[10px] font-bold uppercase text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 rounded-sm transition-colors"
                                     >
-                                      {isSaving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                                      {isSaving ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />}
+                                      Set
                                     </button>
                                   )}
                                 </div>
+                                {hasChanged && (
+                                  <p className="text-[9px] text-text-secondary mt-1">
+                                    {v.stock_qty} → {currentSetVal}
+                                  </p>
+                                )}
                               </td>
+
+                              {/* Quick Add (additive — adds on top of existing) */}
+                              <td className="py-4">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[10px] font-bold text-text-secondary">+</span>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={quickVal}
+                                    placeholder="e.g. 20"
+                                    title="Units to add on top of current stock"
+                                    onChange={(e) => {
+                                      setQuickAddStock(prev => ({
+                                        ...prev,
+                                        [varId]: e.target.value
+                                      }));
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') handleQuickAddStock(varId, p.name, v.stock_qty);
+                                    }}
+                                    className="w-20 px-2 py-1.5 border border-border text-center text-xs focus:outline-none focus:border-accent rounded-sm"
+                                  />
+                                  <button
+                                    disabled={isQuickSaving || !quickVal || parseInt(quickVal) <= 0}
+                                    onClick={() => handleQuickAddStock(varId, p.name, v.stock_qty)}
+                                    title={`Add ${quickVal || '?'} units to current stock of ${v.stock_qty}`}
+                                    className="flex items-center gap-1 px-2 py-1.5 text-[10px] font-bold uppercase bg-accent text-white hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed rounded-sm transition-colors"
+                                  >
+                                    {isQuickSaving ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} />}
+                                    Add
+                                  </button>
+                                </div>
+                                {quickVal && parseInt(quickVal) > 0 && (
+                                  <p className="text-[9px] text-emerald-700 mt-1 font-medium">
+                                    {v.stock_qty} + {quickVal} = {v.stock_qty + parseInt(quickVal)}
+                                  </p>
+                                )}
+                              </td>
+
+                              {/* Status badge */}
                               <td className="py-4 pr-6 text-right">
                                 {v.stock_qty === 0 ? (
                                   <span className="text-[8px] font-black uppercase bg-sale/10 border border-sale text-sale px-2 py-0.5">
@@ -2364,7 +2459,7 @@ export default function Admin() {
                     )}
                     {products.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="py-12 text-center text-xs text-text-secondary">
+                        <td colSpan={6} className="py-12 text-center text-xs text-text-secondary">
                           No product variants registered.
                         </td>
                       </tr>
