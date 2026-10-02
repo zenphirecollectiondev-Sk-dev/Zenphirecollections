@@ -46,10 +46,10 @@ export default function ProductDetail() {
         const [sizeGuideRes, recsRes] = await Promise.allSettled([
           cached.category_id
             ? supabase
-                .from('categories')
-                .select('size_guide_html')
-                .eq('id', cached.category_id)
-                .maybeSingle()
+              .from('categories')
+              .select('size_guide_html')
+              .eq('id', cached.category_id)
+              .maybeSingle()
             : Promise.resolve({ data: null }),
           supabase
             .from('products')
@@ -67,8 +67,11 @@ export default function ProductDetail() {
         if (recsRes.status === 'fulfilled') {
           setRecommendations((recsRes.value as any)?.data || []);
         }
-        // Skip network product re-fetch if still fresh
-        if (!dataCache.isStale(`product:${id}`)) return;
+        // Skip network product re-fetch only if the cache is fresh AND already has variants.
+        // If variants are missing (cache was populated by a listing fetch), we must still
+        // fetch full product details so the size selector can render.
+        const hasVariants = cached.product_variants && cached.product_variants.length > 0;
+        if (!dataCache.isStale(`product:${id}`) && hasVariants) return;
       }
 
       // ── Fetch (first direct URL access or stale revalidation) ──
@@ -86,10 +89,10 @@ export default function ProductDetail() {
           const [sizeGuideRes, recsRes] = await Promise.allSettled([
             data.category_id
               ? supabase
-                  .from('categories')
-                  .select('size_guide_html')
-                  .eq('id', data.category_id)
-                  .maybeSingle()
+                .from('categories')
+                .select('size_guide_html')
+                .eq('id', data.category_id)
+                .maybeSingle()
               : Promise.resolve({ data: null }),
             supabase
               .from('products')
@@ -415,9 +418,8 @@ export default function ProductDetail() {
                 handleWishlistToggle();
               }}
               aria-label="Toggle Wishlist"
-              className={`absolute top-4 left-4 z-20 w-11 h-11 rounded-full bg-white/90 backdrop-blur-md border border-border/80 shadow-md flex items-center justify-center transition-all duration-200 hover:scale-110 hover:bg-white ${
-                heartAnim ? 'anim-heart-pop' : ''
-              }`}
+              className={`absolute top-4 left-4 z-20 w-11 h-11 rounded-full bg-white/90 backdrop-blur-md border border-border/80 shadow-md flex items-center justify-center transition-all duration-200 hover:scale-110 hover:bg-white ${heartAnim ? 'anim-heart-pop' : ''
+                }`}
             >
               <Heart
                 size={19}
@@ -520,13 +522,12 @@ export default function ProductDetail() {
                       return (
                         <div
                           key={size}
-                          className={`min-w-[48px] h-10 px-3.5 border text-xs font-bold flex items-center justify-center rounded select-none transition-colors ${
-                            !available
+                          className={`min-w-[48px] h-10 px-3.5 border text-xs font-bold flex items-center justify-center rounded select-none transition-colors ${!available
                               ? 'opacity-40 bg-bg-subtle text-text-secondary line-through border-border cursor-not-allowed'
                               : selectedSize === size
                                 ? 'ambient-green-gradient text-white border-transparent'
                                 : 'bg-white border-border text-text-primary cursor-default'
-                          }`}
+                            }`}
                         >
                           {size}
                           {available && variant?.stock_qty <= 4 && (
@@ -559,9 +560,8 @@ export default function ProductDetail() {
                   <button
                     disabled={isOutOfStock && availableVariantsForColor.length > 0}
                     onClick={handleBuyNowClick}
-                    className={`btn btn-primary flex-1 min-h-[50px] py-4 font-bold uppercase text-xs tracking-widest flex items-center justify-center gap-2 shadow-md ${
-                      isOutOfStock && availableVariantsForColor.length > 0 ? '!bg-border !text-text-secondary cursor-not-allowed opacity-50' : ''
-                    }`}
+                    className={`btn btn-primary flex-1 min-h-[50px] py-4 font-bold uppercase text-xs tracking-widest flex items-center justify-center gap-2 shadow-md ${isOutOfStock && availableVariantsForColor.length > 0 ? '!bg-border !text-text-secondary cursor-not-allowed opacity-50' : ''
+                      }`}
                   >
                     <Zap size={16} className="fill-current" />
                     {isOutOfStock && availableVariantsForColor.length > 0 ? 'Sold Out' : 'Buy Now'}
@@ -884,13 +884,12 @@ export default function ProductDetail() {
                           setSelectedSize(size as string);
                           setModalSizeError(false);
                         }}
-                        className={`h-12 border text-xs font-bold rounded-lg flex flex-col items-center justify-center transition-all ${
-                          !available
+                        className={`h-12 border text-xs font-bold rounded-lg flex flex-col items-center justify-center transition-all ${!available
                             ? 'opacity-30 bg-bg-subtle text-text-secondary line-through border-border cursor-not-allowed'
                             : isSelected
                               ? 'ambient-green-gradient text-white border-transparent ring-2 ring-emerald-500/50 shadow-md scale-[1.02]'
                               : 'bg-white border-border text-text-primary hover:border-accent hover:bg-bg-subtle'
-                        }`}
+                          }`}
                       >
                         <span>{size}</span>
                         {available && variant?.stock_qty <= 4 && (
