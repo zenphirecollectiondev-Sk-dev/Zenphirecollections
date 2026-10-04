@@ -10,7 +10,7 @@ export default function Cart() {
   const total = subtotal + shipping;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 min-h-[70vh]">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 min-h-[70vh] anim-fade-up">
       {/* Page Header */}
       <div className="border-b border-border pb-6 mb-10">
         <span className="text-xs uppercase tracking-[0.2em] text-text-secondary font-bold">
@@ -67,7 +67,7 @@ export default function Cart() {
                       </div>
                       <button
                         onClick={() => removeItem(item.id)}
-                        className="text-xs text-sale font-medium hover:underline flex items-center gap-1.5 py-1 mt-2 md:mt-0 min-h-[36px]"
+                        className="text-xs text-sale font-medium hover:underline hover:text-sale/80 transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] flex items-center gap-1.5 py-1 mt-2 md:mt-0 min-h-[36px]"
                       >
                         <Trash2 size={13} /> Remove
                       </button>
@@ -85,7 +85,7 @@ export default function Cart() {
                       <button
                         onClick={() => updateQuantity(item.id, item.quantity - 1)}
                         aria-label="Decrease quantity"
-                        className="w-9 h-9 flex items-center justify-center hover:bg-bg-subtle text-text-secondary transition-colors"
+                        className="w-9 h-9 flex items-center justify-center hover:bg-bg-subtle text-text-secondary transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)]"
                       >
                         <Minus size={13} />
                       </button>
@@ -95,7 +95,7 @@ export default function Cart() {
                       <button
                         onClick={() => updateQuantity(item.id, item.quantity + 1)}
                         aria-label="Increase quantity"
-                        className="w-9 h-9 flex items-center justify-center hover:bg-bg-subtle text-text-secondary transition-colors"
+                        className="w-9 h-9 flex items-center justify-center hover:bg-bg-subtle text-text-secondary transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)]"
                       >
                         <Plus size={13} />
                       </button>

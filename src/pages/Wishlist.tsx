@@ -55,7 +55,7 @@ export default function Wishlist() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 min-h-[70vh]">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 min-h-[70vh] anim-fade-up">
       {/* Header */}
       <div className="border-b border-border pb-6 mb-8">
         <span className="text-xs uppercase tracking-[0.2em] text-text-secondary font-bold">
@@ -83,7 +83,7 @@ export default function Wishlist() {
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 sm:gap-4 md:gap-8">
           {wishlistProducts.map((product) => (
-            <div key={product.id} className="group product-card block bg-bg-subtle border border-border overflow-hidden transition-all duration-300 hover:shadow-md">
+            <div key={product.id} className="group product-card block bg-bg-subtle border border-border overflow-hidden">
               <div className="aspect-[3/4] w-full bg-bg-subtle overflow-hidden relative">
                 <Link to={`/product/${product.slug}`}>
                   {product.product_images?.[0]?.url ? (
@@ -92,7 +92,7 @@ export default function Wishlist() {
                       alt={product.name}
                       loading="lazy"
                       decoding="async"
-                      className="card-img w-full h-full object-cover object-top block relative z-10 transition-transform duration-500 group-hover:scale-105"
+                      className="card-img w-full h-full object-cover object-top block relative z-10"
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-bg-subtle">
@@ -100,7 +100,7 @@ export default function Wishlist() {
                     </div>
                   )}
                 </Link>
-                <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-accent-line scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
+                <div className="gold-accent-line" />
                 <button
                   onClick={() => toggleWishlist(product.id)}
                   aria-label="Remove from wishlist"
@@ -116,7 +116,7 @@ export default function Wishlist() {
                   Zenphire
                 </p>
                 <Link to={`/product/${product.slug}`}>
-                  <h3 className="text-xs font-medium text-text-primary group-hover:text-accent-gold transition-colors duration-200 truncate">
+                  <h3 className="text-xs font-medium text-text-primary group-hover:text-accent-gold transition-colors duration-150 truncate">
                     {product.name}
                   </h3>
                 </Link>
@@ -126,7 +126,7 @@ export default function Wishlist() {
                   </p>
                   <Link
                     to={`/product/${product.slug}`}
-                    className="text-[10px] uppercase tracking-wider font-bold text-text-secondary hover:text-text-primary underline underline-offset-4"
+                    className="text-[10px] uppercase tracking-wider font-bold text-text-secondary hover:text-text-primary transition-colors duration-150 underline underline-offset-4"
                   >
                     View
                   </Link>

@@ -390,7 +390,7 @@ export default function Account() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-10 md:py-14">
+    <div className="max-w-6xl mx-auto px-4 py-10 md:py-14 anim-fade-up">
       {/* Title & Banner Header */}
       <div className="bg-white border border-border/60 rounded-2xl p-6 md:p-8 mb-8 shadow-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
@@ -406,7 +406,7 @@ export default function Account() {
         </div>
         <button
           onClick={handleSignOut}
-          className="rounded-xl border border-border/80 bg-white text-text-primary px-5 py-2.5 text-xs font-bold uppercase tracking-wider hover:bg-sale hover:text-white hover:border-sale transition-all flex items-center gap-2 shadow-2xs"
+          className="rounded-xl border border-border/80 bg-white text-text-primary px-5 py-2.5 text-xs font-bold uppercase tracking-wider hover:bg-sale hover:text-white hover:border-sale transition-all duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] flex items-center gap-2 shadow-2xs"
         >
           <LogOut size={14} /> Log Out
         </button>
@@ -416,7 +416,7 @@ export default function Account() {
       <div className="flex bg-bg-subtle p-1.5 rounded-2xl border border-border/60 mb-8 max-w-md">
         <button
           onClick={() => setActiveTab('profile')}
-          className={`flex-1 py-3 px-4 text-xs font-bold tracking-wider uppercase rounded-xl transition-all ${
+          className={`flex-1 py-3 px-4 text-xs font-bold tracking-wider uppercase rounded-xl transition-all duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] ${
             activeTab === 'profile'
               ? 'bg-white text-text-primary shadow-xs'
               : 'text-text-secondary hover:text-text-primary'
@@ -426,7 +426,7 @@ export default function Account() {
         </button>
         <button
           onClick={() => setActiveTab('orders')}
-          className={`flex-1 py-3 px-4 text-xs font-bold tracking-wider uppercase rounded-xl transition-all ${
+          className={`flex-1 py-3 px-4 text-xs font-bold tracking-wider uppercase rounded-xl transition-all duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] ${
             activeTab === 'orders'
               ? 'bg-white text-text-primary shadow-xs'
               : 'text-text-secondary hover:text-text-primary'
@@ -441,7 +441,7 @@ export default function Account() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
 
           {/* Left Column: Personal Profile Card */}
-          <div className="lg:col-span-5 bg-white border border-border/60 rounded-2xl p-6 md:p-7 shadow-xs hover:shadow-sm transition-all">
+          <div className="lg:col-span-5 bg-white border border-border/60 rounded-2xl p-6 md:p-7 shadow-xs hover:shadow-sm transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]">
 
             {!isEditingProfile ? (
               /* VIEW MODE */
@@ -460,7 +460,7 @@ export default function Account() {
                       setProfileError(null);
                       setIsEditingProfile(true);
                     }}
-                    className="rounded-lg border border-border/80 text-text-primary bg-white px-3.5 py-2 text-xs font-bold uppercase tracking-wider hover:bg-bg-subtle transition-all flex items-center gap-1.5 shadow-2xs"
+                    className="rounded-lg border border-border/80 text-text-primary bg-white px-3.5 py-2 text-xs font-bold uppercase tracking-wider hover:bg-bg-subtle transition-all duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] flex items-center gap-1.5 shadow-2xs"
                   >
                     <Edit2 size={12} /> Edit
                   </button>
@@ -612,7 +612,7 @@ export default function Account() {
                         setProfileError(null);
                         setIsEditingProfile(false);
                       }}
-                      className="w-1/2 rounded-xl border border-border bg-white text-text-primary py-3 font-bold uppercase text-xs tracking-wider hover:bg-bg-subtle transition-colors text-center"
+                      className="w-1/2 rounded-xl border border-border bg-white text-text-primary py-3 font-bold uppercase text-xs tracking-wider hover:bg-bg-subtle transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] text-center"
                     >
                       Cancel
                     </button>
@@ -633,7 +633,7 @@ export default function Account() {
 
           {/* Right Column: Address Book Card */}
           <div className="lg:col-span-7 space-y-6">
-            <div className="bg-white border border-border/60 rounded-2xl p-6 md:p-7 shadow-xs hover:shadow-sm transition-all">
+            <div className="bg-white border border-border/60 rounded-2xl p-6 md:p-7 shadow-xs hover:shadow-sm transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]">
               <div className="flex justify-between items-center border-b border-border/60 pb-4 mb-6">
                 <div>
                   <h2 className="text-base font-heading font-bold uppercase tracking-wider text-text-primary">
@@ -646,7 +646,7 @@ export default function Account() {
                 {!addressFormOpen && (
                   <button
                     onClick={handleOpenAddForm}
-                    className="rounded-lg border border-border/80 text-text-primary bg-white px-3.5 py-2 text-xs font-bold uppercase tracking-wider hover:bg-bg-subtle transition-all flex items-center gap-1.5 shadow-2xs"
+                    className="rounded-lg border border-border/80 text-text-primary bg-white px-3.5 py-2 text-xs font-bold uppercase tracking-wider hover:bg-bg-subtle transition-all duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] flex items-center gap-1.5 shadow-2xs"
                   >
                     <Plus size={13} /> Add Address
                   </button>
@@ -819,7 +819,7 @@ export default function Account() {
                       <button
                         type="button"
                         onClick={() => setAddressFormOpen(false)}
-                        className="rounded-lg px-4 py-2.5 min-h-[40px] border border-border bg-white text-text-primary text-xs font-bold uppercase tracking-wider hover:bg-bg-subtle transition-colors"
+                        className="rounded-lg px-4 py-2.5 min-h-[40px] border border-border bg-white text-text-primary text-xs font-bold uppercase tracking-wider hover:bg-bg-subtle transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)]"
                       >
                         Cancel
                       </button>
@@ -864,7 +864,7 @@ export default function Account() {
                   {addresses.map((addr) => (
                     <div
                       key={addr.id}
-                      className={`border rounded-xl p-5 bg-white relative transition-all shadow-2xs hover:shadow-xs ${addr.is_default
+                      className={`border rounded-xl p-5 bg-white relative transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] shadow-2xs hover:shadow-xs ${addr.is_default
                           ? 'border-accent ring-1 ring-accent/30'
                           : 'border-border/70 hover:border-text-secondary'
                         }`}
@@ -903,7 +903,7 @@ export default function Account() {
                         {!addr.is_default ? (
                           <button
                             onClick={() => handleSetDefaultAddress(addr.id)}
-                            className="text-xs font-bold uppercase tracking-wider text-text-secondary hover:text-accent transition-colors min-h-[36px] flex items-center"
+                            className="text-xs font-bold uppercase tracking-wider text-text-secondary hover:text-accent transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] min-h-[36px] flex items-center"
                           >
                             Set Default
                           </button>
@@ -917,14 +917,14 @@ export default function Account() {
                           <button
                             onClick={() => handleOpenEditForm(addr)}
                             aria-label="Edit address"
-                            className="text-text-secondary hover:text-accent p-2 min-w-[36px] min-h-[36px] flex items-center justify-center transition-colors rounded-lg hover:bg-bg-subtle"
+                            className="text-text-secondary hover:text-accent p-2 min-w-[36px] min-h-[36px] flex items-center justify-center transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] rounded-lg hover:bg-bg-subtle"
                           >
                             <Edit2 size={14} />
                           </button>
                           <button
                             onClick={() => handleDeleteAddress(addr.id)}
                             aria-label="Delete address"
-                            className="text-text-secondary hover:text-sale p-2 min-w-[36px] min-h-[36px] flex items-center justify-center transition-colors rounded-lg hover:bg-bg-subtle"
+                            className="text-text-secondary hover:text-sale p-2 min-w-[36px] min-h-[36px] flex items-center justify-center transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] rounded-lg hover:bg-bg-subtle"
                           >
                             <Trash2 size={14} />
                           </button>
@@ -939,7 +939,7 @@ export default function Account() {
         </div>
       ) : (
         /* Tab 2: Orders History */
-        <div className="bg-white border border-border/60 rounded-2xl p-6 md:p-8 shadow-xs hover:shadow-sm transition-all">
+        <div className="bg-white border border-border/60 rounded-2xl p-6 md:p-8 shadow-xs hover:shadow-sm transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]">
           <div className="border-b border-border/60 pb-4 mb-6">
             <h2 className="text-base font-heading font-bold uppercase tracking-wider text-text-primary">
               Order Transactions
@@ -971,7 +971,7 @@ export default function Account() {
                 const { steps, activeIndex, isCancelled } = getTimelineInfo(order.status);
 
                 return (
-                  <div key={order.id} className="border border-border/60 bg-white rounded-2xl overflow-hidden shadow-2xs hover:shadow-xs transition-all">
+                  <div key={order.id} className="border border-border/60 bg-white rounded-2xl overflow-hidden shadow-2xs hover:shadow-xs transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]">
                     {/* Order summary header */}
                     <div className="border-b border-border/60 p-4 md:p-5 bg-bg-subtle/70 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
                       <div className="grid grid-cols-2 md:flex md:items-center gap-x-6 gap-y-2">
@@ -998,7 +998,7 @@ export default function Account() {
                                 setCopiedOrderId(order.id);
                                 setTimeout(() => setCopiedOrderId(null), 2000);
                               }}
-                              className="text-text-secondary hover:text-text-primary p-0.5 rounded transition-colors"
+                              className="text-text-secondary hover:text-text-primary p-0.5 rounded transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)]"
                               title="Copy Order ID"
                             >
                               {copiedOrderId === order.id ? (
@@ -1101,7 +1101,7 @@ export default function Account() {
                                   setCopiedOrderId(order.id);
                                   setTimeout(() => setCopiedOrderId(null), 2000);
                                 }}
-                                className="px-3.5 py-2 border border-border bg-white hover:bg-bg-subtle text-text-primary text-xs font-bold uppercase tracking-wider transition-all flex-shrink-0 flex items-center gap-1.5 rounded-lg shadow-2xs"
+                                className="px-3.5 py-2 border border-border bg-white hover:bg-bg-subtle text-text-primary text-xs font-bold uppercase tracking-wider transition-all duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] flex-shrink-0 flex items-center gap-1.5 rounded-lg shadow-2xs"
                                 title="Copy Tracking ID"
                               >
                                 {copiedOrderId === order.id ? (

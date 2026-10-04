@@ -470,10 +470,10 @@ export default function Home() {
                   <div className="pt-2 md:pt-4">
                     <Link
                       to={slide.buttonLink}
-                      className="btn ambient-green-gradient text-white px-8 py-3.5 text-xs font-bold uppercase tracking-widest hover:opacity-90 transition-all duration-300 shadow-xs inline-flex items-center gap-2 group/btn"
+                      className="btn ambient-green-gradient text-white px-8 py-3.5 text-xs font-bold uppercase tracking-widest hover:opacity-90 shadow-xs inline-flex items-center gap-2 group/btn"
                     >
                       {slide.buttonText}
-                      <ArrowRight size={12} className="transition-transform duration-300 group-hover/btn:translate-x-1" />
+                      <ArrowRight size={12} className="transition-transform duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] group-hover/btn:translate-x-1" />
                     </Link>
                   </div>
                 </div>
@@ -493,7 +493,7 @@ export default function Home() {
                     key={idx}
                     onClick={() => setActiveSlide(idx)}
                     aria-label={`Go to slide ${idx + 1}`}
-                    className={`h-1.5 rounded-full transition-all duration-500 cursor-pointer overflow-hidden relative ${isActive
+                    className={`h-1.5 rounded-full transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] cursor-pointer overflow-hidden relative ${isActive
                       ? 'w-8 bg-accent'
                       : 'w-2 bg-white/40 md:bg-text-secondary/30 hover:bg-white/70 md:hover:bg-text-secondary/60'
                       }`}
@@ -522,14 +522,14 @@ export default function Home() {
                 <button
                   onClick={handlePrevSlide}
                   aria-label="Previous slide"
-                  className="p-2 text-white md:text-text-primary hover:bg-white/10 md:hover:bg-black/5 transition-colors rounded-full cursor-pointer"
+                  className="p-2 text-white md:text-text-primary hover:bg-white/10 md:hover:bg-black/5 transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] rounded-full cursor-pointer"
                 >
                   <ChevronLeft size={16} />
                 </button>
                 <button
                   onClick={handleNextSlide}
                   aria-label="Next slide"
-                  className="p-2 text-white md:text-text-primary hover:bg-white/10 md:hover:bg-black/5 transition-colors rounded-full cursor-pointer"
+                  className="p-2 text-white md:text-text-primary hover:bg-white/10 md:hover:bg-black/5 transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] rounded-full cursor-pointer"
                 >
                   <ChevronRight size={16} />
                 </button>
@@ -605,7 +605,7 @@ export default function Home() {
                 <div className="relative w-full bg-bg-subtle overflow-hidden border border-border">
                   <img src={imgCard(col.image)} alt={col.name} loading="lazy" decoding="async" className="card-img w-full h-auto block" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
-                  <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-accent-line scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
+                  <div className="gold-accent-line" />
                   <div className="absolute bottom-5 left-5 text-white">
                     <p className="text-base font-heading font-bold tracking-widest uppercase">{col.name}</p>
                     <p className="card-overlay text-[10px] tracking-wider opacity-80 uppercase inline-flex items-center gap-1 mt-0.5">
@@ -666,7 +666,7 @@ export default function Home() {
                 <Link
                   key={cat.id}
                   to={`/shop?category=${cat.slug}`}
-                  className="category-card group block relative flex-shrink-0 w-60 md:w-80 snap-center transition-all duration-500 ease-out"
+                  className="category-card group block relative flex-shrink-0 w-60 md:w-80 snap-center"
                   style={{
                     opacity: isActive ? 1 : 0.75,
                     transform: isActive ? 'scale(1.0)' : 'scale(0.92)',
@@ -680,7 +680,7 @@ export default function Home() {
                         alt={cat.name}
                         loading="lazy"
                         decoding="async"
-                        className="card-img w-full h-full object-cover object-top transition-transform duration-700 ease-out group-hover:scale-105"
+                        className="card-img w-full h-full object-cover object-top group-hover:scale-105"
                       />
                     ) : (
                       /* No-image placeholder — shown when admin hasn't set a category image yet */
@@ -691,11 +691,11 @@ export default function Home() {
                         </span>
                       </div>
                     )}
-                    <div className="absolute inset-0 bg-black/5 opacity-20 transition-opacity duration-300 group-hover:opacity-0" />
+                    <div className="absolute inset-0 bg-black/5 opacity-20 transition-opacity duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] group-hover:opacity-0" />
                   </div>
 
                   <div className="mt-4 text-center">
-                    <h3 className="text-xs uppercase tracking-widest font-medium text-neutral-800 transition-colors duration-300 group-hover:text-accent-gold">
+                    <h3 className="text-xs uppercase tracking-widest font-medium text-neutral-800 transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] group-hover:text-accent-gold">
                       {cat.name}
                     </h3>
                   </div>
@@ -749,7 +749,7 @@ export default function Home() {
               <Link
                 key={product.id}
                 to={`/product/${product.slug}`}
-                className="group product-card block bg-bg-subtle border border-border overflow-hidden transition-all duration-300 hover:shadow-md"
+                className="group product-card block bg-bg-subtle border border-border overflow-hidden"
               >
                 <div className="aspect-[3/4] w-full bg-bg-subtle overflow-hidden relative">
                   {product.product_images?.[0]?.url ? (
@@ -758,7 +758,7 @@ export default function Home() {
                       alt={product.name}
                       loading="lazy"
                       decoding="async"
-                      className="card-img w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                      className="card-img w-full h-full object-cover object-top group-hover:scale-105"
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-bg-subtle">
@@ -775,7 +775,7 @@ export default function Home() {
                 </div>
                 <div className="p-3.5 space-y-1">
                   <p className="text-[9px] uppercase tracking-widest text-text-secondary font-bold">Zenphire</p>
-                  <h3 className="text-xs font-medium text-text-primary group-hover:text-accent-gold transition-colors duration-200 truncate">
+                  <h3 className="text-xs font-medium text-text-primary group-hover:text-accent-gold transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] truncate">
                     {product.name}
                   </h3>
                   <p className="text-xs font-semibold text-text-primary">
@@ -836,7 +836,7 @@ export default function Home() {
               <div className="hidden md:block">
                 <button
                   onClick={() => scrollBestSellers('left')}
-                  className="btn-icon w-9 h-9 rounded-full border border-border flex items-center justify-center text-text-secondary hover:text-accent-gold hover:border-accent-gold transition-colors duration-300 focus:outline-none cursor-pointer"
+                  className="btn-icon w-9 h-9 rounded-full border border-border flex items-center justify-center text-text-secondary hover:text-accent-gold hover:border-accent-gold transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] focus:outline-none cursor-pointer"
                   aria-label="Scroll left"
                 >
                   <ChevronLeft size={16} />
@@ -845,7 +845,7 @@ export default function Home() {
               <div className="hidden md:block">
                 <button
                   onClick={() => scrollBestSellers('right')}
-                  className="btn-icon w-9 h-9 rounded-full border border-border flex items-center justify-center text-text-secondary hover:text-accent-gold hover:border-accent-gold transition-colors duration-300 focus:outline-none cursor-pointer"
+                  className="btn-icon w-9 h-9 rounded-full border border-border flex items-center justify-center text-text-secondary hover:text-accent-gold hover:border-accent-gold transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] focus:outline-none cursor-pointer"
                   aria-label="Scroll right"
                 >
                   <ChevronRight size={16} />
@@ -869,7 +869,7 @@ export default function Home() {
                 <Link
                   key={product.id}
                   to={`/product/${product.slug}`}
-                  className="group product-card block w-full bg-bg-subtle border border-border overflow-hidden transition-all duration-300 hover:shadow-md"
+                  className="group product-card block w-full bg-bg-subtle border border-border overflow-hidden"
                 >
                   <div className="aspect-[3/4] w-full bg-bg-subtle overflow-hidden relative">
                     {product.product_images?.[0]?.url ? (
@@ -878,14 +878,14 @@ export default function Home() {
                         alt={product.name}
                         loading="lazy"
                         decoding="async"
-                        className="card-img w-full h-full object-cover object-top block relative z-10 transition-transform duration-500 group-hover:scale-105"
+                        className="card-img w-full h-full object-cover object-top block relative z-10 group-hover:scale-105"
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-bg-subtle">
                         <Image size={20} className="text-text-secondary/20" />
                       </div>
                     )}
-                    <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-accent-line scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
+                    <div className="gold-accent-line" />
                     <button
                       onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleWishlist(product.id); }}
                       aria-label="Toggle Wishlist"
@@ -896,7 +896,7 @@ export default function Home() {
                   </div>
                   <div className="p-3.5 space-y-1">
                     <p className="text-[9px] uppercase tracking-widest text-text-secondary font-bold">Zenphire</p>
-                    <h3 className="text-xs font-medium text-text-primary group-hover:text-accent-gold transition-colors duration-200 truncate">{product.name}</h3>
+                    <h3 className="text-xs font-medium text-text-primary group-hover:text-accent-gold transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] truncate">{product.name}</h3>
                     <p className="text-xs font-semibold text-text-primary">₹{Number(product.base_price || 0).toFixed(2)}</p>
                   </div>
                 </Link>
@@ -922,14 +922,14 @@ export default function Home() {
                         alt={product.name}
                         loading="lazy"
                         decoding="async"
-                        className="card-img w-full h-full object-cover object-top block relative z-10 transition-transform duration-500 group-hover:scale-105"
+                        className="card-img w-full h-full object-cover object-top block relative z-10 group-hover:scale-105"
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-bg-subtle">
                         <Image size={20} className="text-text-secondary/20" />
                       </div>
                     )}
-                    <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-accent-line scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
+                    <div className="gold-accent-line" />
                     <button
                       onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleWishlist(product.id); }}
                       aria-label="Toggle Wishlist"
@@ -940,7 +940,7 @@ export default function Home() {
                   </div>
                   <div className="p-3.5 space-y-1">
                     <p className="text-[9px] uppercase tracking-widest text-text-secondary font-bold">Zenphire</p>
-                    <h3 className="text-xs font-medium text-text-primary group-hover:text-accent-gold transition-colors duration-200 truncate">{product.name}</h3>
+                    <h3 className="text-xs font-medium text-text-primary group-hover:text-accent-gold transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] truncate">{product.name}</h3>
                     <p className="text-xs font-semibold text-text-primary">₹{Number(product.base_price || 0).toFixed(2)}</p>
                   </div>
                 </Link>

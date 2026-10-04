@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { DUR, EASE } from '../lib/motion';
 
 const faqs = [
   {
@@ -48,10 +49,10 @@ function FAQItem({ q, a }: { q: string; a: string }) {
         onClick={() => setOpen(!open)}
         className="w-full flex justify-between items-center py-4 text-left gap-4 group"
       >
-        <span className="text-sm font-medium text-text-primary group-hover:text-accent transition-colors duration-150">{q}</span>
+        <span className="text-sm font-medium text-text-primary group-hover:text-accent transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)]">{q}</span>
         <ChevronDown
           size={15}
-          className={`flex-shrink-0 text-text-secondary transition-transform duration-200 ${open ? 'rotate-180 text-accent-gold' : ''}`}
+          className={`flex-shrink-0 text-text-secondary transition-transform duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] ${open ? 'rotate-180 text-accent-gold' : ''}`}
         />
       </button>
       <AnimatePresence initial={false}>
@@ -60,7 +61,7 @@ function FAQItem({ q, a }: { q: string; a: string }) {
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.22, ease: 'easeInOut' }}
+            transition={{ duration: DUR.fast, ease: EASE }}
             className="overflow-hidden"
           >
             <div className="pb-4">
@@ -75,9 +76,9 @@ function FAQItem({ q, a }: { q: string; a: string }) {
 
 export default function FAQ() {
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12 min-h-[70vh]">
+    <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12 min-h-[70vh] anim-fade-up">
       <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-text-secondary mb-8">
-        <Link to="/" className="hover:text-text-primary transition-colors">Home</Link>
+        <Link to="/" className="hover:text-text-primary transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)]">Home</Link>
         <ChevronRight size={10} />
         <span className="text-text-primary font-bold">Help & FAQ</span>
       </div>

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { X, Plus, Minus, Trash2, ShoppingBag } from 'lucide-react';
 import { useCartStore } from '../store/useCartStore';
 import { motion, AnimatePresence } from 'framer-motion';
+import { DUR, EASE, EASE_ENTER } from '../lib/motion';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -38,7 +39,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+            transition={{ duration: DUR.base, ease: EASE }}
             onClick={onClose}
             className="fixed inset-0 bg-black/40"
           />
@@ -49,7 +50,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
-            transition={{ type: 'tween', duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ type: 'tween', duration: 0.32, ease: EASE_ENTER }}
             className="relative w-full max-w-md bg-white border-l border-border flex flex-col h-full z-50 shadow-2xl"
           >
             {/* Header */}
@@ -118,7 +119,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                             <button
                               onClick={() => updateQuantity(item.id, item.quantity - 1)}
                               aria-label="Decrease quantity"
-                              className="w-9 h-9 flex items-center justify-center hover:bg-bg-subtle text-text-secondary transition-colors"
+                              className="w-9 h-9 flex items-center justify-center hover:bg-bg-subtle text-text-secondary transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)]"
                             >
                               <Minus size={13} />
                             </button>
@@ -128,7 +129,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                             <button
                               onClick={() => updateQuantity(item.id, item.quantity + 1)}
                               aria-label="Increase quantity"
-                              className="w-9 h-9 flex items-center justify-center hover:bg-bg-subtle text-text-secondary transition-colors"
+                              className="w-9 h-9 flex items-center justify-center hover:bg-bg-subtle text-text-secondary transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)]"
                             >
                               <Plus size={13} />
                             </button>

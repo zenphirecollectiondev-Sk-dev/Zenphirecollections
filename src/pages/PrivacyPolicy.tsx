@@ -3,11 +3,11 @@ import { ChevronRight, Shield, Lock, Eye, FileText } from "lucide-react";
 
 export default function PrivacyPolicy() {
   return (
-    <div className="min-h-screen ambient-green-gradient py-12 px-4 sm:px-6 lg:px-8 text-white">
+    <div className="min-h-screen ambient-green-gradient py-12 px-4 sm:px-6 lg:px-8 text-white anim-fade-up">
       <div className="max-w-4xl mx-auto">
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-xs tracking-wider uppercase text-white/50 mb-8">
-          <Link to="/" className="hover:text-accent-gold transition-colors">Home</Link>
+          <Link to="/" className="hover:text-accent-gold transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)]">Home</Link>
           <ChevronRight size={12} />
           <span className="text-accent-gold">Privacy Policy</span>
         </div>

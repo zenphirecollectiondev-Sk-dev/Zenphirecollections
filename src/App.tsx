@@ -8,6 +8,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import SearchOverlay from './components/SearchOverlay';
 import CartDrawer from './components/CartDrawer';
 import { motion, AnimatePresence } from 'framer-motion';
+import { EASE, EASE_ENTER, DUR } from './lib/motion';
 
 import Home from './pages/Home';
 import Shop from './pages/Shop';
@@ -148,7 +149,7 @@ function AppContent() {
 
           {/* Center Logo */}
           <div className="absolute left-1/2 transform -translate-x-1/2">
-            <Link to="/" className={`text-xl font-heading font-normal tracking-[0.2em] uppercase select-none transition-colors duration-200 ${isCustomerPage ? 'text-accent-gold hover:text-accent-gold' : 'text-text-primary hover:text-accent'}`}>
+            <Link to="/" className={`text-xl font-heading font-normal tracking-[0.2em] uppercase select-none transition-colors duration-150 ${isCustomerPage ? 'text-accent-gold hover:text-accent-gold' : 'text-text-primary hover:text-accent'}`}>
               Zenphire
             </Link>
           </div>
@@ -158,7 +159,7 @@ function AppContent() {
             <button
               onClick={() => setIsSearchOpen(true)}
               aria-label="Search"
-              className={`btn-icon p-2 rounded-full transition-colors duration-200 ${isCustomerPage ? 'text-accent-gold hover:bg-white/10' : 'text-text-primary hover:bg-bg-subtle'}`}
+              className={`btn-icon p-2 rounded-full ${isCustomerPage ? 'text-accent-gold hover:bg-white/10' : 'text-text-primary hover:bg-bg-subtle'}`}
             >
               <Search size={19} className="stroke-[1.5]" />
             </button>
@@ -166,11 +167,11 @@ function AppContent() {
             <Link
               to="/wishlist"
               aria-label="Wishlist"
-              className={`btn-icon p-2 rounded-full relative transition-colors duration-200 ${isCustomerPage ? 'text-accent-gold hover:bg-white/10' : 'text-text-primary hover:bg-bg-subtle'}`}
+              className={`btn-icon p-2 rounded-full relative ${isCustomerPage ? 'text-accent-gold hover:bg-white/10' : 'text-text-primary hover:bg-bg-subtle'}`}
             >
               <Heart size={19} className="stroke-[1.5]" />
               {wishlistCount > 0 && (
-                <span className={`absolute top-1.5 right-1.5 text-[8px] font-bold w-3.5 h-3.5 flex items-center justify-center rounded-full transition-all duration-300 ${isCustomerPage ? 'bg-white text-header-base' : 'bg-accent text-white'}`}>
+                <span className={`absolute top-1.5 right-1.5 text-[8px] font-bold w-3.5 h-3.5 flex items-center justify-center rounded-full transition-all duration-150 ${isCustomerPage ? 'bg-white text-header-base' : 'bg-accent text-white'}`}>
                   {wishlistCount}
                 </span>
               )}
@@ -179,11 +180,11 @@ function AppContent() {
             <button
               onClick={() => setIsCartOpen(true)}
               aria-label="Cart"
-              className={`btn-icon p-2 rounded-full relative transition-colors duration-200 ${isCustomerPage ? 'text-accent-gold hover:bg-white/10' : 'text-text-primary hover:bg-bg-subtle'}`}
+              className={`btn-icon p-2 rounded-full relative ${isCustomerPage ? 'text-accent-gold hover:bg-white/10' : 'text-text-primary hover:bg-bg-subtle'}`}
             >
               <ShoppingBag size={19} className="stroke-[1.5]" />
               {cartCount > 0 && (
-                <span className={`absolute top-1.5 right-1.5 text-[8px] font-bold w-3.5 h-3.5 flex items-center justify-center rounded-full transition-all duration-300 ${isCustomerPage ? 'bg-white text-header-base' : 'bg-accent text-white'}`}>
+                <span className={`absolute top-1.5 right-1.5 text-[8px] font-bold w-3.5 h-3.5 flex items-center justify-center rounded-full transition-all duration-150 ${isCustomerPage ? 'bg-white text-header-base' : 'bg-accent text-white'}`}>
                   {cartCount}
                 </span>
               )}
@@ -192,7 +193,7 @@ function AppContent() {
             <Link
               to="/account"
               aria-label="Account"
-              className={`btn-icon p-2 rounded-full transition-colors duration-200 ${isCustomerPage ? 'text-accent-gold hover:bg-white/10' : 'text-text-primary hover:bg-bg-subtle'}`}
+              className={`btn-icon p-2 rounded-full ${isCustomerPage ? 'text-accent-gold hover:bg-white/10' : 'text-text-primary hover:bg-bg-subtle'}`}
             >
               <User size={19} className="stroke-[1.5]" />
             </Link>
@@ -201,7 +202,7 @@ function AppContent() {
               <Link
                 to="/admin"
                 aria-label="Admin Console"
-                className={`btn-icon p-2 rounded-full transition-colors duration-200 ${isCustomerPage ? 'text-accent-gold/70 hover:bg-white/10 hover:text-accent-gold' : 'text-text-secondary hover:bg-bg-subtle hover:text-text-primary'}`}
+                className={`btn-icon p-2 rounded-full ${isCustomerPage ? 'text-accent-gold/70 hover:bg-white/10 hover:text-accent-gold' : 'text-text-secondary hover:bg-bg-subtle hover:text-text-primary'}`}
               >
                 <Shield size={19} className="stroke-[1.5]" />
               </Link>
@@ -211,7 +212,7 @@ function AppContent() {
               <button
                 onClick={signOut}
                 aria-label="Sign Out"
-                className={`btn-icon p-2 rounded-full transition-colors duration-200 ${isCustomerPage ? 'text-accent-gold/70 hover:bg-white/10 hover:text-accent-gold' : 'text-text-secondary hover:bg-bg-subtle hover:text-sale'}`}
+                className={`btn-icon p-2 rounded-full ${isCustomerPage ? 'text-accent-gold/70 hover:bg-white/10 hover:text-accent-gold' : 'text-text-secondary hover:bg-bg-subtle hover:text-sale'}`}
               >
                 <LogOut size={19} className="stroke-[1.5]" />
               </button>
@@ -223,7 +224,7 @@ function AppContent() {
             <button
               onClick={() => setIsSearchOpen(true)}
               aria-label="Search"
-              className={`btn-icon min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full transition-colors duration-200 ${isCustomerPage ? 'text-accent-gold hover:bg-white/10' : 'text-text-primary hover:bg-bg-subtle'}`}
+              className={`btn-icon min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full ${isCustomerPage ? 'text-accent-gold hover:bg-white/10' : 'text-text-primary hover:bg-bg-subtle'}`}
             >
               <Search size={19} className="stroke-[1.5]" />
             </button>
@@ -231,11 +232,11 @@ function AppContent() {
             <button
               onClick={() => setIsCartOpen(true)}
               aria-label="Cart"
-              className={`btn-icon min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full relative transition-colors duration-200 ${isCustomerPage ? 'text-accent-gold hover:bg-white/10' : 'text-text-primary hover:bg-bg-subtle'}`}
+              className={`btn-icon min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full relative ${isCustomerPage ? 'text-accent-gold hover:bg-white/10' : 'text-text-primary hover:bg-bg-subtle'}`}
             >
               <ShoppingBag size={19} className="stroke-[1.5]" />
               {cartCount > 0 && (
-                <span className={`absolute top-2 right-2 text-[8px] font-bold w-3.5 h-3.5 flex items-center justify-center rounded-full transition-all duration-300 ${isCustomerPage ? 'bg-white text-header-base' : 'bg-accent text-white'}`}>
+                <span className={`absolute top-2 right-2 text-[8px] font-bold w-3.5 h-3.5 flex items-center justify-center rounded-full transition-all duration-150 ${isCustomerPage ? 'bg-white text-header-base' : 'bg-accent text-white'}`}>
                   {cartCount}
                 </span>
               )}
@@ -329,15 +330,15 @@ function AppContent() {
             <div>
               <h3 className="font-heading font-normal uppercase tracking-wider text-sm mb-4 text-accent-gold">Customer Care</h3>
               <ul className="space-y-3 text-sm text-white/70">
-                <li><Link to="/faq" className="inline-block py-1 hover:text-accent-gold transition-colors">Help & FAQ</Link></li>
-                <li><Link to="/shipping" className="inline-block py-1 hover:text-accent-gold transition-colors">Shipping & Returns</Link></li>
+                <li><Link to="/faq" className="inline-block py-1 hover:text-accent-gold transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)]">Help & FAQ</Link></li>
+                <li><Link to="/shipping" className="inline-block py-1 hover:text-accent-gold transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)]">Shipping & Returns</Link></li>
               </ul>
             </div>
             <div>
               <h3 className="font-heading font-normal uppercase tracking-wider text-sm mb-4 text-accent-gold">Legal</h3>
               <ul className="space-y-3 text-sm text-white/70">
-                <li><Link to="/privacy" className="inline-block py-1 hover:text-accent-gold transition-colors">Privacy Policy</Link></li>
-                <li><Link to="/terms" className="inline-block py-1 hover:text-accent-gold transition-colors">Terms of Service</Link></li>
+                <li><Link to="/privacy" className="inline-block py-1 hover:text-accent-gold transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)]">Privacy Policy</Link></li>
+                <li><Link to="/terms" className="inline-block py-1 hover:text-accent-gold transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)]">Terms of Service</Link></li>
               </ul>
             </div>
           </div>
@@ -432,7 +433,7 @@ function MobileMenuDrawer({ onClose, openSections, toggleSection, wishlistCount,
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        transition={{ duration: 0.25 }}
+        transition={{ duration: DUR.base, ease: EASE }}
         onClick={onClose}
         className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm md:hidden"
       />
@@ -443,7 +444,7 @@ function MobileMenuDrawer({ onClose, openSections, toggleSection, wishlistCount,
         initial={{ x: '-100%' }}
         animate={{ x: 0 }}
         exit={{ x: '-100%' }}
-        transition={{ type: 'tween', duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+        transition={{ type: 'tween', duration: 0.32, ease: EASE_ENTER }}
         className="fixed top-0 left-0 bottom-0 z-[61] w-[300px] max-w-[88vw] md:hidden flex flex-col"
         style={{
           background: 'linear-gradient(160deg, #00221A 0%, #063A2C 45%, #001510 100%)',
@@ -464,7 +465,7 @@ function MobileMenuDrawer({ onClose, openSections, toggleSection, wishlistCount,
           <button
             onClick={onClose}
             aria-label="Close menu"
-            className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-[#B8975A]/70 hover:text-[#B8975A] hover:bg-white/8 transition-all duration-200"
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-[#B8975A]/70 hover:text-[#B8975A] hover:bg-white/8 transition-all duration-150"
           >
             <X size={18} strokeWidth={1.5} />
           </button>
@@ -477,10 +478,10 @@ function MobileMenuDrawer({ onClose, openSections, toggleSection, wishlistCount,
           <Link
             to="/shop"
             onClick={onClose}
-            className="group flex items-center justify-between w-full px-3 py-3.5 mb-2 rounded-lg text-[#E4C783] hover:bg-white/6 transition-all duration-200"
+            className="group flex items-center justify-between w-full px-3 py-3.5 mb-2 rounded-lg text-[#E4C783] hover:bg-white/6 transition-all duration-150"
           >
             <span className="text-[13px] font-heading tracking-[0.18em] uppercase font-medium">Shop Collection</span>
-            <ArrowRight size={14} className="text-[#B8975A]/50 group-hover:text-[#B8975A] group-hover:translate-x-0.5 transition-all duration-200" />
+            <ArrowRight size={14} className="text-[#B8975A]/50 group-hover:text-[#B8975A] group-hover:translate-x-0.5 transition-all duration-150" />
           </Link>
 
           {/* Gold divider */}
@@ -491,15 +492,15 @@ function MobileMenuDrawer({ onClose, openSections, toggleSection, wishlistCount,
             <div key={section.key} className="mb-1">
               <button
                 onClick={() => toggleSection(section.key)}
-                className="group w-full min-h-[44px] flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-white/6 transition-all duration-200"
+                className="group w-full min-h-[44px] flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-white/6 transition-all duration-150"
               >
-                <span className="text-[12px] font-heading tracking-[0.18em] uppercase font-medium text-[#B8975A]/85 group-hover:text-[#B8975A] transition-colors">
+                <span className="text-[12px] font-heading tracking-[0.18em] uppercase font-medium text-[#B8975A]/85 group-hover:text-[#B8975A] transition-colors duration-150">
                   {section.label}
                 </span>
                 <ChevronDown
                   size={14}
                   strokeWidth={1.8}
-                  className={`text-[#B8975A]/50 transition-transform duration-300 ${openSections[section.key] ? 'rotate-180 text-[#B8975A]' : ''}`}
+                  className={`text-[#B8975A]/50 transition-transform duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] ${openSections[section.key] ? 'rotate-180 text-[#B8975A]' : ''}`}
                 />
               </button>
 
@@ -509,7 +510,7 @@ function MobileMenuDrawer({ onClose, openSections, toggleSection, wishlistCount,
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: 'auto', opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.22, ease: 'easeInOut' }}
+                    transition={{ duration: DUR.fast, ease: EASE }}
                     className="overflow-hidden"
                   >
                     <div className="flex flex-col gap-1 pl-4 pb-2 pt-1">
@@ -518,12 +519,12 @@ function MobileMenuDrawer({ onClose, openSections, toggleSection, wishlistCount,
                           key={item.name}
                           initial={{ opacity: 0, x: -6 }}
                           animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: i * 0.03, duration: 0.18 }}
+                          transition={{ delay: i * 0.03, duration: DUR.fast, ease: EASE }}
                         >
                           <Link
                             to={item.to}
                             onClick={onClose}
-                            className="flex items-center gap-2.5 px-3 py-2.5 min-h-[40px] rounded-md text-[11px] font-sans tracking-[0.14em] uppercase font-medium text-white/50 hover:text-[#E4C783] hover:bg-white/5 transition-all duration-180"
+                            className="flex items-center gap-2.5 px-3 py-2.5 min-h-[40px] rounded-md text-[11px] font-sans tracking-[0.14em] uppercase font-medium text-white/50 hover:text-[#E4C783] hover:bg-white/5 transition-all duration-150"
                           >
                             <span className="w-1 h-1 rounded-full bg-[#B8975A]/35 flex-shrink-0" />
                             {item.name}
@@ -544,7 +545,7 @@ function MobileMenuDrawer({ onClose, openSections, toggleSection, wishlistCount,
           <Link
             to="/wishlist"
             onClick={onClose}
-            className="group flex items-center justify-between w-full px-3 py-3 mb-1 rounded-lg text-[#B8975A]/80 hover:text-[#E4C783] hover:bg-white/6 transition-all duration-200"
+            className="group flex items-center justify-between w-full px-3 py-3 mb-1 rounded-lg text-[#B8975A]/80 hover:text-[#E4C783] hover:bg-white/6 transition-all duration-150"
           >
             <div className="flex items-center gap-2.5">
               <Heart size={14} strokeWidth={1.5} />
@@ -562,7 +563,7 @@ function MobileMenuDrawer({ onClose, openSections, toggleSection, wishlistCount,
           <Link
             to="/account"
             onClick={onClose}
-            className="group flex items-center gap-2.5 w-full px-3 py-3 mb-1 rounded-lg text-[#B8975A]/80 hover:text-[#E4C783] hover:bg-white/6 transition-all duration-200"
+            className="group flex items-center gap-2.5 w-full px-3 py-3 mb-1 rounded-lg text-[#B8975A]/80 hover:text-[#E4C783] hover:bg-white/6 transition-all duration-150"
           >
             <User size={14} strokeWidth={1.5} />
             <span className="text-[12px] font-heading tracking-[0.18em] uppercase font-medium">My Account</span>
@@ -573,7 +574,7 @@ function MobileMenuDrawer({ onClose, openSections, toggleSection, wishlistCount,
             <Link
               to="/admin"
               onClick={onClose}
-              className="group flex items-center gap-2.5 w-full px-3 py-3 mb-1 rounded-lg text-[#B8975A]/80 hover:text-[#E4C783] hover:bg-white/6 transition-all duration-200"
+              className="group flex items-center gap-2.5 w-full px-3 py-3 mb-1 rounded-lg text-[#B8975A]/80 hover:text-[#E4C783] hover:bg-white/6 transition-all duration-150"
             >
               <Shield size={14} strokeWidth={1.5} />
               <span className="text-[12px] font-heading tracking-[0.18em] uppercase font-medium">Admin Console</span>
@@ -586,7 +587,7 @@ function MobileMenuDrawer({ onClose, openSections, toggleSection, wishlistCount,
           {session ? (
             <button
               onClick={() => { onClose(); signOut(); }}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-lg text-[11px] font-bold tracking-[0.2em] uppercase transition-all duration-200 text-red-400/80 hover:text-red-400 border border-red-400/20 hover:border-red-400/40 hover:bg-red-400/5"
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-lg text-[11px] font-bold tracking-[0.2em] uppercase transition-all duration-150 text-red-400/80 hover:text-red-400 border border-red-400/20 hover:border-red-400/40 hover:bg-red-400/5"
             >
               <LogOut size={13} strokeWidth={1.8} />
               Sign Out
@@ -595,7 +596,7 @@ function MobileMenuDrawer({ onClose, openSections, toggleSection, wishlistCount,
             <Link
               to="/account"
               onClick={onClose}
-              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-lg text-[11px] font-bold tracking-[0.2em] uppercase transition-all duration-200 text-[#00221A]"
+              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-lg text-[11px] font-bold tracking-[0.2em] uppercase transition-all duration-150 text-[#00221A]"
               style={{ background: 'linear-gradient(135deg, #B8975A 0%, #E4C783 60%, #B8975A 100%)' }}
             >
               Sign In / Register

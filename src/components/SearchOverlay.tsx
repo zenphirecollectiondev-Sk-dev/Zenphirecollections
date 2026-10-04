@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { X, Search, ArrowRight, Sparkles, Image } from 'lucide-react';
 import { getActiveProducts, getCategories } from '../lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
+import { DUR, EASE, EASE_ENTER } from '../lib/motion';
 import { dataCache } from '../lib/dataCache';
 
 interface SearchOverlayProps {
@@ -121,7 +122,7 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        transition={{ duration: 0.22 }}
+        transition={{ duration: DUR.base, ease: EASE }}
         className="fixed inset-0 z-[200] flex flex-col"
         style={{
           background: 'linear-gradient(160deg, rgba(0,34,26,0.97) 0%, rgba(6,58,44,0.96) 50%, rgba(0,21,16,0.98) 100%)',
@@ -132,7 +133,7 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
         <motion.div
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.06, duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: DUR.base, ease: EASE_ENTER }}
           className="flex-shrink-0 w-full px-4 sm:px-6 lg:px-8 pt-6 pb-5"
           style={{ borderBottom: '1px solid rgba(184,151,90,0.2)' }}
         >
@@ -145,7 +146,7 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
               <button
                 onClick={onClose}
                 aria-label="Close search"
-                className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-[#B8975A]/60 hover:text-[#B8975A] hover:bg-white/8 transition-all duration-200"
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-[#B8975A]/60 hover:text-[#B8975A] hover:bg-white/8 transition-all duration-150 ease-[cubic-bezier(0.4,0,0.2,1)]"
               >
                 <X size={20} strokeWidth={1.5} />
               </button>
@@ -153,7 +154,7 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
 
             {/* Input row */}
             <div
-              className="flex items-center gap-4 px-4 py-4 rounded-xl transition-all duration-300"
+              className="flex items-center gap-4 px-4 py-4 rounded-xl transition-all duration-150 ease-[cubic-bezier(0.4,0,0.2,1)]"
               style={{
                 background: isFocused
                   ? 'rgba(184,151,90,0.08)'
@@ -167,7 +168,7 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
               <Search
                 size={20}
                 strokeWidth={1.5}
-                className="flex-shrink-0 transition-colors duration-200"
+                className="flex-shrink-0 transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)]"
                 style={{ color: isFocused ? '#B8975A' : 'rgba(184,151,90,0.5)' }}
               />
               <input
@@ -186,7 +187,7 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                 <button
                   onClick={() => setQuery('')}
                   aria-label="Clear search input"
-                  className="flex-shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-full hover:bg-white/10 text-white/40 hover:text-white/70 transition-all"
+                  className="flex-shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-full hover:bg-white/10 text-white/40 hover:text-white/70 transition-all duration-150 ease-[cubic-bezier(0.4,0,0.2,1)]"
                 >
                   <X size={15} />
                 </button>
@@ -200,7 +201,7 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                   <button
                     key={term}
                     onClick={() => handleSuggestion(term)}
-                    className="flex items-center gap-1.5 px-3.5 py-2 min-h-[36px] rounded-full text-[10px] tracking-[0.15em] uppercase font-medium transition-all duration-200 hover:scale-105"
+                    className="flex items-center gap-1.5 px-3.5 py-2 min-h-[36px] rounded-full text-[10px] tracking-[0.15em] uppercase font-medium transition-all duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] hover:scale-105"
                     style={{
                       background: 'rgba(184,151,90,0.08)',
                       border: '1px solid rgba(184,151,90,0.2)',
@@ -268,9 +269,9 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                         key={product.id}
                         initial={{ opacity: 0, y: 6 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: i * 0.04 }}
+                        transition={{ delay: i * 0.04, duration: DUR.fast, ease: EASE }}
                         onClick={() => handleResultClick(product.slug)}
-                        className="group w-full flex items-center gap-4 px-4 py-3.5 rounded-xl text-left transition-all duration-200"
+                        className="group w-full flex items-center gap-4 px-4 py-3.5 rounded-xl text-left transition-all duration-150 ease-[cubic-bezier(0.4,0,0.2,1)]"
                         style={{
                           background: 'rgba(255,255,255,0.02)',
                           border: '1px solid transparent',
@@ -324,7 +325,7 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                         <ArrowRight
                           size={14}
                           strokeWidth={1.5}
-                          className="flex-shrink-0 opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all duration-200"
+                          className="flex-shrink-0 opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all duration-150 ease-[cubic-bezier(0.4,0,0.2,1)]"
                           style={{ color: '#B8975A' }}
                         />
                       </motion.button>

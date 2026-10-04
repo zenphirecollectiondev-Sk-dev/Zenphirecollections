@@ -3,9 +3,9 @@ import { ChevronRight, Truck, RefreshCw, Shield, Clock } from "lucide-react";
 
 export default function ShippingReturns() {
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12 min-h-[70vh]">
+    <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12 min-h-[70vh] anim-fade-up">
       <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-text-secondary mb-8">
-        <Link to="/" className="hover:text-text-primary transition-colors">Home</Link>
+        <Link to="/" className="hover:text-text-primary transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)]">Home</Link>
         <ChevronRight size={10} />
         <span className="text-text-primary font-bold">Shipping & Returns</span>
       </div>

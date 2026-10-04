@@ -25,12 +25,13 @@
   /* One easing for everything — natural deceleration */
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
 
-  /* Two durations: fast = micro-interactions, base = layout changes */
-  --dur-fast: 150ms;
-  --dur-base: 300ms;
+  /* Duration tiers — applied by role, not guessed per component */
+  --dur-fast: 150ms;   /* micro-interactions: hover, badges, tiny reveals */
+  --dur-base: 300ms;   /* enter/exit: drawers, modals, overlays */
+  --dur-enter: 500ms;  /* page-level: section entrances, large reveals */
+  --dur-slow: 500ms;   /* alias for --dur-enter (semantic) */
 
-  /* For entrances only */
-  --dur-enter: 500ms;
+  /* Entrance spring — confident, no overshoot */
   --ease-enter: cubic-bezier(0.22, 1, 0.36, 1);
 
   /* ── Pure white app background ── */
@@ -485,15 +486,18 @@
    ========================================= */
 
 .product-card {
-  transition: transform var(--dur-base) var(--ease);
+  transition:
+    transform var(--dur-base) var(--ease),
+    box-shadow var(--dur-base) var(--ease);
   will-change: transform;
 }
 
 .product-card:hover {
   transform: translateY(-3px);
+  box-shadow: var(--shadow-card-hover);
 }
 
-/* Image zoom — slower, smoother */
+/* Image zoom — uses base duration, system easing */
 .product-card .card-img {
   transition: transform var(--dur-base) var(--ease);
   will-change: transform;
@@ -538,6 +542,31 @@
 .category-card:active {
   transform: translateY(0) scale(0.99);
   box-shadow: none;
+}
+
+/* =========================================
+   GOLD ACCENT LINE
+   Shared pattern: slides in from left on
+   card/group hover. Requires parent to have
+   class="group" (Tailwind) or :hover scope.
+   ========================================= */
+
+.gold-accent-line {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--gradient-accent-line);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform var(--dur-base) var(--ease);
+  pointer-events: none;
+}
+
+.group:hover .gold-accent-line,
+:hover > .gold-accent-line {
+  transform: scaleX(1);
 }
 
 /* =========================================
@@ -811,5 +840,46 @@
   }
   .preloader-text {
     opacity: 1 !important;
+  }
+}
+
+/* =========================================
+   GLOBAL REDUCED MOTION
+   Catch-all: disables all CSS transitions
+   and animations when the user has requested
+   reduced motion in their OS settings.
+   Framer Motion respects this automatically
+   when using the `useReducedMotion` hook
+   or when the environment flag is set.
+   ========================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Keep ambient gradient static */
+  .ambient-green-gradient {
+    animation: none;
+    background-size: 100% 100%;
+  }
+
+  /* Keep heading gradient static */
+  .heading-primary {
+    animation: none !important;
+    background: none !important;
+    color: var(--color-heading-primary-mid) !important;
+    -webkit-text-fill-color: var(--color-heading-primary-mid) !important;
+  }
+
+  /* Skeleton shimmer: stop it, show flat color */
+  .skeleton {
+    animation: none;
+    background: #f0f0f0;
   }
 }

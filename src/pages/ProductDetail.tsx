@@ -5,6 +5,7 @@ import { useCartStore } from '../store/useCartStore';
 import { useWishlistStore } from '../store/useWishlistStore';
 import { getProductDetails, supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
+import { DUR, EASE, EASE_ENTER } from '../lib/motion';
 import { dataCache } from '../lib/dataCache';
 import { imgHero, imgCard, imgThumb } from '../lib/imgTransform';
 import DOMPurify from 'dompurify';
@@ -372,7 +373,7 @@ export default function ProductDetail() {
   };
 
   return (
-    <div className="bg-bg min-h-screen overflow-x-hidden">
+    <div className="bg-bg min-h-screen overflow-x-hidden anim-fade-up">
 
       {/* Breadcrumb */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-2">
@@ -418,7 +419,7 @@ export default function ProductDetail() {
                 handleWishlistToggle();
               }}
               aria-label="Toggle Wishlist"
-              className={`absolute top-4 left-4 z-20 w-11 h-11 rounded-full bg-white/90 backdrop-blur-md border border-border/80 shadow-md flex items-center justify-center transition-all duration-200 hover:scale-110 hover:bg-white ${heartAnim ? 'anim-heart-pop' : ''
+              className={`wishlist-btn absolute top-4 left-4 z-20 w-11 h-11 rounded-full bg-white/90 backdrop-blur-md border border-border/80 shadow-md flex items-center justify-center ${heartAnim ? 'anim-heart-pop' : ''
                 }`}
             >
               <Heart
@@ -428,7 +429,7 @@ export default function ProductDetail() {
             </button>
 
             {/* Zoom hint */}
-            <div className="absolute bottom-3 right-3 bg-white/80 border border-border/60 p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+            <div className="absolute bottom-3 right-3 bg-white/80 border border-border/60 p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-150 ease-[cubic-bezier(0.4,0,0.2,1)]">
               <ZoomIn size={14} className="text-text-secondary" />
             </div>
           </div>
@@ -522,7 +523,7 @@ export default function ProductDetail() {
                       return (
                         <div
                           key={size}
-                          className={`min-w-[48px] h-10 px-3.5 border text-xs font-bold flex items-center justify-center rounded select-none transition-colors ${!available
+                          className={`min-w-[48px] h-10 px-3.5 border text-xs font-bold flex items-center justify-center rounded select-none transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] ${!available
                               ? 'opacity-40 bg-bg-subtle text-text-secondary line-through border-border cursor-not-allowed'
                               : selectedSize === size
                                 ? 'ambient-green-gradient text-white border-transparent'
@@ -594,7 +595,7 @@ export default function ProductDetail() {
                 key={rec.id}
                 to={`/product/${rec.slug}`}
                 onClick={() => { setSelectedSize(''); setActiveImageIdx(0); }}
-                className="group product-card block bg-bg-subtle border border-border overflow-hidden transition-all duration-300 hover:shadow-md"
+                className="group product-card block bg-bg-subtle border border-border overflow-hidden"
               >
                 <div className="aspect-[3/4] w-full bg-bg-subtle overflow-hidden relative">
                   {rec.product_images?.[0]?.url ? (
@@ -603,7 +604,7 @@ export default function ProductDetail() {
                       alt={rec.name}
                       loading="lazy"
                       decoding="async"
-                      className="card-img w-full h-full object-cover object-top block relative z-10 transition-transform duration-500 group-hover:scale-105"
+                      className="card-img w-full h-full object-cover object-top block relative z-10"
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-bg-subtle">
@@ -620,7 +621,7 @@ export default function ProductDetail() {
                 </div>
                 <div className="p-3.5 space-y-1">
                   <p className="text-[9px] uppercase tracking-widest text-text-secondary font-bold">Zenphire</p>
-                  <h3 className="text-xs font-medium text-text-primary group-hover:text-accent-gold transition-colors duration-200 truncate">{rec.name}</h3>
+                  <h3 className="text-xs font-medium text-text-primary group-hover:text-accent-gold transition-colors duration-150 truncate">{rec.name}</h3>
                   <p className="text-xs font-semibold text-text-primary">₹{Number(rec.base_price || 0).toFixed(2)}</p>
                 </div>
               </Link>
@@ -638,7 +639,7 @@ export default function ProductDetail() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
+              transition={{ duration: DUR.base, ease: EASE }}
               onClick={() => setIsSizeGuideOpen(false)}
               className="fixed inset-0 bg-black/50"
             />
@@ -646,7 +647,7 @@ export default function ProductDetail() {
               initial={{ opacity: 0, scale: 0.97, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.97, y: 10 }}
-              transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+              transition={{ duration: DUR.base, ease: EASE_ENTER }}
               className="relative w-full max-w-lg bg-white border border-border p-6 shadow-xl z-10 flex flex-col max-h-[88vh]"
             >
               <div className="flex justify-between items-center border-b border-border pb-4 mb-5">
@@ -708,7 +709,7 @@ export default function ProductDetail() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
+            transition={{ duration: DUR.base, ease: EASE }}
             style={{ backgroundColor: 'rgba(0, 0, 0, 0.96)' }}
             className="fixed inset-0 z-[9999] flex items-center justify-center"
             onClick={() => setIsLightboxOpen(false)}
@@ -748,7 +749,7 @@ export default function ProductDetail() {
                 initial={{ opacity: 0, scale: 0.97 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.97 }}
-                transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+                transition={{ duration: DUR.base, ease: EASE_ENTER }}
                 src={imgHero(product.product_images[lightboxIdx].url)}
                 alt={`${product.name} — view ${lightboxIdx + 1}`}
                 className="max-h-[88vh] max-w-[85vw] md:max-w-[55vw] object-contain select-none"
@@ -786,7 +787,7 @@ export default function ProductDetail() {
                     key={idx}
                     onClick={() => setLightboxIdx(idx)}
                     aria-label={`View image ${idx + 1}`}
-                    className={`rounded-full transition-all duration-200 ${lightboxIdx === idx
+                    className={`rounded-full transition-all duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] ${lightboxIdx === idx
                       ? 'bg-white w-2 h-2'
                       : 'bg-white/30 hover:bg-white/60 w-1.5 h-1.5'
                       }`}
@@ -807,6 +808,7 @@ export default function ProductDetail() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
+              transition={{ duration: DUR.base, ease: EASE }}
               onClick={() => setIsBuyModalOpen(false)}
               className="fixed inset-0 bg-black/70 backdrop-blur-sm"
             />
@@ -816,7 +818,7 @@ export default function ProductDetail() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              transition={{ duration: 0.2, ease: 'easeOut' }}
+              transition={{ duration: DUR.base, ease: EASE_ENTER }}
               className="relative w-full max-w-md bg-white border border-border shadow-2xl p-6 sm:p-7 rounded-xl space-y-6 z-10 text-left overflow-hidden"
             >
               {/* Top Header */}
@@ -831,7 +833,7 @@ export default function ProductDetail() {
                 </div>
                 <button
                   onClick={() => setIsBuyModalOpen(false)}
-                  className="p-2 rounded-full hover:bg-bg-subtle text-text-secondary hover:text-text-primary transition-colors"
+                  className="p-2 rounded-full hover:bg-bg-subtle text-text-secondary hover:text-text-primary transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)]"
                 >
                   <X size={18} />
                 </button>
@@ -864,7 +866,7 @@ export default function ProductDetail() {
                       setIsBuyModalOpen(false);
                       setIsSizeGuideOpen(true);
                     }}
-                    className="text-[11px] text-text-secondary underline hover:text-text-primary transition-colors"
+                    className="text-[11px] text-text-secondary underline hover:text-text-primary transition-colors duration-150"
                   >
                     Size Measurement Guide
                   </button>
@@ -884,7 +886,7 @@ export default function ProductDetail() {
                           setSelectedSize(size as string);
                           setModalSizeError(false);
                         }}
-                        className={`h-12 border text-xs font-bold rounded-lg flex flex-col items-center justify-center transition-all ${!available
+                        className={`h-12 border text-xs font-bold rounded-lg flex flex-col items-center justify-center transition-all duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] ${!available
                             ? 'opacity-30 bg-bg-subtle text-text-secondary line-through border-border cursor-not-allowed'
                             : isSelected
                               ? 'ambient-green-gradient text-white border-transparent ring-2 ring-emerald-500/50 shadow-md scale-[1.02]'
