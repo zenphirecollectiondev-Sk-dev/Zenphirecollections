@@ -161,20 +161,13 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                   Shipping &amp; taxes are calculated at checkout.
                 </p>
 
-                <div className="space-y-2.5">
+                <div>
                   <Link
                     to="/checkout"
                     onClick={onClose}
                     className="btn btn-primary block w-full py-4 font-bold uppercase text-[10px] tracking-widest text-center"
                   >
                     Proceed to Checkout
-                  </Link>
-                  <Link
-                    to="/cart"
-                    onClick={onClose}
-                    className="btn btn-secondary block w-full py-3 font-semibold uppercase text-[10px] tracking-widest text-center"
-                  >
-                    View Full Cart
                   </Link>
                 </div>
               </div>

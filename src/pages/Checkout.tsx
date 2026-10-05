@@ -27,7 +27,7 @@ interface AddressForm {
 export default function Checkout() {
   const navigate = useNavigate();
   const { items, clearCart } = useCartStore();
-  const { user } = useAuthStore();
+  const { user, loading: authLoading } = useAuthStore();
 
   const [step, setStep] = useState<CheckoutStep>('SHIPPING');
   const [loading, setLoading] = useState(false);
@@ -35,7 +35,36 @@ export default function Checkout() {
   const [copiedTrackId, setCopiedTrackId] = useState(false);
   const [mobileSummaryOpen, setMobileSummaryOpen] = useState(false);
 
-  // Address State
+  // Address State with immediate localStorage cache to prevent flash of address filler form
+  const [savedAddresses, setSavedAddresses] = useState<any[]>(() => {
+    try {
+      const cached = localStorage.getItem('zenphire_saved_addresses');
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [loadingAddresses, setLoadingAddresses] = useState<boolean>(() => {
+    try {
+      const cached = localStorage.getItem('zenphire_saved_addresses');
+      if (cached && JSON.parse(cached).length > 0) return false;
+    } catch {}
+    return true;
+  });
+  const [selectedAddressId, setSelectedAddressId] = useState<string>(() => {
+    try {
+      const cached = localStorage.getItem('zenphire_saved_addresses');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && parsed.length > 0) {
+          const defaultAddr = parsed.find((a: any) => a.is_default);
+          return defaultAddr ? defaultAddr.id : parsed[0].id;
+        }
+      }
+    } catch {}
+    return 'new';
+  });
+
   const [addressForm, setAddressForm] = useState<AddressForm>({
     recipient_name: '',
     phone_primary: '',
@@ -46,8 +75,6 @@ export default function Checkout() {
     pincode: '',
     is_default: true,
   });
-  const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
-  const [selectedAddressId, setSelectedAddressId] = useState<string>('new');
 
   // Coupon State
   const [couponCode, setCouponCode] = useState('');
@@ -62,8 +89,19 @@ export default function Checkout() {
 
   // Fetch saved addresses from Supabase if logged in
   useEffect(() => {
+    let cancelled = false;
+
     async function fetchAddresses() {
-      if (!user) return;
+      // Wait if authentication is still resolving
+      if (authLoading) return;
+
+      if (!user) {
+        setSavedAddresses([]);
+        setSelectedAddressId('new');
+        setLoadingAddresses(false);
+        return;
+      }
+
       try {
         const { data, error: addrError } = await supabase
           .from('addresses')
@@ -71,17 +109,39 @@ export default function Checkout() {
           .eq('user_id', user.id);
 
         if (addrError) throw addrError;
+        if (cancelled) return;
+
         if (data && data.length > 0) {
           setSavedAddresses(data);
+          try {
+            localStorage.setItem('zenphire_saved_addresses', JSON.stringify(data));
+          } catch {}
           const defaultAddr = data.find((a) => a.is_default);
-          setSelectedAddressId(defaultAddr ? defaultAddr.id : data[0].id);
+          setSelectedAddressId((prev) => {
+            if (prev === 'new' || !data.some((a) => a.id === prev)) {
+              return defaultAddr ? defaultAddr.id : data[0].id;
+            }
+            return prev;
+          });
+        } else {
+          setSavedAddresses([]);
+          setSelectedAddressId('new');
+          try {
+            localStorage.removeItem('zenphire_saved_addresses');
+          } catch {}
         }
       } catch (err) {
         console.warn('Could not load addresses (placeholder DB or network issue):', err);
+      } finally {
+        if (!cancelled) setLoadingAddresses(false);
       }
     }
+
     fetchAddresses();
-  }, [user]);
+    return () => {
+      cancelled = true;
+    };
+  }, [user, authLoading]);
 
   // Order Calculations
   const subtotal = useMemo(() => items.reduce((acc, item) => acc + item.price * item.quantity, 0), [items]);
@@ -399,55 +459,49 @@ export default function Checkout() {
       {/* ── Minimal Header & Stepper (Non-Success Steps) ── */}
       {step !== 'SUCCESS' && (
         <header className="mb-6 sm:mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-border/70">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-border/60">
             {/* Left: Back to Cart + Title */}
             <div className="flex items-center gap-2.5">
               <Link
                 to="/cart"
-                className="inline-flex items-center gap-1 text-xs text-text-secondary hover:text-text-primary transition-colors duration-150 py-1"
+                className="inline-flex items-center gap-1 text-xs text-text-secondary hover:text-text-primary transition-colors py-1"
                 aria-label="Back to Cart"
               >
                 <ChevronLeft size={15} />
-                <span>Cart</span>
+                <span>Bag</span>
               </Link>
-              <span className="text-border/80">/</span>
-              <h1 className="text-base sm:text-lg font-heading font-medium uppercase tracking-wider text-text-primary">
+              <span className="text-border">/</span>
+              <h1 className="text-base sm:text-lg font-heading font-medium tracking-wide uppercase text-text-primary">
                 Checkout
               </h1>
             </div>
 
             {/* Right: Minimal Step Indicator & Trust Badge */}
-            <div className="flex items-center gap-3">
-              <nav aria-label="Checkout Progress" className="flex items-center gap-1.5 text-xs">
+            <div className="flex items-center gap-4">
+              <nav aria-label="Checkout Progress" className="flex items-center gap-2 text-xs">
                 <button
                   type="button"
                   onClick={() => step === 'REVIEW' && setStep('SHIPPING')}
-                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full transition-all duration-150 ${step === 'SHIPPING'
-                      ? 'ambient-green-gradient text-white font-medium shadow-2xs border border-white/10'
-                      : 'text-text-secondary hover:text-text-primary cursor-pointer'
-                    }`}
+                  className={`transition-colors flex items-center gap-1.5 ${
+                    step === 'SHIPPING' ? 'text-text-primary font-semibold' : 'text-text-secondary hover:text-text-primary cursor-pointer'
+                  }`}
                 >
-                  <span className={`w-3.5 h-3.5 rounded-full text-[9px] flex items-center justify-center font-bold ${step === 'SHIPPING' ? 'bg-white/25 text-white' : 'bg-black/5 text-text-secondary'
-                    }`}>1</span>
-                  <span>Address</span>
+                  <span className="text-[11px] uppercase tracking-wider">1. Shipping</span>
                 </button>
 
-                <span className="text-text-secondary/30 text-xs">→</span>
+                <span className="text-text-secondary/40 text-xs">—</span>
 
                 <div
-                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full transition-all duration-150 ${step === 'REVIEW'
-                      ? 'ambient-green-gradient text-white font-medium shadow-2xs border border-white/10'
-                      : 'text-text-secondary/50'
-                    }`}
+                  className={`transition-colors flex items-center gap-1.5 ${
+                    step === 'REVIEW' ? 'text-text-primary font-semibold' : 'text-text-secondary/50'
+                  }`}
                 >
-                  <span className={`w-3.5 h-3.5 rounded-full text-[9px] flex items-center justify-center font-bold ${step === 'REVIEW' ? 'bg-white/25 text-white' : 'bg-black/5 text-text-secondary/50'
-                    }`}>2</span>
-                  <span>Payment</span>
+                  <span className="text-[11px] uppercase tracking-wider">2. Payment</span>
                 </div>
               </nav>
 
-              <div className="hidden md:flex items-center gap-1 text-[11px] text-text-secondary/70 pl-3 border-l border-border/70">
-                <Lock size={12} className="text-accent-gold" />
+              <div className="hidden md:flex items-center gap-1 text-[11px] text-text-secondary/70 pl-3 border-l border-border/60">
+                <Lock size={12} className="text-emerald-700" />
                 <span>256-Bit SSL</span>
               </div>
             </div>
@@ -560,7 +614,7 @@ export default function Checkout() {
             {step === 'SHIPPING' && (
               <form onSubmit={handleShippingSubmit} className="space-y-6">
                 <div>
-                  <h2 className="text-sm font-heading font-semibold uppercase tracking-wider text-text-primary mb-1">
+                  <h2 className="text-sm font-heading font-medium uppercase tracking-wider text-text-primary mb-1">
                     Shipping Address
                   </h2>
                   <p className="text-xs text-text-secondary">
@@ -568,205 +622,259 @@ export default function Checkout() {
                   </p>
                 </div>
 
-                {/* Saved addresses selector */}
-                {savedAddresses.length > 0 && (
-                  <div className="space-y-2.5">
-                    <label className="block text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
-                      Saved Addresses
-                    </label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {savedAddresses.map((addr) => {
-                        const isSelected = selectedAddressId === addr.id;
-                        return (
-                          <div
-                            key={addr.id}
-                            onClick={() => setSelectedAddressId(addr.id)}
-                            className={`p-3.5 rounded-xl border cursor-pointer transition-all duration-150 relative flex flex-col justify-between text-left ${isSelected
-                                ? 'border-[#063A2C] bg-[#00221A]/5 ring-1 ring-[#063A2C]/20 shadow-2xs'
-                                : 'border-border/70 bg-white hover:border-border hover:bg-bg-subtle/40'
-                              }`}
-                          >
-                            <div className="flex items-start justify-between gap-2 mb-2">
-                              <div className="flex items-center gap-2">
-                                <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${isSelected ? 'border-[#00221A] ambient-green-gradient' : 'border-border'
-                                  }`}>
-                                  {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                                </div>
-                                <span className="text-xs font-bold text-text-primary truncate">
-                                  {addr.recipient_name || 'Saved Address'}
-                                </span>
-                              </div>
-                              {addr.is_default && (
-                                <span className="text-[9px] uppercase tracking-wider text-accent-gold font-bold bg-accent-gold/10 px-1.5 py-0.5 rounded">
-                                  Default
-                                </span>
-                              )}
+                {/* Saved addresses selector or loading skeleton */}
+                <AnimatePresence mode="wait">
+                  {loadingAddresses && (authLoading || user) && savedAddresses.length === 0 ? (
+                    <motion.div
+                      key="saved-addresses-skeleton"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: DUR.fast, ease: EASE }}
+                      className="space-y-2.5 animate-pulse"
+                      aria-label="Loading saved addresses"
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="h-3 w-28 bg-zinc-200/80 rounded" />
+                        <div className="h-2 w-10 bg-zinc-100 rounded" />
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="p-3.5 rounded-sm border border-zinc-200/80 bg-zinc-50/70 min-h-[96px] flex flex-col justify-between">
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div className="flex items-center gap-2">
+                              <div className="w-3.5 h-3.5 rounded-full bg-zinc-200/90" />
+                              <div className="h-3.5 w-24 bg-zinc-200/80 rounded" />
                             </div>
-                            <p className="text-xs text-text-primary leading-relaxed pl-5 font-normal">
-                              {addr.line1}
-                            </p>
-                            <p className="text-[11px] text-text-secondary pl-5 mt-0.5">
-                              {addr.city}, {addr.state} — {addr.pincode}
-                            </p>
+                            <div className="h-3.5 w-12 bg-zinc-200/60 rounded" />
                           </div>
-                        );
-                      })}
+                          <div className="pl-5 space-y-1.5">
+                            <div className="h-3 w-4/5 bg-zinc-200/70 rounded" />
+                            <div className="h-2.5 w-3/5 bg-zinc-200/50 rounded" />
+                          </div>
+                        </div>
+                        <div className="p-3.5 rounded-sm border border-dashed border-zinc-200/80 bg-zinc-50/40 min-h-[96px] flex items-center justify-center">
+                          <div className="h-3 w-32 bg-zinc-200/70 rounded" />
+                        </div>
+                      </div>
+                    </motion.div>
+                  ) : savedAddresses.length > 0 ? (
+                    <motion.div
+                      key="saved-addresses-list"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: DUR.fast, ease: EASE }}
+                      className="space-y-2.5"
+                    >
+                      <label className="block text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
+                        Saved Addresses
+                      </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {savedAddresses.map((addr) => {
+                          const isSelected = selectedAddressId === addr.id;
+                          return (
+                            <div
+                              key={addr.id}
+                              onClick={() => setSelectedAddressId(addr.id)}
+                              className={`p-3.5 rounded-sm border cursor-pointer transition-all relative flex flex-col justify-between text-left ${
+                                isSelected
+                                  ? 'border-[#00221A] ring-1 ring-[#00221A] bg-white'
+                                  : 'border-border/70 bg-white hover:border-text-primary'
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-2 mb-2">
+                                <div className="flex items-center gap-2">
+                                  <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${
+                                    isSelected ? 'border-[#00221A] bg-[#00221A]' : 'border-border'
+                                  }`}>
+                                    {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                                  </div>
+                                  <span className="text-xs font-semibold text-text-primary truncate">
+                                    {addr.recipient_name || 'Saved Address'}
+                                  </span>
+                                </div>
+                                {addr.is_default && (
+                                  <span className="text-[9px] uppercase tracking-wider text-text-secondary font-medium bg-zinc-100 px-1.5 py-0.5 rounded-xs border border-border/50">
+                                    Default
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-text-primary leading-relaxed pl-5 font-normal">
+                                {addr.line1}
+                              </p>
+                              <p className="text-[11px] text-text-secondary pl-5 mt-0.5">
+                                {addr.city}, {addr.state} — {addr.pincode}
+                              </p>
+                            </div>
+                          );
+                        })}
 
-                      <div
-                        onClick={() => setSelectedAddressId('new')}
-                        className={`p-3.5 rounded-xl border border-dashed cursor-pointer transition-all duration-150 flex items-center justify-center gap-2 text-center min-h-[92px] ${selectedAddressId === 'new'
-                            ? 'border-[#063A2C] bg-[#00221A]/5 text-[#00221A] font-semibold'
-                            : 'border-border/70 bg-white text-text-secondary hover:border-[#063A2C] hover:text-[#00221A]'
+                        <div
+                          onClick={() => setSelectedAddressId('new')}
+                          className={`p-3.5 rounded-sm border border-dashed cursor-pointer transition-all flex items-center justify-center gap-2 text-center min-h-[96px] ${
+                            selectedAddressId === 'new'
+                              ? 'border-[#00221A] bg-white text-[#00221A] font-semibold'
+                              : 'border-border/70 bg-white text-text-secondary hover:border-text-primary hover:text-text-primary'
                           }`}
-                      >
-                        <span className="text-xs tracking-wider">
-                          + Use New Address
-                        </span>
+                        >
+                          <span className="text-xs tracking-wider">
+                            + Use New Address
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                )}
+                    </motion.div>
+                  ) : null}
+                </AnimatePresence>
 
-                {/* Form for new address */}
-                {selectedAddressId === 'new' && (
-                  <div className="space-y-4 pt-1">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                {/* Form for new address (Only shown if NOT loading saved addresses, and selectedAddressId is 'new') */}
+                <AnimatePresence>
+                  {(!loadingAddresses || savedAddresses.length > 0 || (!authLoading && !user)) && selectedAddressId === 'new' && (
+                    <motion.div
+                      key="new-address-form"
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -4 }}
+                      transition={{ duration: DUR.fast, ease: EASE }}
+                      className="space-y-4 pt-1"
+                    >
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                        <div>
+                          <label htmlFor="recipient_name" className="block text-[11px] font-semibold uppercase tracking-wider text-text-secondary mb-1">
+                            Full Name *
+                          </label>
+                          <input
+                            id="recipient_name"
+                            name="recipient_name"
+                            type="text"
+                            required
+                            value={addressForm.recipient_name}
+                            onChange={handleAddressInputChange}
+                            className="w-full px-3.5 py-2.5 rounded-sm border border-border/80 bg-white text-xs sm:text-sm text-text-primary placeholder:text-text-secondary/40 focus:outline-none focus:border-[#00221A] transition-colors"
+                            placeholder="e.g. Rahul Sharma"
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor="phone_primary" className="block text-[11px] font-semibold uppercase tracking-wider text-text-secondary mb-1">
+                            Mobile Number *
+                          </label>
+                          <input
+                            id="phone_primary"
+                            name="phone_primary"
+                            type="tel"
+                            required
+                            value={addressForm.phone_primary}
+                            onChange={handleAddressInputChange}
+                            className="w-full px-3.5 py-2.5 rounded-sm border border-border/80 bg-white text-xs sm:text-sm text-text-primary placeholder:text-text-secondary/40 focus:outline-none focus:border-[#00221A] transition-colors"
+                            placeholder="10-digit mobile"
+                          />
+                        </div>
+                      </div>
+
                       <div>
-                        <label htmlFor="recipient_name" className="block text-[11px] font-semibold uppercase tracking-wider text-text-secondary mb-1">
-                          Full Name *
+                        <label htmlFor="line1" className="block text-[11px] font-semibold uppercase tracking-wider text-text-secondary mb-1">
+                          Street Address *
                         </label>
                         <input
-                          id="recipient_name"
-                          name="recipient_name"
+                          id="line1"
+                          name="line1"
                           type="text"
                           required
-                          value={addressForm.recipient_name}
+                          value={addressForm.line1}
                           onChange={handleAddressInputChange}
-                          className="w-full px-3.5 py-2.5 rounded-lg border border-border/80 bg-white text-sm text-text-primary placeholder:text-text-secondary/40 focus:outline-none focus:border-[#063A2C] focus:ring-1 focus:ring-[#063A2C]/20 transition-all duration-150"
-                          placeholder="e.g. Rahul Sharma"
+                          className="w-full px-3.5 py-2.5 rounded-sm border border-border/80 bg-white text-xs sm:text-sm text-text-primary placeholder:text-text-secondary/40 focus:outline-none focus:border-[#00221A] transition-colors"
+                          placeholder="Flat, House no., Building, Company, Apartment"
                         />
                       </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5">
+                        <div className="col-span-1">
+                          <label htmlFor="city" className="block text-[11px] font-semibold uppercase tracking-wider text-text-secondary mb-1">
+                            City *
+                          </label>
+                          <input
+                            id="city"
+                            name="city"
+                            type="text"
+                            required
+                            value={addressForm.city}
+                            onChange={handleAddressInputChange}
+                            className="w-full px-3.5 py-2.5 rounded-sm border border-border/80 bg-white text-xs sm:text-sm text-text-primary placeholder:text-text-secondary/40 focus:outline-none focus:border-[#00221A] transition-colors"
+                            placeholder="e.g. Mumbai"
+                          />
+                        </div>
+
+                        <div className="col-span-1">
+                          <label htmlFor="state" className="block text-[11px] font-semibold uppercase tracking-wider text-text-secondary mb-1">
+                            State *
+                          </label>
+                          <input
+                            id="state"
+                            name="state"
+                            type="text"
+                            required
+                            value={addressForm.state}
+                            onChange={handleAddressInputChange}
+                            className="w-full px-3.5 py-2.5 rounded-sm border border-border/80 bg-white text-xs sm:text-sm text-text-primary placeholder:text-text-secondary/40 focus:outline-none focus:border-[#00221A] transition-colors"
+                            placeholder="e.g. Maharashtra"
+                          />
+                        </div>
+
+                        <div className="col-span-2 sm:col-span-1">
+                          <label htmlFor="pincode" className="block text-[11px] font-semibold uppercase tracking-wider text-text-secondary mb-1">
+                            Pincode *
+                          </label>
+                          <input
+                            id="pincode"
+                            name="pincode"
+                            type="text"
+                            required
+                            value={addressForm.pincode}
+                            onChange={handleAddressInputChange}
+                            className="w-full px-3.5 py-2.5 rounded-sm border border-border/80 bg-white text-xs sm:text-sm text-text-primary placeholder:text-text-secondary/40 focus:outline-none focus:border-[#00221A] transition-colors"
+                            placeholder="6 digits"
+                          />
+                        </div>
+                      </div>
+
                       <div>
-                        <label htmlFor="phone_primary" className="block text-[11px] font-semibold uppercase tracking-wider text-text-secondary mb-1">
-                          Mobile Number *
+                        <label htmlFor="phone_secondary" className="block text-[11px] font-semibold uppercase tracking-wider text-text-secondary mb-1">
+                          Alternate Mobile <span className="text-text-secondary/50 font-normal">(Optional)</span>
                         </label>
                         <input
-                          id="phone_primary"
-                          name="phone_primary"
+                          id="phone_secondary"
+                          name="phone_secondary"
                           type="tel"
-                          required
-                          value={addressForm.phone_primary}
+                          value={addressForm.phone_secondary}
                           onChange={handleAddressInputChange}
-                          className="w-full px-3.5 py-2.5 rounded-lg border border-border/80 bg-white text-sm text-text-primary placeholder:text-text-secondary/40 focus:outline-none focus:border-[#063A2C] focus:ring-1 focus:ring-[#063A2C]/20 transition-all duration-150"
-                          placeholder="10-digit mobile"
+                          className="w-full px-3.5 py-2.5 rounded-sm border border-border/80 bg-white text-xs sm:text-sm text-text-primary placeholder:text-text-secondary/40 focus:outline-none focus:border-[#00221A] transition-colors"
+                          placeholder="Alternative contact number"
                         />
                       </div>
-                    </div>
 
-                    <div>
-                      <label htmlFor="line1" className="block text-[11px] font-semibold uppercase tracking-wider text-text-secondary mb-1">
-                        Street Address *
-                      </label>
-                      <input
-                        id="line1"
-                        name="line1"
-                        type="text"
-                        required
-                        value={addressForm.line1}
-                        onChange={handleAddressInputChange}
-                        className="w-full px-3.5 py-2.5 rounded-lg border border-border/80 bg-white text-sm text-text-primary placeholder:text-text-secondary/40 focus:outline-none focus:border-[#063A2C] focus:ring-1 focus:ring-[#063A2C]/20 transition-all duration-150"
-                        placeholder="House/Flat No, Apartment, Street, Landmark"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5">
-                      <div className="col-span-1">
-                        <label htmlFor="city" className="block text-[11px] font-semibold uppercase tracking-wider text-text-secondary mb-1">
-                          City *
+                      {user && (
+                        <label className="flex items-center gap-2 pt-1 cursor-pointer select-none">
+                          <input
+                            id="is_default"
+                            name="is_default"
+                            type="checkbox"
+                            checked={addressForm.is_default}
+                            onChange={handleAddressInputChange}
+                            className="w-3.5 h-3.5 rounded accent-[#00221A]"
+                          />
+                          <span className="text-xs text-text-secondary">
+                            Save as default shipping address
+                          </span>
                         </label>
-                        <input
-                          id="city"
-                          name="city"
-                          type="text"
-                          required
-                          value={addressForm.city}
-                          onChange={handleAddressInputChange}
-                          className="w-full px-3.5 py-2.5 rounded-lg border border-border/80 bg-white text-sm text-text-primary placeholder:text-text-secondary/40 focus:outline-none focus:border-[#063A2C] focus:ring-1 focus:ring-[#063A2C]/20 transition-all duration-150"
-                          placeholder="e.g. Mumbai"
-                        />
-                      </div>
-
-                      <div className="col-span-1">
-                        <label htmlFor="state" className="block text-[11px] font-semibold uppercase tracking-wider text-text-secondary mb-1">
-                          State *
-                        </label>
-                        <input
-                          id="state"
-                          name="state"
-                          type="text"
-                          required
-                          value={addressForm.state}
-                          onChange={handleAddressInputChange}
-                          className="w-full px-3.5 py-2.5 rounded-lg border border-border/80 bg-white text-sm text-text-primary placeholder:text-text-secondary/40 focus:outline-none focus:border-[#063A2C] focus:ring-1 focus:ring-[#063A2C]/20 transition-all duration-150"
-                          placeholder="e.g. Maharashtra"
-                        />
-                      </div>
-
-                      <div className="col-span-2 sm:col-span-1">
-                        <label htmlFor="pincode" className="block text-[11px] font-semibold uppercase tracking-wider text-text-secondary mb-1">
-                          Pincode *
-                        </label>
-                        <input
-                          id="pincode"
-                          name="pincode"
-                          type="text"
-                          required
-                          value={addressForm.pincode}
-                          onChange={handleAddressInputChange}
-                          className="w-full px-3.5 py-2.5 rounded-lg border border-border/80 bg-white text-sm text-text-primary placeholder:text-text-secondary/40 focus:outline-none focus:border-[#063A2C] focus:ring-1 focus:ring-[#063A2C]/20 transition-all duration-150"
-                          placeholder="6 digits"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label htmlFor="phone_secondary" className="block text-[11px] font-semibold uppercase tracking-wider text-text-secondary mb-1">
-                        Alternate Mobile <span className="text-text-secondary/50 font-normal">(Optional)</span>
-                      </label>
-                      <input
-                        id="phone_secondary"
-                        name="phone_secondary"
-                        type="tel"
-                        value={addressForm.phone_secondary}
-                        onChange={handleAddressInputChange}
-                        className="w-full px-3.5 py-2.5 rounded-lg border border-border/80 bg-white text-sm text-text-primary placeholder:text-text-secondary/40 focus:outline-none focus:border-[#063A2C] focus:ring-1 focus:ring-[#063A2C]/20 transition-all duration-150"
-                        placeholder="Alternative contact number"
-                      />
-                    </div>
-
-                    {user && (
-                      <label className="flex items-center gap-2 pt-1 cursor-pointer select-none">
-                        <input
-                          id="is_default"
-                          name="is_default"
-                          type="checkbox"
-                          checked={addressForm.is_default}
-                          onChange={handleAddressInputChange}
-                          className="w-4 h-4 rounded accent-[#063A2C]"
-                        />
-                        <span className="text-xs text-text-secondary">
-                          Save as default shipping address
-                        </span>
-                      </label>
-                    )}
-                  </div>
-                )}
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 {/* Submit Action */}
                 <div className="pt-2">
                   <button
                     type="submit"
-                    className="btn w-full h-11 sm:h-12 rounded-xl ambient-green-gradient text-white font-medium text-xs uppercase tracking-widest hover:opacity-95 hover:shadow-md transition-all duration-150 shadow-xs flex items-center justify-center gap-2 border border-white/10"
+                    className="btn w-full h-12 rounded-sm bg-[#00221A] hover:bg-[#063A2C] text-white font-semibold text-xs uppercase tracking-widest transition-all shadow-xs flex items-center justify-center gap-2"
                   >
                     <span>Continue to Payment</span>
                     <ArrowRight size={14} />
@@ -930,7 +1038,7 @@ export default function Checkout() {
               RIGHT COLUMN: Desktop Sticky Order Summary
              ───────────────────────────────────────────────────────────── */}
           <aside className="hidden lg:block lg:col-span-5 xl:col-span-4 sticky top-24">
-            <div className="bg-white border border-border/70 rounded-2xl p-5 sm:p-6 space-y-5 shadow-xs">
+            <div className="bg-[#FAFAFA] border border-border/70 rounded-md p-6 space-y-5">
               <div className="flex items-center justify-between pb-3 border-b border-border/60">
                 <h3 className="text-xs font-heading font-semibold uppercase tracking-wider text-text-primary">
                   Order Summary
@@ -947,7 +1055,7 @@ export default function Checkout() {
                     <img
                       src={item.image}
                       alt={item.name}
-                      className="w-10 h-13 object-cover object-center rounded border border-border/60 bg-bg-subtle flex-shrink-0"
+                      className="w-10 aspect-[2/3] object-cover object-top rounded-sm border border-border/60 bg-white flex-shrink-0"
                     />
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium text-text-primary truncate">{item.name}</p>
@@ -970,7 +1078,7 @@ export default function Checkout() {
                 </div>
 
                 {appliedCoupon && (
-                  <div className="flex justify-between text-emerald-600 font-medium">
+                  <div className="flex justify-between text-emerald-700 font-medium">
                     <span>Discount ({appliedCoupon.code})</span>
                     <span>-₹{discount.toFixed(2)}</span>
                   </div>
@@ -979,7 +1087,7 @@ export default function Checkout() {
                 <div className="flex justify-between text-text-secondary">
                   <span>Shipping</span>
                   {shipping === 0 ? (
-                    <span className="text-emerald-600 font-semibold uppercase text-[11px]">Free</span>
+                    <span className="text-emerald-700 font-semibold uppercase text-[11px]">Free</span>
                   ) : (
                     <span className="text-text-primary font-medium">₹{shipping.toFixed(2)}</span>
                   )}
@@ -1001,7 +1109,7 @@ export default function Checkout() {
                   type="button"
                   onClick={initializePayment}
                   disabled={loading || paymentLoading}
-                  className="btn w-full h-11 sm:h-12 rounded-xl ambient-green-gradient text-white font-medium text-xs uppercase tracking-widest hover:opacity-95 hover:shadow-md transition-all duration-150 shadow-xs flex items-center justify-center gap-2 border border-white/10 disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="btn w-full h-12 rounded-sm bg-[#00221A] hover:bg-[#063A2C] text-white font-semibold text-xs uppercase tracking-widest transition-all shadow-xs flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading || paymentLoading ? (
                     <><RefreshCw size={14} className="animate-spin" /> Preparing Payment...</>
