@@ -40,4 +40,24 @@ export const dataCache = {
   has(key: string): boolean {
     return store.has(key);
   },
+
+  /** Delete a specific cache key. */
+  delete(key: string): void {
+    store.delete(key);
+  },
+
+  /** Invalidate a specific key or all keys (forcing isStale to true). */
+  invalidate(key?: string): void {
+    if (key) {
+      const entry = store.get(key);
+      if (entry) entry.ts = 0;
+    } else {
+      store.forEach(entry => { entry.ts = 0; });
+    }
+  },
+
+  /** Clear all cache entries. */
+  clear(): void {
+    store.clear();
+  },
 };

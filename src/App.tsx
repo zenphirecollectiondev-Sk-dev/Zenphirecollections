@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation, NavLink } from 'react-router-dom';
 import { ShoppingBag, Heart, User, Search, Shield, LogOut, Menu, X, ChevronDown, ArrowRight } from 'lucide-react';
 import { useAuthStore } from './store/useAuthStore';
 import { useCartStore } from './store/useCartStore';
 import { useWishlistStore } from './store/useWishlistStore';
+import { getCategories } from './lib/supabase';
+import { dataCache } from './lib/dataCache';
 import ProtectedRoute from './components/ProtectedRoute';
 import SearchOverlay from './components/SearchOverlay';
 import CartDrawer from './components/CartDrawer';
@@ -376,54 +378,82 @@ function MobileMenuDrawer({ onClose, openSections, toggleSection, wishlistCount,
     return () => { document.body.style.overflow = prev; };
   }, []);
 
-  const navSections = [
-    {
-      key: 'occasions',
-      label: 'Occasions',
-      items: [
-        { name: 'Casuals', to: '/shop?occasion=casuals' },
-        { name: 'Formal', to: '/shop?occasion=formal' },
-        { name: 'Ethnic', to: '/shop?occasion=ethnic' },
-        { name: 'Party Wear', to: '/shop?occasion=party-wear' },
-      ],
-    },
-    {
-      key: 'women',
-      label: 'Women',
-      items: [
-        { name: 'Dresses', to: '/shop?category=dresses&gender=female' },
-        { name: 'Co-ords', to: '/shop?category=co-ords&gender=female' },
-        { name: 'Crop Tops', to: '/shop?category=crop-tops&gender=female' },
-        { name: 'Trousers', to: '/shop?category=pants&gender=female' },
-        { name: 'Jackets', to: '/shop?category=jackets&gender=female' },
-        { name: 'Shirts', to: '/shop?category=shirts&gender=female' },
-        { name: 'T-Shirt & Tops', to: '/shop?category=t-shirts&gender=female' },
-      ],
-    },
-    {
-      key: 'men',
-      label: 'Men',
-      items: [
-        { name: 'Shirts', to: '/shop?category=shirts&gender=male' },
-        { name: 'T-Shirts', to: '/shop?category=t-shirts&gender=male' },
-        { name: 'Trousers', to: '/shop?category=pants&gender=male' },
-        { name: 'Hoodies', to: '/shop?category=hoodies&gender=male' },
-        { name: 'Sweatshirts', to: '/shop?category=sweatshirts&gender=male' },
-      ],
-    },
-    {
-      key: 'unisex',
-      label: 'Unisex',
-      items: [
-        { name: 'Cargo', to: '/shop?category=cargo&gender=unisex' },
-        { name: 'Jeans', to: '/shop?category=jeans&gender=unisex' },
-        { name: 'Shirts', to: '/shop?category=shirts&gender=unisex' },
-        { name: 'T-Shirts', to: '/shop?category=t-shirts&gender=unisex' },
-        { name: 'Hoodies', to: '/shop?category=hoodies&gender=unisex' },
-        { name: 'Sweatshirts', to: '/shop?category=sweatshirts&gender=unisex' },
-      ],
-    },
-  ];
+  const [categories, setCategories] = useState<any[]>(() => dataCache.get<any[]>('categories') ?? []);
+
+  useEffect(() => {
+    const cached = dataCache.get<any[]>('categories');
+    if (cached && cached.length > 0) setCategories(cached);
+    if (!cached || dataCache.isStale('categories')) {
+      getCategories().then((cats) => {
+        if (cats && cats.length > 0) {
+          dataCache.set('categories', cats);
+          setCategories(cats);
+        }
+      });
+    }
+  }, []);
+
+  const formatTitleCase = (str: string): string => {
+    if (!str) return '';
+    return str
+      .toLowerCase()
+      .split(' ')
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
+  };
+
+  const navSections = useMemo(() => {
+    const getGenderCategoryItems = (genderKey: 'male' | 'female' | 'unisex', allLabel: string) => {
+      const parents = categories.filter((c: any) => !c.parent_category_id);
+      const matchingParents = parents.filter((parent: any) => {
+        return categories.some((c: any) =>
+          c.parent_category_id === parent.id &&
+          (c.name?.toLowerCase() === genderKey || c.slug?.toLowerCase().endsWith(`-${genderKey}`))
+        );
+      });
+
+      const items: { name: string; to: string }[] = [
+        { name: allLabel, to: `/shop?gender=${genderKey}` }
+      ];
+
+      matchingParents.forEach((p: any) => {
+        items.push({
+          name: formatTitleCase(p.name),
+          to: `/shop?category=${p.slug}&gender=${genderKey}`
+        });
+      });
+
+      return items;
+    };
+
+    return [
+      {
+        key: 'occasions',
+        label: 'Occasions',
+        items: [
+          { name: 'Casuals', to: '/shop?occasion=casuals' },
+          { name: 'Formal', to: '/shop?occasion=formal' },
+          { name: 'Ethnic', to: '/shop?occasion=ethnic' },
+          { name: 'Party Wear', to: '/shop?occasion=party-wear' },
+        ],
+      },
+      {
+        key: 'women',
+        label: 'Women',
+        items: getGenderCategoryItems('female', "All Women's"),
+      },
+      {
+        key: 'men',
+        label: 'Men',
+        items: getGenderCategoryItems('male', "All Men's"),
+      },
+      {
+        key: 'unisex',
+        label: 'Unisex',
+        items: getGenderCategoryItems('unisex', "All Unisex"),
+      },
+    ];
+  }, [categories]);
 
   return (
     <>

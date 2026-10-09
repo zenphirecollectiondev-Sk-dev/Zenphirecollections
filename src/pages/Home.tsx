@@ -1,12 +1,18 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { ArrowRight, Heart, Image, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useWishlistStore } from '../store/useWishlistStore';
 import { getActiveProducts, getCategories, supabase } from '../lib/supabase';
 import { dataCache } from '../lib/dataCache';
 import { imgHero, imgCard } from '../lib/imgTransform';
 import { usePageSEO } from '../hooks/usePageSEO';
+import HeroCarousel from '../components/HeroCarousel';
+import {
+  buildHeroSlidesFromConfig,
+  getPersistedFirstSlideUrl,
+  HERO_SLIDE_COPY,
+} from '../lib/heroSlides';
+import { useHeroPreload } from '../hooks/useHeroPreload';
 
 export default function Home() {
   usePageSEO({
@@ -41,196 +47,23 @@ export default function Home() {
   const [activeCategoryIndex, setActiveCategoryIndex] = useState(0);
   const categoryScrollRef = useRef<HTMLDivElement>(null);
 
-  // Hero Slider State
-  const [activeSlide, setActiveSlide] = useState(0);
-  const [imagesLoaded, setImagesLoaded] = useState<Record<number, boolean>>(() => {
-    // Kick off slide-1 image download immediately on mount — synchronously, before any render.
-    // On repeat visits the URL is in localStorage/cache so this starts downloading right away.
-    try {
-      const cfg = dataCache.get<any>('homepage_config') || (() => {
-        const raw = localStorage.getItem('zenphire_homepage_config');
-        return raw ? JSON.parse(raw) : null;
-      })();
-      let url = cfg?.hero_image_url || null;
-      if (url?.includes(':::')) url = url.split(':::')[0];
-      if (url) {
-        const img = new window.Image();
-        img.src = url;
-        // If the browser already has it cached, mark slide 1 as loaded immediately
-        if (img.complete && img.naturalWidth > 0) return { 1: true } as Record<number, boolean>;
-      }
-    } catch (_) {}
-    return {} as Record<number, boolean>;
-  });
+  // Hero banner ready — true once the first slide's image has decoded
   const [heroBannerReady, setHeroBannerReady] = useState(false);
-  const touchStartX = useRef<number | null>(null);
-  const touchEndX = useRef<number | null>(null);
 
 
-  const heroSlides = useMemo(() => {
-    let slide1Image = homepageConfig?.hero_image_url || null;
-    let slide2Image = homepageConfig?.hero_image_url_2 || null;
-    let pos1 = homepageConfig?.hero_image_position || 'center';
-    let pos2 = homepageConfig?.hero_image_position_2 || 'center';
+  // Build the typed HeroSlide[] from homepage_config via the adapter
+  const heroSlides = useMemo(
+    () => buildHeroSlidesFromConfig(homepageConfig),
+    [homepageConfig]
+  );
 
-    if (slide1Image && slide1Image.includes(':::')) {
-      const parts = slide1Image.split(':::');
-      slide1Image = parts[0] || null;
-      slide2Image = parts[1] || slide2Image;
-    }
-    if (pos1 && pos1.includes(':::')) {
-      const pParts = pos1.split(':::');
-      pos1 = pParts[0] || 'center';
-      pos2 = pParts[1] || pos2;
-    }
+  // Preload URL: available from localStorage on repeat visits before the fetch resolves
+  const firstSlideUrl = heroSlides[0]?.url ?? getPersistedFirstSlideUrl();
+  useHeroPreload(firstSlideUrl);
 
-    const slides: any[] = [
-      {
-        id: 1,
-        image: slide1Image,
-        position: pos1,
-        titlePart1: 'Raw',
-        titleHighlight1: 'Textures',
-        titlePart2: 'Minimal',
-        titleHighlight2: 'Form',
-        description: 'Organic fabrics, artisan weaves, and relaxed silhouettes designed to stand the test of time. Embodying the true essence of modern simplicity.',
-        buttonText: 'Discover Form',
-        buttonLink: '/shop',
-      }
-    ];
+  // Banner is revealed once the HeroCarousel reports the first image ready
 
-    if (slide2Image) {
-      slides.push({
-        id: 2,
-        image: slide2Image,
-        position: pos2,
-        titlePart1: 'Timeless',
-        titleHighlight1: 'Elegance',
-        titlePart2: 'Curated',
-        titleHighlight2: 'Craft',
-        description: 'Sculpted cuts and versatile essentials engineered for everyday luxury. Elevate your personal style with our latest seasonal collection.',
-        buttonText: 'Explore Collection',
-        buttonLink: '/shop?sort=newest',
-      });
-    }
-
-    return slides;
-  }, [homepageConfig]);
-
-  // Hero image preload + banner-ready gate:
-  // Diamond loader always shows for exactly 6 seconds minimum.
-  // Both the 6s timer AND image load must complete before dismissing.
-  // Image is preloaded in background so it's ready the moment loader fades out.
-  useEffect(() => {
-    let cancelled = false;
-    let imageReady = false;
-    let timerDone = false;
-
-    const tryReveal = () => {
-      if (cancelled || !imageReady || !timerDone) return;
-      // Both conditions met — dismiss the loader
-      requestAnimationFrame(() => {
-        if (!cancelled) setHeroBannerReady(true);
-      });
-    };
-
-    // Fixed 6-second loader duration
-    const sixSecondTimer = setTimeout(() => {
-      if (!cancelled) { timerDone = true; tryReveal(); }
-    }, 6000);
-
-    const firstSlide = heroSlides[0];
-
-    if (!firstSlide || !firstSlide.image) {
-      // No image configured — image is "ready" immediately, just wait for timer
-      if (firstSlide) setImagesLoaded((prev) => ({ ...prev, [firstSlide.id]: true }));
-      imageReady = true;
-      return () => { cancelled = true; clearTimeout(sixSecondTimer); };
-    }
-
-    const imgUrl =
-      typeof firstSlide.image === 'string' &&
-      (firstSlide.image.startsWith('http') || firstSlide.image.startsWith('data:'))
-        ? imgHero(firstSlide.image)
-        : firstSlide.image;
-
-    const img = new window.Image();
-    img.src = imgUrl;
-
-    const onImageReady = () => {
-      if (cancelled) return;
-      setImagesLoaded((prev) => ({ ...prev, [firstSlide.id]: true }));
-      imageReady = true;
-      tryReveal();
-    };
-
-    if (img.complete && img.naturalWidth > 0) {
-      onImageReady();
-    } else {
-      img.onload = onImageReady;
-      img.onerror = onImageReady; // On error, still mark ready so timer can dismiss
-    }
-
-    // Preload remaining slides silently in the background (non-blocking)
-    heroSlides.slice(1).forEach((slide) => {
-      if (!slide.image) return;
-      const sUrl =
-        typeof slide.image === 'string' &&
-        (slide.image.startsWith('http') || slide.image.startsWith('data:'))
-          ? imgHero(slide.image)
-          : slide.image;
-      const sImg = new window.Image();
-      sImg.src = sUrl;
-      sImg.onload = () => setImagesLoaded((prev) => ({ ...prev, [slide.id]: true }));
-    });
-
-    return () => { cancelled = true; clearTimeout(sixSecondTimer); };
-  }, [heroSlides]);
-
-
-  const isCurrentSlideLoaded = !heroSlides[activeSlide]?.image || !!imagesLoaded[heroSlides[activeSlide]?.id];
-
-  // Auto-slide effect every 6 seconds — only starts counting when the active slide's banner image is fully loaded and heroBannerReady is true
-  useEffect(() => {
-    if (!heroBannerReady || heroSlides.length <= 1) return;
-    if (!isCurrentSlideLoaded) return;
-
-    const timer = setInterval(() => {
-      setActiveSlide((prev) => (prev + 1) % heroSlides.length);
-    }, 6000);
-    return () => clearInterval(timer);
-  }, [activeSlide, heroSlides, imagesLoaded, isCurrentSlideLoaded, heroBannerReady]);
-
-  const handlePrevSlide = () => {
-    setActiveSlide((prev) => (prev - 1 + heroSlides.length) % heroSlides.length);
-  };
-
-  const handleNextSlide = () => {
-    setActiveSlide((prev) => (prev + 1) % heroSlides.length);
-  };
-
-  // Mobile Touch Swipe Handlers
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    touchEndX.current = e.touches[0].clientX;
-  };
-
-  const handleTouchEnd = () => {
-    if (touchStartX.current === null || touchEndX.current === null) return;
-    const distance = touchStartX.current - touchEndX.current;
-    if (distance > 50) {
-      handleNextSlide();
-    } else if (distance < -50) {
-      handlePrevSlide();
-    }
-    touchStartX.current = null;
-    touchEndX.current = null;
-  };
-
-  // Reorder categories: Shirts -> Pants -> T-shirts -> Co-ords / Accessories
+  // Reorder categories: Shirts -> Pants -> T-shirts -> Co-ords -> Dresses -> New categories -> Accessories
   const sortedCategories = useMemo(() => {
     return [...categories].sort((a, b) => {
       const aName = a.name.toLowerCase();
@@ -238,10 +71,12 @@ export default function Home() {
 
       const getIndex = (name: string) => {
         if (name.includes('shirt') && !name.includes('t-shirt') && !name.includes('tshirt')) return 0;
-        if (name.includes('pant') || name.includes('trouser') || name.includes('women')) return 1;
-        if (name.includes('t-shirt') || name.includes('tshirt') || name.includes('t shirt') || name.includes('coord') || name.includes('co-ord') || name.includes('co ord')) return 2;
-        if (name.includes('accessories') || name.includes('bag') || name.includes('cap') || name.includes('hat')) return 3;
-        return 99;
+        if (name.includes('pant') || name.includes('trouser')) return 1;
+        if (name.includes('t-shirt') || name.includes('tshirt') || name.includes('t shirt')) return 2;
+        if (name.includes('coord') || name.includes('co-ord') || name.includes('co ord')) return 3;
+        if (name.includes('dress')) return 4;
+        if (name.includes('accessories') || name.includes('bag') || name.includes('cap') || name.includes('hat')) return 98;
+        return 10;
       };
 
       return getIndex(aName) - getIndex(bName);
@@ -301,8 +136,13 @@ export default function Home() {
     const cachedCats = dataCache.get<any[]>('categories');
     // homepageConfig already initialised from cache in useState lazy init
 
+    const isMainCat = (c: any) =>
+      !c.parent_category_id ||
+      (!['male', 'female', 'unisex'].includes(c.name?.toLowerCase() || '') &&
+       !['male', 'female', 'unisex'].includes(c.slug?.split('-').pop()?.toLowerCase() || ''));
+
     if (cachedProds && cachedProds.length > 0) setProducts(cachedProds);
-    if (cachedCats) setCategories(cachedCats.filter((c: any) => !c.parent_category_id));
+    if (cachedCats) setCategories(cachedCats.filter(isMainCat));
 
     // ── Step 2a: Fast fetch — homepage_config + categories (small tables, ~2-4s) ──
     // These two resolve quickly and unblock hero image + category cards immediately.
@@ -319,7 +159,7 @@ export default function Home() {
 
         if (catResult.status === 'fulfilled' && catResult.value && catResult.value.length > 0) {
           dataCache.set('categories', catResult.value);
-          setCategories(catResult.value.filter((c: any) => !c.parent_category_id));
+          setCategories(catResult.value.filter(isMainCat));
         }
         let hpData =
           hpResult.status === 'fulfilled' && !(hpResult.value as any)?.error
@@ -420,165 +260,13 @@ export default function Home() {
   return (
     <div className="bg-bg min-h-screen overflow-x-hidden">
 
-      {/* ── 1. HERO SLIDER ── */}
-      <section
-        className="relative bg-[#001510] h-[75vh] md:h-[80vh] flex flex-col md:flex-row items-stretch overflow-hidden border-b border-border group/hero select-none"
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-      >
-        {/* Diamond Loader Overlay — active until Slide 1 image is fully fetched & decoded */}
-        <AnimatePresence>
-          {!heroBannerReady && (
-            <motion.div
-              key="hero-diamond-loader"
-              initial={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.45, ease: [0.4, 0, 0.2, 1] }}
-              className="absolute inset-0 z-40 bg-[#001510] flex flex-col items-center justify-center pointer-events-none"
-            >
-              <div className="preloader-diamond-container mb-4">
-                <div className="preloader-diamond" />
-                <div className="preloader-diamond-inner" />
-              </div>
-              <div className="preloader-text">Zenphire</div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <div className="absolute inset-0 md:relative md:w-1/2 flex flex-col justify-end md:justify-center px-6 pb-14 pt-16 md:px-16 lg:px-24 bg-transparent md:bg-bg-subtle z-20">
-          <div className="max-w-md hero-content text-left relative min-h-[250px] flex flex-col justify-center">
-            {heroSlides.map((slide, index) => {
-              const isActive = index === activeSlide;
-              return (
-                <div
-                  key={slide.id}
-                  className={`transition-all duration-1000 ease-out space-y-4 md:space-y-8 ${isActive
-                    ? 'opacity-100 translate-y-0 relative z-20 pointer-events-auto'
-                    : 'opacity-0 translate-y-6 absolute inset-0 z-0 pointer-events-none'
-                    }`}
-                >
-                  <h1 className="text-3xl md:text-6xl lg:text-7xl font-sans uppercase font-extralight tracking-tight leading-[1.05] text-white md:text-text-primary">
-                    {slide.titlePart1} <span className="font-semibold block font-heading tracking-wide text-white md:text-text-primary">{slide.titleHighlight1}</span>
-                    {slide.titlePart2} <span className="italic block font-serif tracking-normal text-white/90 md:text-text-secondary">{slide.titleHighlight2}</span>
-                  </h1>
-
-                  <p className="hidden sm:block text-xs md:text-sm text-white/80 md:text-text-secondary leading-relaxed max-w-sm font-sans tracking-wide">
-                    {slide.description}
-                  </p>
-
-                  <div className="pt-2 md:pt-4">
-                    <Link
-                      to={slide.buttonLink}
-                      className="btn ambient-green-gradient text-white px-8 py-3.5 text-xs font-bold uppercase tracking-widest hover:opacity-90 shadow-xs inline-flex items-center gap-2 group/btn"
-                    >
-                      {slide.buttonText}
-                      <ArrowRight size={12} className="transition-transform duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] group-hover/btn:translate-x-1" />
-                    </Link>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Controls & Indicators */}
-          <div className="flex items-center gap-4 mt-6 md:mt-8 z-30">
-            <div className="flex items-center gap-2">
-              {heroSlides.map((_, idx) => {
-                const isActive = idx === activeSlide;
-                const isSlideReady = !heroSlides[idx]?.image || !!imagesLoaded[heroSlides[idx]?.id];
-
-                return (
-                  <button
-                    key={idx}
-                    onClick={() => setActiveSlide(idx)}
-                    aria-label={`Go to slide ${idx + 1}`}
-                    className={`h-1.5 rounded-full transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] cursor-pointer overflow-hidden relative ${isActive
-                      ? 'w-8 bg-accent'
-                      : 'w-2 bg-white/40 md:bg-text-secondary/30 hover:bg-white/70 md:hover:bg-text-secondary/60'
-                      }`}
-                  >
-                    {isActive && heroSlides.length > 1 && isSlideReady && heroBannerReady && (
-                      <span
-                        key={`prog-${activeSlide}`}
-                        className="absolute inset-0 bg-white/60 animate-[progress_6s_linear_infinite]"
-                        style={{
-                          transformOrigin: 'left',
-                          animationDuration: '6000ms'
-                        }}
-                      />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-
-            <span className="text-[10px] tracking-widest uppercase font-mono text-white/70 md:text-text-secondary/70 font-semibold">
-              0{activeSlide + 1} / 0{heroSlides.length}
-            </span>
-
-            {heroSlides.length > 1 && (
-              <div className="flex items-center gap-1.5 ml-auto md:ml-4">
-                <button
-                  onClick={handlePrevSlide}
-                  aria-label="Previous slide"
-                  className="p-2 text-white md:text-text-primary hover:bg-white/10 md:hover:bg-black/5 transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] rounded-full cursor-pointer"
-                >
-                  <ChevronLeft size={16} />
-                </button>
-                <button
-                  onClick={handleNextSlide}
-                  aria-label="Next slide"
-                  className="p-2 text-white md:text-text-primary hover:bg-white/10 md:hover:bg-black/5 transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] rounded-full cursor-pointer"
-                >
-                  <ChevronRight size={16} />
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="absolute inset-0 md:relative md:w-1/2 flex justify-center overflow-hidden z-0 self-stretch bg-[#001510]">
-          {heroSlides.map((slide, index) => {
-            const isActive = index === activeSlide;
-
-            return (
-              <div
-                key={slide.id}
-                className={`absolute inset-0 transition-all duration-1000 ease-in-out ${isActive ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
-                  }`}
-              >
-                {slide.image ? (
-                  <img
-                    src={typeof slide.image === 'string' && (slide.image.startsWith('http') || slide.image.startsWith('data:')) ? imgHero(slide.image) : slide.image}
-                    alt="Zenphire Editorial Showcase"
-                    fetchPriority={index === 0 ? "high" : "low"}
-                    loading={index === 0 ? "eager" : "lazy"}
-                    decoding="async"
-                    onLoad={() => setImagesLoaded((prev) => ({ ...prev, [slide.id]: true }))}
-                    className={`w-full h-full object-cover transition-all ease-out ${
-                      isActive ? 'scale-105' : 'scale-100'
-                    } ${imagesLoaded[slide.id] ? 'opacity-100' : 'opacity-0'}`}
-                    style={{
-                      objectPosition: slide.position,
-                      transitionProperty: 'transform, opacity',
-                      transitionDuration: isActive ? '6000ms, 600ms' : '1000ms, 600ms'
-                    }}
-                  />
-                ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-[#001510] via-[#063A2C] to-[#00221A]" />
-                )}
-              </div>
-            );
-          })}
-          <div
-            className="absolute bottom-0 left-0 right-0 h-[40%] md:hidden pointer-events-none z-10"
-            style={{
-              background: 'radial-gradient(160% 140% at 50% 135%, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.6) 40%, rgba(0,0,0,0.25) 70%, rgba(0,0,0,0) 100%)'
-            }}
-          />
-        </div>
-      </section>
+      {/* ── 1. HERO CAROUSEL ── */}
+      <HeroCarousel
+        slides={heroSlides}
+        copy={HERO_SLIDE_COPY}
+        showLoader={!heroBannerReady}
+        onFirstImageReady={() => setHeroBannerReady(true)}
+      />
 
       {/* ── 2. GENDER COLLECTIONS ── */}
       {/* GENDER COLLECTIONS — only rendered once config is loaded and images are configured */}

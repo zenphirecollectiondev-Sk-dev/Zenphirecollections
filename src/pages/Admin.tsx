@@ -26,6 +26,9 @@ import {
   Truck,
   Settings2,
   ShoppingCart,
+  ArrowUp,
+  ArrowDown,
+  ChevronDown,
 } from 'lucide-react';
 
 
@@ -177,6 +180,7 @@ export default function Admin() {
   const [catSizeGuide, setCatSizeGuide] = useState('');
   const [catImageUrl, setCatImageUrl] = useState('');
   const [isUploadingCategory, setIsUploadingCategory] = useState(false);
+  const [uploadingCatId, setUploadingCatId] = useState<string | null>(null);
   const [isUploadingProductImage, setIsUploadingProductImage] = useState(false);
 
   // Inventory inline edit state (SET absolute value)
@@ -203,6 +207,26 @@ export default function Admin() {
 
 
   // Homepage state variables
+  interface AdminHeroSlide {
+    id: string;
+    url: string;
+    position: string;
+    alt?: string;
+    titlePart1?: string;
+    titleHighlight1?: string;
+    titlePart2?: string;
+    titleHighlight2?: string;
+    description?: string;
+    buttonText?: string;
+    buttonLink?: string;
+  }
+  const [heroSlidesList, setHeroSlidesList] = useState<AdminHeroSlide[]>([
+    { id: 'slide-1', url: '', position: 'center', alt: 'Zenphire Showcase 1' }
+  ]);
+  const [uploadingSlideIdx, setUploadingSlideIdx] = useState<number | null>(null);
+  const [activeDragSlideIdx, setActiveDragSlideIdx] = useState<number | null>(null);
+  const slideContainerRefs = useRef<(HTMLDivElement | null)[]>([]);
+
   const [heroImageUrl, setHeroImageUrl] = useState('');
   const [heroImagePosition, setHeroImagePosition] = useState('center');
   const [heroImageUrl2, setHeroImageUrl2] = useState('');
@@ -219,23 +243,13 @@ export default function Admin() {
   const [coordsImageUrl, setCoordsImageUrl] = useState('');
   const [pantsImageUrl, setPantsImageUrl] = useState('');
   const [isSavingHomepage, setIsSavingHomepage] = useState(false);
-  const [isUploadingHero, setIsUploadingHero] = useState(false);
-  const [isUploadingHero2, setIsUploadingHero2] = useState(false);
   const [isUploadingTheEdit, setIsUploadingTheEdit] = useState(false);
   const [isUploadingMen, setIsUploadingMen] = useState(false);
   const [isUploadingWomen, setIsUploadingWomen] = useState(false);
   const [isUploadingUnisex, setIsUploadingUnisex] = useState(false);
-  const [isUploadingShirt, setIsUploadingShirt] = useState(false);
-  const [isUploadingTshirt, setIsUploadingTshirt] = useState(false);
-  const [isUploadingCoords, setIsUploadingCoords] = useState(false);
-  const [isUploadingPants, setIsUploadingPants] = useState(false);
 
-  const [heroDragActive, setHeroDragActive] = useState(false);
-  const [hero2DragActive, setHero2DragActive] = useState(false);
   const [theEditDragActive, setTheEditDragActive] = useState(false);
 
-  const heroContainerRef = useRef<HTMLDivElement>(null);
-  const hero2ContainerRef = useRef<HTMLDivElement>(null);
   const editContainerRef = useRef<HTMLDivElement>(null);
 
   // Search queries for selectors
@@ -261,6 +275,7 @@ export default function Admin() {
         .order('name', { ascending: true });
       if (catErr) throw catErr;
       setCategories(catData || []);
+      dataCache.set('categories', catData || []);
 
       // 2. Fetch Products, variants and images as SEPARATE queries so a timeout
       //    on product_images doesn't bring down the entire data load.
@@ -401,6 +416,59 @@ export default function Admin() {
           setHeroImagePosition(p1);
           setHeroImageUrl2(s2);
           setHeroImagePosition2(p2);
+
+          // Populate heroSlidesList with rich data or derived from columns
+          if (Array.isArray(merged.hero_slides) && merged.hero_slides.length > 0) {
+            setHeroSlidesList(
+              merged.hero_slides.map((s: any, idx: number) => ({
+                id: s.id || `slide-${idx + 1}`,
+                url: s.url || '',
+                position: s.position || 'center',
+                alt: s.alt || `Zenphire Slide ${idx + 1}`,
+                titlePart1: s.titlePart1 || '',
+                titleHighlight1: s.titleHighlight1 || '',
+                titlePart2: s.titlePart2 || '',
+                titleHighlight2: s.titleHighlight2 || '',
+                description: s.description || '',
+                buttonText: s.buttonText || '',
+                buttonLink: s.buttonLink || '',
+              }))
+            );
+          } else {
+            const initSlides: AdminHeroSlide[] = [];
+            const rawHero = merged.hero_image_url || '';
+            const rawPos = merged.hero_image_position || 'center';
+            if (rawHero) {
+              const urlParts = rawHero.includes(':::')
+                ? rawHero.split(':::').map((u: string) => u.trim()).filter(Boolean)
+                : [rawHero.trim()];
+              const posParts = rawPos.includes(':::')
+                ? rawPos.split(':::').map((p: string) => p.trim())
+                : [rawPos.trim()];
+
+              urlParts.forEach((u: string, idx: number) => {
+                initSlides.push({
+                  id: `slide-${idx + 1}`,
+                  url: u,
+                  position: posParts[idx] || 'center',
+                  alt: `Zenphire Slide ${idx + 1}`,
+                });
+              });
+            }
+            if (s2 && !initSlides.some(s => s.url === s2)) {
+              initSlides.push({
+                id: `slide-${initSlides.length + 1}`,
+                url: s2,
+                position: p2 || 'center',
+                alt: `Zenphire Slide ${initSlides.length + 1}`,
+              });
+            }
+            if (initSlides.length === 0) {
+              initSlides.push({ id: 'slide-1', url: '', position: 'center', alt: 'Zenphire Slide 1' });
+            }
+            setHeroSlidesList(initSlides);
+          }
+
           setTheEditImageUrl(merged.the_edit_image_url || '');
           setTheEditImagePosition(merged.the_edit_image_position || 'center');
           setBestSellersIds(merged.best_sellers_ids || []);
@@ -703,44 +771,58 @@ export default function Admin() {
   // Handle local image upload to Supabase Storage with Base64 fallback
   const handleImageUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
-    type: 'hero' | 'hero2' | 'edit' | 'men' | 'women' | 'unisex' | 'category' | 'shirt' | 'tshirt' | 'coords' | 'pants' | 'sizeguide'
+    type: 'edit' | 'men' | 'women' | 'unisex' | 'category' | 'shirt' | 'tshirt' | 'coords' | 'pants' | 'sizeguide' | string
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const previousUrl =
-      type === 'hero' ? heroImageUrl :
-        type === 'hero2' ? heroImageUrl2 :
-          type === 'edit' ? theEditImageUrl :
-            type === 'men' ? menImageUrl :
-              type === 'women' ? womenImageUrl :
-                type === 'unisex' ? unisexImageUrl :
-                  type === 'shirt' ? shirtImageUrl :
-                    type === 'tshirt' ? tshirtImageUrl :
-                      type === 'coords' ? coordsImageUrl :
-                        type === 'pants' ? pantsImageUrl :
-                          type === 'category' ? catImageUrl :
-                            type === 'sizeguide' ? newSizeGuideImageUrl : '';
+    const isSpecificCategory = type.startsWith('cat-');
+    const specificCatId = isSpecificCategory ? type.replace('cat-', '') : '';
+    const specificCat = isSpecificCategory ? categories.find(c => c.id === specificCatId) : null;
 
-    const setLoader =
-      type === 'hero' ? setIsUploadingHero :
-        type === 'hero2' ? setIsUploadingHero2 :
-          type === 'edit' ? setIsUploadingTheEdit :
-            type === 'men' ? setIsUploadingMen :
-              type === 'women' ? setIsUploadingWomen :
-                type === 'unisex' ? setIsUploadingUnisex :
-                  type === 'shirt' ? setIsUploadingShirt :
-                    type === 'tshirt' ? setIsUploadingTshirt :
-                      type === 'coords' ? setIsUploadingCoords :
-                        type === 'pants' ? setIsUploadingPants :
-                          type === 'sizeguide' ? setIsUploadingSizeGuide :
-                            setIsUploadingCategory;
-    setLoader(true);
+    const previousUrl =
+      isSpecificCategory ? (specificCat?.image_url || '') :
+        type === 'edit' ? theEditImageUrl :
+          type === 'men' ? menImageUrl :
+            type === 'women' ? womenImageUrl :
+              type === 'unisex' ? unisexImageUrl :
+                type === 'shirt' ? shirtImageUrl :
+                  type === 'tshirt' ? tshirtImageUrl :
+                    type === 'coords' ? coordsImageUrl :
+                      type === 'pants' ? pantsImageUrl :
+                        type === 'category' ? catImageUrl :
+                          type === 'sizeguide' ? newSizeGuideImageUrl : '';
+
+    if (isSpecificCategory) {
+      setUploadingCatId(specificCatId);
+    } else {
+      const setLoader =
+        type === 'edit' ? setIsUploadingTheEdit :
+          type === 'men' ? setIsUploadingMen :
+            type === 'women' ? setIsUploadingWomen :
+              type === 'unisex' ? setIsUploadingUnisex :
+                type === 'sizeguide' ? setIsUploadingSizeGuide :
+                  setIsUploadingCategory;
+      setLoader(true);
+    }
 
     const assignUrl = (url: string) => {
-      if (type === 'hero') setHeroImageUrl(url);
-      else if (type === 'hero2') setHeroImageUrl2(url);
-      else if (type === 'edit') setTheEditImageUrl(url);
+      if (isSpecificCategory) {
+        setCategories(prev => prev.map(c => c.id === specificCatId ? { ...c, image_url: url } : c));
+        // Also persist directly to supabase
+        supabase.from('categories').update({ image_url: url }).eq('id', specificCatId).then(() => {
+          dataCache.delete('categories');
+          dataCache.invalidate('categories');
+        });
+        // Sync legacy states if name matches
+        if (specificCat) {
+          const n = specificCat.name.toLowerCase();
+          if (n.includes('t-shirt') || n.includes('tshirt')) setTshirtImageUrl(url);
+          else if (n.includes('shirt')) setShirtImageUrl(url);
+          else if (n.includes('coord') || n.includes('co-ord')) setCoordsImageUrl(url);
+          else if (n.includes('pant') || n.includes('trouser')) setPantsImageUrl(url);
+        }
+      } else if (type === 'edit') setTheEditImageUrl(url);
       else if (type === 'men') setMenImageUrl(url);
       else if (type === 'women') setWomenImageUrl(url);
       else if (type === 'unisex') setUnisexImageUrl(url);
@@ -753,17 +835,16 @@ export default function Admin() {
     };
 
     const readableName =
-      type === 'hero' ? 'Hero Slide 1' :
-        type === 'hero2' ? 'Hero Slide 2' :
-          type === 'edit' ? 'The Edit' :
-            type === 'men' ? 'Men Collection' :
-              type === 'women' ? 'Women Collection' :
-                type === 'unisex' ? 'Unisex Collection' :
-                  type === 'shirt' ? 'Shirt Category' :
-                    type === 'tshirt' ? 'T-Shirt Category' :
-                      type === 'coords' ? 'Co-ords Category' :
-                        type === 'pants' ? 'Pants Category' :
-                          type === 'sizeguide' ? 'Size Guide' : 'Category';
+      isSpecificCategory ? `${specificCat?.name || 'Category'} Showcase` :
+        type === 'edit' ? 'The Edit' :
+          type === 'men' ? 'Men Collection' :
+            type === 'women' ? 'Women Collection' :
+              type === 'unisex' ? 'Unisex Collection' :
+                type === 'shirt' ? 'Shirt Category' :
+                  type === 'tshirt' ? 'T-Shirt Category' :
+                    type === 'coords' ? 'Co-ords Category' :
+                      type === 'pants' ? 'Pants Category' :
+                        type === 'sizeguide' ? 'Size Guide' : 'Category';
 
     try {
       // 1. Optimize / compress image client-side to ensure small payload size & fast upload
@@ -811,17 +892,40 @@ export default function Admin() {
           deleteOldStorageAsset(previousUrl);
         }
         assignUrl(publicUrl);
-        triggerNotification(`${readableName} image uploaded to cloud storage! Click "Save Homepage Settings" to persist.`);
+        if (isSpecificCategory) {
+          triggerNotification(`${readableName} mockup updated and saved successfully!`);
+        } else if (type === 'category') {
+          triggerNotification('Category cover image uploaded. Click "Save Category" to persist.');
+        } else {
+          triggerNotification(`${readableName} image uploaded! Click "Save Homepage Settings" to persist.`);
+        }
       } else {
         // Safe compressed Data URL fallback
         assignUrl(compressedDataUrl);
-        triggerNotification(`${readableName} image loaded & compressed. Click "Save Homepage Settings" to persist.`);
+        if (isSpecificCategory) {
+          triggerNotification(`${readableName} mockup image loaded.`);
+        } else if (type === 'category') {
+          triggerNotification('Category cover image loaded. Click "Save Category" to persist.');
+        } else {
+          triggerNotification(`${readableName} image loaded. Click "Save Homepage Settings" to persist.`);
+        }
       }
     } catch (err: any) {
       console.error('Error processing image:', err);
       triggerNotification(err.message || 'Error processing image upload', true);
     } finally {
-      setLoader(false);
+      if (isSpecificCategory) {
+        setUploadingCatId(null);
+      } else {
+        const setLoader =
+          type === 'edit' ? setIsUploadingTheEdit :
+            type === 'men' ? setIsUploadingMen :
+              type === 'women' ? setIsUploadingWomen :
+                type === 'unisex' ? setIsUploadingUnisex :
+                  type === 'sizeguide' ? setIsUploadingSizeGuide :
+                    setIsUploadingCategory;
+        setLoader(false);
+      }
       e.target.value = '';
     }
   };
@@ -929,6 +1033,8 @@ export default function Admin() {
     if (name.includes('CO-ORD') || name.includes('COORD')) return 'CRD';
     if (name.includes('T-SHIRT') || name.includes('TSHIRT')) return 'TEE';
     if (name.includes('JACKET') || name.includes('COAT') || name.includes('OUTER')) return 'JKT';
+    if (name.includes('DRESS')) return 'DRS';
+    if (name.includes('HOODIE')) return 'HOD';
     return name.replace(/[^A-Z]/g, '').slice(0, 3).padEnd(3, 'X');
   };
 
@@ -1033,24 +1139,134 @@ export default function Admin() {
     }
   }, [isPantsProduct, varSize]);
 
-  const handleHeroDrag = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!heroDragActive || !heroContainerRef.current) return;
-    const rect = heroContainerRef.current.getBoundingClientRect();
+  const handleSlideDrag = (e: React.MouseEvent<HTMLDivElement>, index: number) => {
+    if (activeDragSlideIdx !== index) return;
+    const ref = slideContainerRefs.current[index];
+    if (!ref) return;
+    const rect = ref.getBoundingClientRect();
     const x = ((e.clientX - rect.left) / rect.width) * 100;
     const y = ((e.clientY - rect.top) / rect.height) * 100;
     const posX = Math.max(0, Math.min(100, Math.round(x)));
     const posY = Math.max(0, Math.min(100, Math.round(y)));
-    setHeroImagePosition(`${posX}% ${posY}%`);
+    const pos = `${posX}% ${posY}%`;
+    setHeroSlidesList(prev => {
+      const copy = [...prev];
+      copy[index] = { ...copy[index], position: pos };
+      return copy;
+    });
+    if (index === 0) setHeroImagePosition(pos);
+    if (index === 1) setHeroImagePosition2(pos);
   };
 
-  const handleHero2Drag = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!hero2DragActive || !hero2ContainerRef.current) return;
-    const rect = hero2ContainerRef.current.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
+  const handleSlideTouchDrag = (e: React.TouchEvent<HTMLDivElement>, index: number) => {
+    const ref = slideContainerRefs.current[index];
+    if (!ref) return;
+    const touch = e.touches[0];
+    const rect = ref.getBoundingClientRect();
+    const x = ((touch.clientX - rect.left) / rect.width) * 100;
+    const y = ((touch.clientY - rect.top) / rect.height) * 100;
     const posX = Math.max(0, Math.min(100, Math.round(x)));
     const posY = Math.max(0, Math.min(100, Math.round(y)));
-    setHeroImagePosition2(`${posX}% ${posY}%`);
+    const pos = `${posX}% ${posY}%`;
+    setHeroSlidesList(prev => {
+      const copy = [...prev];
+      copy[index] = { ...copy[index], position: pos };
+      return copy;
+    });
+    if (index === 0) setHeroImagePosition(pos);
+    if (index === 1) setHeroImagePosition2(pos);
+  };
+
+  const handleAddSlide = () => {
+    setHeroSlidesList(prev => [
+      ...prev,
+      {
+        id: `slide-${Date.now()}`,
+        url: '',
+        position: 'center',
+        alt: `Zenphire Slide ${prev.length + 1}`,
+      }
+    ]);
+  };
+
+  const handleDeleteSlide = (index: number) => {
+    const slide = heroSlidesList[index];
+    if (slide?.url) deleteOldStorageAsset(slide.url);
+    setHeroSlidesList(prev => {
+      const next = prev.filter((_, i) => i !== index);
+      if (next.length === 0) {
+        return [{ id: 'slide-1', url: '', position: 'center', alt: 'Zenphire Slide 1' }];
+      }
+      return next;
+    });
+  };
+
+  const handleMoveSlide = (index: number, direction: 'up' | 'down') => {
+    const target = direction === 'up' ? index - 1 : index + 1;
+    if (target < 0 || target >= heroSlidesList.length) return;
+    setHeroSlidesList(prev => {
+      const copy = [...prev];
+      const temp = copy[index];
+      copy[index] = copy[target];
+      copy[target] = temp;
+      return copy;
+    });
+  };
+
+  const handleSlideImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, slideIdx: number) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingSlideIdx(slideIdx);
+    const oldUrl = heroSlidesList[slideIdx]?.url;
+    try {
+      const { blob: compressedBlob, dataUrl: compressedDataUrl } = await compressImage(file, 1920, 1920, 0.85);
+      const fileExt = file.name.split('.').pop() || 'jpg';
+      const fileName = `hero-slide-${slideIdx + 1}-${Date.now()}.${fileExt}`;
+      const filePath = `banners/${fileName}`;
+
+      let publicUrl = '';
+      try {
+        const { error: uploadError } = await supabase.storage
+          .from('homepage-assets')
+          .upload(filePath, compressedBlob, { cacheControl: '3600', upsert: true });
+
+        if (!uploadError) {
+          const { data } = supabase.storage.from('homepage-assets').getPublicUrl(filePath);
+          publicUrl = data.publicUrl;
+        } else {
+          const { error: uploadError2 } = await supabase.storage
+            .from('product-images')
+            .upload(filePath, compressedBlob, { cacheControl: '3600', upsert: true });
+          if (!uploadError2) {
+            const { data } = supabase.storage.from('product-images').getPublicUrl(filePath);
+            publicUrl = data.publicUrl;
+          }
+        }
+      } catch (storageErr) {
+        console.warn('Storage upload error:', storageErr);
+      }
+
+      const finalUrl = publicUrl || compressedDataUrl;
+      if (publicUrl && oldUrl && oldUrl !== publicUrl) {
+        deleteOldStorageAsset(oldUrl);
+      }
+
+      setHeroSlidesList(prev => {
+        const copy = [...prev];
+        copy[slideIdx] = { ...copy[slideIdx], url: finalUrl };
+        return copy;
+      });
+      if (slideIdx === 0) setHeroImageUrl(finalUrl);
+      if (slideIdx === 1) setHeroImageUrl2(finalUrl);
+
+      triggerNotification(`Slide ${slideIdx + 1} image uploaded! Click "Save Homepage Settings" to persist.`);
+    } catch (err: any) {
+      console.error('Error uploading slide image:', err);
+      triggerNotification(err.message || 'Error uploading slide image', true);
+    } finally {
+      setUploadingSlideIdx(null);
+      e.target.value = '';
+    }
   };
 
   const handleEditDrag = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -1061,28 +1277,6 @@ export default function Admin() {
     const posX = Math.max(0, Math.min(100, Math.round(x)));
     const posY = Math.max(0, Math.min(100, Math.round(y)));
     setTheEditImagePosition(`${posX}% ${posY}%`);
-  };
-
-  const handleHeroTouchDrag = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (!heroContainerRef.current) return;
-    const touch = e.touches[0];
-    const rect = heroContainerRef.current.getBoundingClientRect();
-    const x = ((touch.clientX - rect.left) / rect.width) * 100;
-    const y = ((touch.clientY - rect.top) / rect.height) * 100;
-    const posX = Math.max(0, Math.min(100, Math.round(x)));
-    const posY = Math.max(0, Math.min(100, Math.round(y)));
-    setHeroImagePosition(`${posX}% ${posY}%`);
-  };
-
-  const handleHero2TouchDrag = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (!hero2ContainerRef.current) return;
-    const touch = e.touches[0];
-    const rect = hero2ContainerRef.current.getBoundingClientRect();
-    const x = ((touch.clientX - rect.left) / rect.width) * 100;
-    const y = ((touch.clientY - rect.top) / rect.height) * 100;
-    const posX = Math.max(0, Math.min(100, Math.round(x)));
-    const posY = Math.max(0, Math.min(100, Math.round(y)));
-    setHeroImagePosition2(`${posX}% ${posY}%`);
   };
 
   const handleEditTouchDrag = (e: React.TouchEvent<HTMLDivElement>) => {
@@ -1099,20 +1293,19 @@ export default function Admin() {
   // Save Homepage Settings
   const handleSaveHomepage = async () => {
     setIsSavingHomepage(true);
-    const combinedHeroUrl = heroImageUrl2.trim()
-      ? `${heroImageUrl.trim()}:::${heroImageUrl2.trim()}`
-      : (heroImageUrl.trim() || null);
-    const combinedHeroPos =
-      heroImagePosition2 !== 'center' || heroImagePosition !== 'center'
-        ? `${heroImagePosition}:::${heroImagePosition2}`
-        : heroImagePosition;
+    const validSlides = heroSlidesList.filter(s => s.url && s.url.trim());
+    const combinedHeroUrl = validSlides.map(s => s.url.trim()).join(':::') || (heroImageUrl.trim() || null);
+    const combinedHeroPos = validSlides.map(s => s.position || 'center').join(':::') || heroImagePosition;
+    const slide2Url = validSlides[1]?.url?.trim() || heroImageUrl2.trim() || null;
+    const slide2Pos = validSlides[1]?.position || heroImagePosition2 || 'center';
 
     const configPayload: any = {
       id: 'global',
+      hero_slides: validSlides.length > 0 ? validSlides : heroSlidesList,
       hero_image_url: combinedHeroUrl,
       hero_image_position: combinedHeroPos,
-      hero_image_url_2: heroImageUrl2.trim() || null,
-      hero_image_position_2: heroImagePosition2,
+      hero_image_url_2: slide2Url,
+      hero_image_position_2: slide2Pos,
       the_edit_image_url: theEditImageUrl.trim() || null,
       the_edit_image_position: theEditImagePosition,
       best_sellers_ids: bestSellersIds,
@@ -1334,13 +1527,16 @@ export default function Admin() {
           const { data: newParent, error: parentErr } = await supabase
             .from('categories')
             .insert({
-              name: newParentCatName.trim(),
-              slug: parentSlug
+              name: newParentCatName.trim().toUpperCase(),
+              slug: parentSlug,
+              parent_category_id: null
             })
             .select()
             .single();
           if (parentErr) throw parentErr;
           parentId = newParent.id;
+          dataCache.delete('categories');
+          dataCache.invalidate('categories');
         }
 
         if (selectedGender) {
@@ -1596,6 +1792,9 @@ export default function Admin() {
         if (error) throw error;
       }
 
+      dataCache.delete('categories');
+      dataCache.invalidate('categories');
+
       setIsCategoryModalOpen(false);
       triggerNotification(`Category "${catName}" saved successfully`);
       fetchData();
@@ -1610,6 +1809,8 @@ export default function Admin() {
     try {
       const { error } = await supabase.from('categories').delete().eq('id', id);
       if (error) throw error;
+      dataCache.delete('categories');
+      dataCache.invalidate('categories');
       triggerNotification('Category deleted successfully');
       fetchData();
     } catch (err: any) {
@@ -2194,52 +2395,86 @@ export default function Admin() {
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
                       <tr className="border-b border-border text-[9px] uppercase tracking-wider text-text-secondary">
-                        <th className="py-2.5 w-14">Image</th>
+                        <th className="py-2.5 w-14">Cover</th>
                         <th className="py-2.5">Category Name</th>
                         <th className="py-2.5">Slug</th>
+                        <th className="py-2.5">Placement</th>
                         <th className="py-2.5">Size Guide</th>
                         <th className="py-2.5 text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
-                      {categories.map((c) => (
-                        <tr key={c.id} className="hover:bg-bg-subtle">
-                          <td className="py-3">
-                            {c.image_url ? (
-                              <img src={c.image_url} alt={c.name} className="w-8 h-10 object-cover border border-border bg-bg-subtle" />
-                            ) : (
-                              <span className="text-[10px] text-text-secondary/70 italic">None</span>
-                            )}
-                          </td>
-                          <td className="py-3 font-bold text-text-primary uppercase tracking-wide text-[11px]">{c.name}</td>
-                          <td className="py-3 font-mono text-[10px] text-text-secondary">{c.slug}</td>
-                          <td className="py-3 text-[10px]">
-                            {c.size_guide_html ? (
-                              <span className="text-green-700 font-semibold flex items-center gap-1">
-                                <Check size={10} /> Configured
-                              </span>
-                            ) : (
-                              <span className="text-text-secondary">None</span>
-                            )}
-                          </td>
-                          <td className="py-3 text-right">
-                            <div className="flex gap-2 justify-end">
-                              <button
-                                onClick={() => handleOpenEditCategory(c)}
-                                className="p-1 hover:bg-bg-subtle text-text-secondary hover:text-accent transition-colors"
-                              >
-                                <Edit2 size={12} />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteCategory(c.id)}
-                                className="p-1 hover:bg-bg-subtle text-text-secondary hover:text-sale transition-colors"
-                              >
-                                <Trash2 size={12} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                      {categories.map((c) => {
+                        const isTop = !c.parent_category_id;
+                        const parentCat = categories.find(p => p.id === c.parent_category_id);
+                        return (
+                          <tr key={c.id} className="hover:bg-bg-subtle">
+                            <td className="py-3">
+                              {c.image_url ? (
+                                <img src={c.image_url} alt={c.name} className="w-8 h-10 object-cover border border-border bg-bg-subtle" />
+                              ) : (
+                                <span className="text-[10px] text-text-secondary/70 italic">None</span>
+                              )}
+                            </td>
+                            <td className="py-3 font-bold text-text-primary uppercase tracking-wide text-[11px]">{c.name}</td>
+                            <td className="py-3 font-mono text-[10px] text-text-secondary">{c.slug}</td>
+                            <td className="py-3 text-[10px]">
+                              {isTop ? (
+                                <span className="text-accent font-bold uppercase tracking-wider text-[8px] bg-accent/10 px-2 py-0.5 border border-accent/20 rounded">
+                                  Top-Level (Home &amp; Filters)
+                                </span>
+                              ) : (
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-text-secondary font-medium">Sub of {parentCat?.name || 'Category'}</span>
+                                  {!['male', 'female', 'unisex'].includes(c.name.toLowerCase()) && (
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        await supabase.from('categories').update({ parent_category_id: null }).eq('id', c.id);
+                                        dataCache.delete('categories');
+                                        dataCache.invalidate('categories');
+                                        triggerNotification(`Promoted "${c.name}" to Top-Level Collection!`);
+                                        fetchData();
+                                      }}
+                                      className="text-[9px] text-accent font-bold hover:underline cursor-pointer"
+                                      title="Make this a top-level collection so it shows on Homepage and Filters"
+                                    >
+                                      Make Top-Level
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-3 text-[10px]">
+                              {c.size_guide_html ? (
+                                <span className="text-green-700 font-semibold flex items-center gap-1">
+                                  <Check size={10} /> Configured
+                                </span>
+                              ) : (
+                                <span className="text-text-secondary">None</span>
+                              )}
+                            </td>
+                            <td className="py-3 text-right">
+                              <div className="flex gap-2 justify-end">
+                                <button
+                                  onClick={() => handleOpenEditCategory(c)}
+                                  className="p-1 hover:bg-bg-subtle text-text-secondary hover:text-accent transition-colors"
+                                  title="Edit Category & Cover Mockup"
+                                >
+                                  <Edit2 size={12} />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteCategory(c.id)}
+                                  className="p-1 hover:bg-bg-subtle text-text-secondary hover:text-sale transition-colors"
+                                  title="Delete Category"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -2830,183 +3065,268 @@ export default function Admin() {
 
               {/* Banners block */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Hero Banner Slide 1 Setting */}
-                <div className="space-y-4">
+                {/* Unlimited Hero Slides Manager */}
+                <div className="space-y-4 md:col-span-2 bg-bg-subtle/50 p-4 border border-border">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-border">
                   <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
-                      Hero Banner Image (Slide 1)
-                    </label>
-                    <div className="space-y-2">
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={heroImageUrl}
-                          onChange={(e) => setHeroImageUrl(e.target.value)}
-                          placeholder="Paste image URL (https://...)"
-                          className="flex-1 px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent"
-                        />
-                        {heroImageUrl && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (heroImageUrl) deleteOldStorageAsset(heroImageUrl);
-                              setHeroImageUrl('');
-                            }}
-                            className="px-2.5 py-1 bg-bg-subtle text-sale border border-border text-[10px] font-bold hover:bg-sale/10 cursor-pointer"
-                          >
-                            Clear
-                          </button>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] text-text-secondary uppercase font-semibold">Or upload:</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          disabled={isUploadingHero}
-                          onChange={(e) => handleImageUpload(e, 'hero')}
-                          className="text-xs text-text-primary file:mr-2 file:py-1 file:px-2.5 file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
-                        />
-                      </div>
-                      {isUploadingHero && (
-                        <span className="text-[9px] text-accent mt-1 block font-bold animate-pulse">
-                          Optimizing & uploading image...
-                        </span>
-                      )}
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-text-primary">
+                        Hero Carousel Banners (Multi-Slide)
+                      </h4>
+                      <span className="text-[10px] font-bold bg-accent/15 text-accent px-2 py-0.5 rounded-full font-mono">
+                        {heroSlidesList.length} {heroSlidesList.length === 1 ? 'Slide' : 'Slides'}
+                      </span>
                     </div>
-                    <span className="text-[9px] text-text-secondary mt-1 block font-semibold">
-                      Recommended: 1920 × 1200px.
-                    </span>
+                    <p className="text-[10px] text-text-secondary mt-0.5">
+                      Crossfade slideshow rotates through these banners automatically. Drag any preview to set its focal crop.
+                    </p>
                   </div>
-
-                  {/* Hero preview - Drag to adjust */}
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider block">
-                      Crop Adjustment (Slide 1)
-                    </span>
-                    <div
-                      ref={heroContainerRef}
-                      onMouseDown={() => setHeroDragActive(true)}
-                      onMouseMove={handleHeroDrag}
-                      onMouseUp={() => setHeroDragActive(false)}
-                      onMouseLeave={() => setHeroDragActive(false)}
-                      onTouchMove={handleHeroTouchDrag}
-                      className="border border-border bg-bg-subtle aspect-[16/9] relative overflow-hidden group select-none cursor-move"
-                    >
-                      {heroImageUrl ? (
-                        <>
-                          <img
-                            src={heroImageUrl}
-                            alt="Hero Preview 1"
-                            className="w-full h-full object-cover pointer-events-none"
-                            style={{ objectPosition: heroImagePosition }}
-                          />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-                            <span className="text-[10px] text-white font-bold uppercase tracking-widest bg-black/60 px-3 py-1.5 border border-white/20">
-                              Click &amp; Drag to adjust focus
-                            </span>
-                          </div>
-                          <div className="absolute bottom-2 left-2 bg-black/80 px-2 py-0.5 border border-white/10 text-[9px] font-mono text-white/95 pointer-events-none rounded">
-                            Pivot: {heroImagePosition === 'center' ? '50% 50%' : heroImagePosition}
-                          </div>
-                        </>
-                      ) : (
-                        <div className="absolute inset-0 flex items-center justify-center text-[10px] text-text-secondary/70 italic font-semibold pointer-events-none">
-                          No custom hero image loaded.
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddSlide}
+                    className="self-start sm:self-auto px-3 py-1.5 bg-accent text-white text-[10px] font-bold uppercase tracking-wider hover:bg-accent-hover transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer"
+                  >
+                    <Plus size={12} />
+                    Add Slide
+                  </button>
                 </div>
 
-                {/* Hero Banner Slide 2 Setting */}
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
-                      Hero Banner Image (Slide 2 - Auto Slide)
-                    </label>
-                    <div className="space-y-2">
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={heroImageUrl2}
-                          onChange={(e) => setHeroImageUrl2(e.target.value)}
-                          placeholder="Paste slide 2 image URL (https://...)"
-                          className="flex-1 px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent"
-                        />
-                        {heroImageUrl2 && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (heroImageUrl2) deleteOldStorageAsset(heroImageUrl2);
-                              setHeroImageUrl2('');
-                            }}
-                            className="px-2.5 py-1 bg-bg-subtle text-sale border border-border text-[10px] font-bold hover:bg-sale/10 cursor-pointer"
-                          >
-                            Clear
-                          </button>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] text-text-secondary uppercase font-semibold">Or upload:</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          disabled={isUploadingHero2}
-                          onChange={(e) => handleImageUpload(e, 'hero2')}
-                          className="text-xs text-text-primary file:mr-2 file:py-1 file:px-2.5 file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
-                        />
-                      </div>
-                      {isUploadingHero2 && (
-                        <span className="text-[9px] text-accent mt-1 block font-bold animate-pulse">
-                          Optimizing & uploading image...
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-[9px] text-text-secondary mt-1 block font-semibold">
-                      Slides automatically every 6 seconds on the storefront.
-                    </span>
-                  </div>
+                {/* Slides Grid / List */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                  {heroSlidesList.map((slide, index) => {
+                    return (
+                      <div
+                        key={slide.id || index}
+                        className="bg-white border border-border p-4 space-y-3 relative group/slide shadow-xs"
+                      >
+                        {/* Slide Card Header */}
+                        <div className="flex items-center justify-between border-b border-border/60 pb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-text-primary font-mono">
+                              Slide #{index + 1}
+                            </span>
+                            {index === 0 && (
+                              <span className="text-[9px] bg-accent-gold/20 text-[#8c6b2d] font-bold px-1.5 py-0.5 rounded uppercase">
+                                Primary Banner
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              title="Move Up"
+                              disabled={index === 0}
+                              onClick={() => handleMoveSlide(index, 'up')}
+                              className="p-1 hover:bg-bg-subtle text-text-secondary hover:text-text-primary disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                            >
+                              <ArrowUp size={12} />
+                            </button>
+                            <button
+                              type="button"
+                              title="Move Down"
+                              disabled={index === heroSlidesList.length - 1}
+                              onClick={() => handleMoveSlide(index, 'down')}
+                              className="p-1 hover:bg-bg-subtle text-text-secondary hover:text-text-primary disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                            >
+                              <ArrowDown size={12} />
+                            </button>
+                            <button
+                              type="button"
+                              title="Delete Slide"
+                              onClick={() => handleDeleteSlide(index)}
+                              className="p-1 hover:bg-sale/10 text-sale/70 hover:text-sale transition-colors ml-1 cursor-pointer"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        </div>
 
-                  {/* Hero 2 preview - Drag to adjust */}
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider block">
-                      Crop Adjustment (Slide 2)
-                    </span>
-                    <div
-                      ref={hero2ContainerRef}
-                      onMouseDown={() => setHero2DragActive(true)}
-                      onMouseMove={handleHero2Drag}
-                      onMouseUp={() => setHero2DragActive(false)}
-                      onMouseLeave={() => setHero2DragActive(false)}
-                      onTouchMove={handleHero2TouchDrag}
-                      className="border border-border bg-bg-subtle aspect-[16/9] relative overflow-hidden group select-none cursor-move"
-                    >
-                      {heroImageUrl2 ? (
-                        <>
-                          <img
-                            src={heroImageUrl2}
-                            alt="Hero Preview 2"
-                            className="w-full h-full object-cover pointer-events-none"
-                            style={{ objectPosition: heroImagePosition2 }}
-                          />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-                            <span className="text-[10px] text-white font-bold uppercase tracking-widest bg-black/60 px-3 py-1.5 border border-white/20">
-                              Click &amp; Drag to adjust focus
+                        {/* URL and Upload input */}
+                        <div className="space-y-2">
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={slide.url || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setHeroSlidesList(prev => {
+                                  const copy = [...prev];
+                                  copy[index] = { ...copy[index], url: val };
+                                  return copy;
+                                });
+                                if (index === 0) setHeroImageUrl(val);
+                                if (index === 1) setHeroImageUrl2(val);
+                              }}
+                              placeholder="Paste banner image URL (https://...)"
+                              className="flex-1 px-3 py-1.5 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent"
+                            />
+                            {slide.url && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (slide.url) deleteOldStorageAsset(slide.url);
+                                  setHeroSlidesList(prev => {
+                                    const copy = [...prev];
+                                    copy[index] = { ...copy[index], url: '' };
+                                    return copy;
+                                  });
+                                  if (index === 0) setHeroImageUrl('');
+                                  if (index === 1) setHeroImageUrl2('');
+                                }}
+                                className="px-2.5 py-1 bg-bg-subtle text-sale border border-border text-[10px] font-bold hover:bg-sale/10 cursor-pointer"
+                              >
+                                Clear
+                              </button>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-text-secondary uppercase font-semibold">Or upload:</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              disabled={uploadingSlideIdx === index}
+                              onChange={(e) => handleSlideImageUpload(e, index)}
+                              className="text-xs text-text-primary file:mr-2 file:py-1 file:px-2.5 file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
+                            />
+                          </div>
+                          {uploadingSlideIdx === index && (
+                            <span className="text-[9px] text-accent mt-1 block font-bold animate-pulse">
+                              Optimizing & uploading slide image...
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Interactive Focal Point Crop Preview */}
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider block">
+                              Crop Adjustment
+                            </span>
+                            <span className="text-[9px] font-mono text-text-secondary">
+                              Pivot: {slide.position === 'center' ? '50% 50%' : slide.position}
                             </span>
                           </div>
-                          <div className="absolute bottom-2 left-2 bg-black/80 px-2 py-0.5 border border-white/10 text-[9px] font-mono text-white/95 pointer-events-none rounded">
-                            Pivot: {heroImagePosition2 === 'center' ? '50% 50%' : heroImagePosition2}
+                          <div
+                            ref={(el) => { slideContainerRefs.current[index] = el; }}
+                            onMouseDown={() => setActiveDragSlideIdx(index)}
+                            onMouseMove={(e) => handleSlideDrag(e, index)}
+                            onMouseUp={() => setActiveDragSlideIdx(null)}
+                            onMouseLeave={() => {
+                              if (activeDragSlideIdx === index) setActiveDragSlideIdx(null);
+                            }}
+                            onTouchMove={(e) => handleSlideTouchDrag(e, index)}
+                            className="border border-border bg-bg-subtle aspect-[16/9] relative overflow-hidden group/crop select-none cursor-move rounded-xs"
+                          >
+                            {slide.url ? (
+                              <>
+                                <img
+                                  src={slide.url}
+                                  alt={`Slide Preview ${index + 1}`}
+                                  className="w-full h-full object-cover pointer-events-none"
+                                  style={{ objectPosition: slide.position || 'center' }}
+                                />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/crop:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                                  <span className="text-[10px] text-white font-bold uppercase tracking-widest bg-black/60 px-3 py-1.5 border border-white/20">
+                                    Click &amp; Drag to adjust focus
+                                  </span>
+                                </div>
+                              </>
+                            ) : (
+                              <div className="absolute inset-0 flex items-center justify-center text-[10px] text-text-secondary/70 italic font-semibold pointer-events-none">
+                                No image loaded for slide #{index + 1}.
+                              </div>
+                            )}
                           </div>
-                        </>
-                      ) : (
-                        <div className="absolute inset-0 flex items-center justify-center text-[10px] text-text-secondary/70 italic font-semibold pointer-events-none">
-                          No custom slide 2 hero image loaded.
                         </div>
-                      )}
-                    </div>
-                  </div>
+
+                        {/* Optional Slide Headline & CTA Settings */}
+                        <details className="text-xs group/details border-t border-border/50 pt-2">
+                          <summary className="cursor-pointer text-[10px] font-bold uppercase tracking-wider text-text-secondary hover:text-text-primary flex items-center gap-1 select-none">
+                            <span>Customize Text &amp; CTA Button</span>
+                            <ChevronDown size={10} className="group-open/details:rotate-180 transition-transform" />
+                          </summary>
+                          <div className="pt-2 space-y-2">
+                            <div className="grid grid-cols-2 gap-2">
+                              <input
+                                type="text"
+                                placeholder="Title (e.g. Modern)"
+                                value={slide.titlePart1 || ''}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setHeroSlidesList(prev => {
+                                    const copy = [...prev];
+                                    copy[index] = { ...copy[index], titlePart1: val };
+                                    return copy;
+                                  });
+                                }}
+                                className="px-2.5 py-1 text-xs border border-border"
+                              />
+                              <input
+                                type="text"
+                                placeholder="Highlight (e.g. Form)"
+                                value={slide.titleHighlight1 || ''}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setHeroSlidesList(prev => {
+                                    const copy = [...prev];
+                                    copy[index] = { ...copy[index], titleHighlight1: val };
+                                    return copy;
+                                  });
+                                }}
+                                className="px-2.5 py-1 text-xs border border-border"
+                              />
+                            </div>
+                            <input
+                              type="text"
+                              placeholder="Subtitle / Description text"
+                              value={slide.description || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setHeroSlidesList(prev => {
+                                  const copy = [...prev];
+                                  copy[index] = { ...copy[index], description: val };
+                                  return copy;
+                                });
+                              }}
+                              className="w-full px-2.5 py-1 text-xs border border-border"
+                            />
+                            <div className="grid grid-cols-2 gap-2">
+                              <input
+                                type="text"
+                                placeholder="Button Text (e.g. Shop Now)"
+                                value={slide.buttonText || ''}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setHeroSlidesList(prev => {
+                                    const copy = [...prev];
+                                    copy[index] = { ...copy[index], buttonText: val };
+                                    return copy;
+                                  });
+                                }}
+                                className="px-2.5 py-1 text-xs border border-border"
+                              />
+                              <input
+                                type="text"
+                                placeholder="Button Link (e.g. /shop)"
+                                value={slide.buttonLink || ''}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setHeroSlidesList(prev => {
+                                    const copy = [...prev];
+                                    copy[index] = { ...copy[index], buttonLink: val };
+                                    return copy;
+                                  });
+                                }}
+                                className="px-2.5 py-1 text-xs border border-border"
+                              />
+                            </div>
+                          </div>
+                        </details>
+                      </div>
+                    );
+                  })}
                 </div>
+              </div>
 
                 {/* The Edit Banner Setting */}
                 <div className="space-y-4 md:col-span-2">
@@ -3250,209 +3570,121 @@ export default function Admin() {
                 </div>
               </div>
 
-              {/* Category Showcase Images (Shirts, T-Shirts, Co-ords, Pants) */}
+              {/* Category Showcase Images (Dynamic for All Main Categories) */}
               <div className="border-t border-border pt-6 space-y-6">
-                <h3 className="text-xs font-sans font-bold uppercase tracking-wider text-text-primary">
-                  Shop By Category Banner Images (Shirts, T-Shirts, Co-ords, Pants)
-                </h3>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-xs font-sans font-bold uppercase tracking-wider text-text-primary">
+                      Shop By Category Banner Images &amp; Mockups
+                    </h3>
+                    <p className="text-[10px] text-text-secondary mt-0.5">
+                      Cover mockups for collections displayed in the Homepage "Shop By Category" carousel. Any new category added will automatically appear here.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleOpenAddCategory}
+                    className="self-start sm:self-auto px-3 py-1 bg-accent text-white text-[9px] font-bold uppercase tracking-wider hover:bg-accent-hover transition-colors flex items-center gap-1 shadow-xs cursor-pointer"
+                  >
+                    <Plus size={10} />
+                    New Category
+                  </button>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-                  {/* Shirts Image */}
-                  <div className="space-y-3">
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
-                      Shirts Category Image
-                    </label>
-                    <div className="space-y-2">
-                      <input
-                        type="text"
-                        value={shirtImageUrl}
-                        onChange={(e) => setShirtImageUrl(e.target.value)}
-                        placeholder="Paste image URL..."
-                        className="w-full px-2.5 py-1.5 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent"
-                      />
-                      <input
-                        type="file"
-                        accept="image/*"
-                        disabled={isUploadingShirt}
-                        onChange={(e) => handleImageUpload(e, 'shirt')}
-                        className="w-full text-[10px] text-text-primary file:mr-1 file:py-0.5 file:px-2 file:border-0 file:text-[9px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
-                      />
-                    </div>
-                    {isUploadingShirt && (
-                      <span className="text-[9px] text-accent mt-1 block font-bold animate-pulse">
-                        Uploading...
-                      </span>
-                    )}
-                    {shirtImageUrl ? (
-                      <div className="space-y-2">
-                        <div className="aspect-[3/4] bg-bg-subtle relative overflow-hidden border border-border">
-                          <img src={shirtImageUrl} alt="Shirts Preview" className="w-full h-full object-cover" />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (shirtImageUrl) deleteOldStorageAsset(shirtImageUrl);
-                            setShirtImageUrl('');
-                          }}
-                          className="text-[10px] text-sale font-bold hover:underline cursor-pointer flex items-center gap-1"
-                        >
-                          <X size={10} className="stroke-[2]" /> Clear Image
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="aspect-[3/4] border border-border bg-bg-subtle flex items-center justify-center text-[10px] text-text-secondary/70 italic font-semibold rounded-none">
-                        No Shirts image
-                      </div>
-                    )}
-                  </div>
+                  {categories
+                    .filter(c => !c.parent_category_id || (!['male', 'female', 'unisex'].includes(c.name.toLowerCase()) && !['male', 'female', 'unisex'].includes(c.slug.split('-').pop()?.toLowerCase() || '')))
+                    .map((cat) => {
+                      const isUploadingThis = uploadingCatId === cat.id;
+                      const catNameLower = cat.name.toLowerCase();
+                      const fallbackConfigUrl =
+                        (catNameLower.includes('shirt') && !catNameLower.includes('t-shirt') && !catNameLower.includes('tshirt') ? shirtImageUrl : '') ||
+                        (catNameLower.includes('t-shirt') || catNameLower.includes('tshirt') ? tshirtImageUrl : '') ||
+                        (catNameLower.includes('coord') || catNameLower.includes('co-ord') ? coordsImageUrl : '') ||
+                        (catNameLower.includes('pant') || catNameLower.includes('trouser') ? pantsImageUrl : '');
 
-                  {/* T-Shirts Image */}
-                  <div className="space-y-3">
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
-                      T-Shirts Category Image
-                    </label>
-                    <div className="space-y-2">
-                      <input
-                        type="text"
-                        value={tshirtImageUrl}
-                        onChange={(e) => setTshirtImageUrl(e.target.value)}
-                        placeholder="Paste image URL..."
-                        className="w-full px-2.5 py-1.5 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent"
-                      />
-                      <input
-                        type="file"
-                        accept="image/*"
-                        disabled={isUploadingTshirt}
-                        onChange={(e) => handleImageUpload(e, 'tshirt')}
-                        className="w-full text-[10px] text-text-primary file:mr-1 file:py-0.5 file:px-2 file:border-0 file:text-[9px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
-                      />
-                    </div>
-                    {isUploadingTshirt && (
-                      <span className="text-[9px] text-accent mt-1 block font-bold animate-pulse">
-                        Uploading...
-                      </span>
-                    )}
-                    {tshirtImageUrl ? (
-                      <div className="space-y-2">
-                        <div className="aspect-[3/4] bg-bg-subtle relative overflow-hidden border border-border">
-                          <img src={tshirtImageUrl} alt="T-Shirts Preview" className="w-full h-full object-cover" />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (tshirtImageUrl) deleteOldStorageAsset(tshirtImageUrl);
-                            setTshirtImageUrl('');
-                          }}
-                          className="text-[10px] text-sale font-bold hover:underline cursor-pointer flex items-center gap-1"
-                        >
-                          <X size={10} className="stroke-[2]" /> Clear Image
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="aspect-[3/4] border border-border bg-bg-subtle flex items-center justify-center text-[10px] text-text-secondary/70 italic font-semibold rounded-none">
-                        No T-Shirts image
-                      </div>
-                    )}
-                  </div>
+                      const currentCatImg = cat.image_url || fallbackConfigUrl || '';
 
-                  {/* Co-ords Image */}
-                  <div className="space-y-3">
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
-                      Co-ords Category Image
-                    </label>
-                    <div className="space-y-2">
-                      <input
-                        type="text"
-                        value={coordsImageUrl}
-                        onChange={(e) => setCoordsImageUrl(e.target.value)}
-                        placeholder="Paste image URL..."
-                        className="w-full px-2.5 py-1.5 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent"
-                      />
-                      <input
-                        type="file"
-                        accept="image/*"
-                        disabled={isUploadingCoords}
-                        onChange={(e) => handleImageUpload(e, 'coords')}
-                        className="w-full text-[10px] text-text-primary file:mr-1 file:py-0.5 file:px-2 file:border-0 file:text-[9px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
-                      />
-                    </div>
-                    {isUploadingCoords && (
-                      <span className="text-[9px] text-accent mt-1 block font-bold animate-pulse">
-                        Uploading...
-                      </span>
-                    )}
-                    {coordsImageUrl ? (
-                      <div className="space-y-2">
-                        <div className="aspect-[3/4] bg-bg-subtle relative overflow-hidden border border-border">
-                          <img src={coordsImageUrl} alt="Co-ords Preview" className="w-full h-full object-cover" />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (coordsImageUrl) deleteOldStorageAsset(coordsImageUrl);
-                            setCoordsImageUrl('');
-                          }}
-                          className="text-[10px] text-sale font-bold hover:underline cursor-pointer flex items-center gap-1"
-                        >
-                          <X size={10} className="stroke-[2]" /> Clear Image
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="aspect-[3/4] border border-border bg-bg-subtle flex items-center justify-center text-[10px] text-text-secondary/70 italic font-semibold rounded-none">
-                        No Co-ords image
-                      </div>
-                    )}
-                  </div>
+                      return (
+                        <div key={cat.id} className="space-y-3 bg-bg-subtle/30 p-3 border border-border">
+                          <div className="flex items-center justify-between">
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary">
+                              {cat.name}
+                            </label>
+                            <span className="text-[8px] font-mono uppercase bg-accent/10 text-accent px-1.5 py-0.5 rounded">
+                              {cat.slug}
+                            </span>
+                          </div>
 
-                  {/* Pants Image */}
-                  <div className="space-y-3">
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
-                      Pants Category Image
-                    </label>
-                    <div className="space-y-2">
-                      <input
-                        type="text"
-                        value={pantsImageUrl}
-                        onChange={(e) => setPantsImageUrl(e.target.value)}
-                        placeholder="Paste image URL..."
-                        className="w-full px-2.5 py-1.5 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent"
-                      />
-                      <input
-                        type="file"
-                        accept="image/*"
-                        disabled={isUploadingPants}
-                        onChange={(e) => handleImageUpload(e, 'pants')}
-                        className="w-full text-[10px] text-text-primary file:mr-1 file:py-0.5 file:px-2 file:border-0 file:text-[9px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
-                      />
-                    </div>
-                    {isUploadingPants && (
-                      <span className="text-[9px] text-accent mt-1 block font-bold animate-pulse">
-                        Uploading...
-                      </span>
-                    )}
-                    {pantsImageUrl ? (
-                      <div className="space-y-2">
-                        <div className="aspect-[3/4] bg-bg-subtle relative overflow-hidden border border-border">
-                          <img src={pantsImageUrl} alt="Pants Preview" className="w-full h-full object-cover" />
+                          <div className="space-y-2">
+                            <input
+                              type="text"
+                              value={currentCatImg}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setCategories(prev => prev.map(c => c.id === cat.id ? { ...c, image_url: val } : c));
+                                if (catNameLower.includes('shirt') && !catNameLower.includes('t-shirt')) setShirtImageUrl(val);
+                                else if (catNameLower.includes('t-shirt') || catNameLower.includes('tshirt')) setTshirtImageUrl(val);
+                                else if (catNameLower.includes('coord') || catNameLower.includes('co-ord')) setCoordsImageUrl(val);
+                                else if (catNameLower.includes('pant') || catNameLower.includes('trouser')) setPantsImageUrl(val);
+                              }}
+                              placeholder="Paste image URL (https://...)"
+                              className="w-full px-2.5 py-1.5 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent"
+                            />
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[9px] text-text-secondary uppercase font-semibold">Upload:</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                disabled={isUploadingThis}
+                                onChange={(e) => handleImageUpload(e, `cat-${cat.id}`)}
+                                className="w-full text-[10px] text-text-primary file:mr-1 file:py-0.5 file:px-2 file:border-0 file:text-[9px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
+                              />
+                            </div>
+                          </div>
+
+                          {isUploadingThis && (
+                            <span className="text-[9px] text-accent mt-1 block font-bold animate-pulse">
+                              Uploading mockup...
+                            </span>
+                          )}
+
+                          {currentCatImg ? (
+                            <div className="space-y-2">
+                              <div className="aspect-[3/4] bg-bg-subtle relative overflow-hidden border border-border">
+                                <img src={currentCatImg} alt={`${cat.name} Mockup`} className="w-full h-full object-cover" />
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  deleteOldStorageAsset(currentCatImg);
+                                  setCategories(prev => prev.map(c => c.id === cat.id ? { ...c, image_url: '' } : c));
+                                  supabase.from('categories').update({ image_url: null }).eq('id', cat.id).then(() => {
+                                    dataCache.delete('categories');
+                                    dataCache.invalidate('categories');
+                                  });
+                                  if (catNameLower.includes('shirt') && !catNameLower.includes('t-shirt')) setShirtImageUrl('');
+                                  else if (catNameLower.includes('t-shirt') || catNameLower.includes('tshirt')) setTshirtImageUrl('');
+                                  else if (catNameLower.includes('coord') || catNameLower.includes('co-ord')) setCoordsImageUrl('');
+                                  else if (catNameLower.includes('pant') || catNameLower.includes('trouser')) setPantsImageUrl('');
+                                }}
+                                className="text-[10px] text-sale font-bold hover:underline cursor-pointer flex items-center gap-1"
+                              >
+                                <X size={10} className="stroke-[2]" /> Clear Image
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="aspect-[3/4] border border-border bg-bg-subtle flex flex-col items-center justify-center p-3 text-center text-[10px] text-text-secondary/70 italic font-semibold">
+                              <span>No {cat.name} mockup</span>
+                              <span className="text-[9px] text-text-secondary/50 font-normal mt-1">Upload banner above</span>
+                            </div>
+                          )}
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (pantsImageUrl) deleteOldStorageAsset(pantsImageUrl);
-                            setPantsImageUrl('');
-                          }}
-                          className="text-[10px] text-sale font-bold hover:underline cursor-pointer flex items-center gap-1"
-                        >
-                          <X size={10} className="stroke-[2]" /> Clear Image
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="aspect-[3/4] border border-border bg-bg-subtle flex items-center justify-center text-[10px] text-text-secondary/70 italic font-semibold rounded-none">
-                        No Pants image
-                      </div>
-                    )}
-                  </div>
+                      );
+                    })}
                 </div>
               </div>
+
 
               {/* Dynamic Highlights Collections */}
               <div className="border-t border-border pt-6 space-y-6">
@@ -4038,7 +4270,7 @@ export default function Admin() {
                     </div>
 
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                      {categories.filter(c => !c.parent_category_id).map((c) => (
+                      {categories.filter(c => !c.parent_category_id || (!['male', 'female', 'unisex'].includes(c.name.toLowerCase()) && !['male', 'female', 'unisex'].includes(c.slug.split('-').pop()?.toLowerCase() || ''))).map((c) => (
                         <button
                           key={c.id}
                           type="button"
@@ -4711,35 +4943,50 @@ export default function Admin() {
                     onChange={(e) => setCatParent(e.target.value)}
                     className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent uppercase font-semibold"
                   >
-                    <option value="">None (Top Level)</option>
+                    <option value="">None (Top Level — Visible on Homepage &amp; Shop Filters)</option>
                     {categories
-                      .filter(c => c.id !== editingCategory?.id)
+                      .filter(c => !c.parent_category_id && c.id !== editingCategory?.id && !['male', 'female', 'unisex'].includes(c.name.toLowerCase()))
                       .map((c) => (
-                        <option key={c.id} value={c.id}>{c.name}</option>
+                        <option key={c.id} value={c.id}>Subcategory of {c.name}</option>
                       ))}
                   </select>
+                  <p className="text-[9px] text-text-secondary mt-1">
+                    Leave as "None (Top Level)" to display this category on the Homepage Collections Carousel and in Shop filter bars.
+                  </p>
                 </div>
 
                 {/* Category Cover Image */}
                 <div>
                   <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
-                    Category Cover Image
+                    Category Cover / Mockup Image
                   </label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    disabled={isUploadingCategory}
-                    onChange={(e) => handleImageUpload(e, 'category')}
-                    className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent file:mr-4 file:py-1 file:px-2 file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
-                  />
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={catImageUrl}
+                      onChange={(e) => setCatImageUrl(e.target.value)}
+                      placeholder="Paste mockup image URL (https://...)"
+                      className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent"
+                    />
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-text-secondary uppercase font-semibold">Or upload:</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        disabled={isUploadingCategory}
+                        onChange={(e) => handleImageUpload(e, 'category')}
+                        className="text-xs text-text-primary file:mr-2 file:py-1 file:px-2.5 file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-accent file:text-white hover:file:bg-accent-hover cursor-pointer"
+                      />
+                    </div>
+                  </div>
                   {isUploadingCategory && (
-                    <span className="text-[9px] text-text-secondary mt-1 block font-bold animate-pulse">
+                    <span className="text-[9px] text-accent mt-1 block font-bold animate-pulse">
                       Uploading image file...
                     </span>
                   )}
                   {catImageUrl ? (
                     <div className="mt-2 space-y-2">
-                      <div className="w-24 aspect-[4/5] bg-bg-subtle relative overflow-hidden border border-border">
+                      <div className="w-24 aspect-[3/4] bg-bg-subtle relative overflow-hidden border border-border">
                         <img src={catImageUrl} alt="Category Preview" className="w-full h-full object-cover" />
                       </div>
                       <button
@@ -4752,7 +4999,7 @@ export default function Admin() {
                     </div>
                   ) : (
                     <span className="text-[9px] text-text-secondary mt-1 block font-semibold">
-                      Upload a cover image representing this category (used for storefront catalog grids).
+                      Upload or paste a cover image representing this category (used for the Homepage carousel and catalog grids).
                     </span>
                   )}
                 </div>
