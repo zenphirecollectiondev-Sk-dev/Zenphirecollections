@@ -341,7 +341,7 @@ export default function ProductDetail() {
         <h2 className="text-xl font-heading font-bold uppercase mb-2">Product Not Found</h2>
         <p className="text-text-secondary text-sm mb-6">This product doesn't exist or has been removed.</p>
         <Link to="/shop" className="btn btn-primary px-6 py-3 text-xs font-bold uppercase tracking-widest">
-          Back to Catalog
+          Back to Shop
         </Link>
       </div>
     );

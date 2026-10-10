@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams, Link } from "react-router-dom";
 import {
   SlidersHorizontal, X, ChevronDown, Heart, ShoppingBag,
@@ -25,16 +26,22 @@ function ProductImage({
   src,
   alt,
   lazy,
+  priority,
 }: {
   src: string | null;
   alt: string;
   lazy: boolean;
+  priority?: boolean;
 }) {
   const [imgState, setImgState] = useState<ImgState>(src ? "loading" : "error");
+  const imgRef = useRef<HTMLImageElement>(null);
 
   // Reset when src changes (e.g. navigating between categories)
   useEffect(() => {
     setImgState(src ? "loading" : "error");
+    if (src && imgRef.current?.complete) {
+      setImgState("loaded");
+    }
   }, [src]);
 
   return (
@@ -92,12 +99,15 @@ function ProductImage({
       {/* The real image � only rendered when we have a src */}
       {src && (
         <img
+          ref={imgRef}
           src={src}
           alt={alt}
           loading={lazy ? "lazy" : "eager"}
+          decoding="async"
+          {...(priority ? { fetchPriority: "high" as any } : {})}
           onLoad={() => setImgState("loaded")}
           onError={() => setImgState("error")}
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${imgState === "loaded" ? "opacity-100" : "opacity-0"
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ease-in-out ${imgState === "loaded" ? "opacity-100" : "opacity-0"
             }`}
         />
       )}
@@ -251,18 +261,71 @@ export default function Shop() {
   }, [activeCategory, categories]);
 
   const shopTitle = useMemo(() => {
-    const genderLabel = activeGender !== 'all' ? (activeGender === 'male' ? "Men's" : activeGender === 'female' ? "Women's" : "Unisex") : null;
-    let catLabel = null;
+    const genderLabel =
+      activeGender !== 'all'
+        ? activeGender === 'male'
+          ? "Men's"
+          : activeGender === 'female'
+          ? "Women's"
+          : "Unisex"
+        : null;
+
+    let catLabel: string | null = null;
     if (activeCategory !== 'all') {
-      const match = categories.find((c: any) => c.slug === activeCategory || c.name?.toLowerCase() === activeCategory.toLowerCase());
-      catLabel = match ? (match.name.charAt(0).toUpperCase() + match.name.slice(1).toLowerCase()) : (activeCategory.charAt(0).toUpperCase() + activeCategory.slice(1));
+      const match = categories.find(
+        (c: any) =>
+          c.slug === activeCategory ||
+          c.name?.toLowerCase() === activeCategory.toLowerCase()
+      );
+      const raw = match ? match.name : activeCategory.replace(/-/g, ' ');
+      // Format as title case cleanly
+      catLabel = raw
+        .split(' ')
+        .filter(Boolean)
+        .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+        .join(' ');
     }
 
-    if (genderLabel && catLabel) return `${genderLabel} ${catLabel}`;
+    // Clean up if catLabel is already a standalone gender name
+    if (catLabel) {
+      const catNorm = catLabel.toLowerCase().replace(/[^a-z]/g, '');
+      if (catNorm === 'men' || catNorm === 'mens' || catNorm === 'male') {
+        return "Men's Collection";
+      }
+      if (catNorm === 'women' || catNorm === 'womens' || catNorm === 'female') {
+        return "Women's Collection";
+      }
+      if (catNorm === 'unisex') {
+        return "Unisex Collection";
+      }
+    }
+
+    if (genderLabel && catLabel) {
+      const catLower = catLabel.toLowerCase();
+      const genderStem = activeGender === 'male' ? 'men' : activeGender === 'female' ? 'women' : 'unisex';
+      // If catLabel already has the gender prefix, e.g. "Men's Collection" or "Men's Shirts", don't repeat gender
+      if (catLower.includes(genderStem)) {
+        return catLabel.endsWith('collection') ? catLabel : `${catLabel} Collection`;
+      }
+      if (catLower.endsWith('collection')) {
+        return `${genderLabel} ${catLabel}`;
+      }
+      return `${genderLabel} ${catLabel}`;
+    }
+
     if (genderLabel) return `${genderLabel} Collection`;
-    if (catLabel) return `${catLabel} Collection`;
-    if (activeOccasion) return `${activeOccasion.charAt(0).toUpperCase() + activeOccasion.slice(1)} Selection`;
-    return 'Complete Collection';
+
+    if (catLabel) {
+      if (catLabel.toLowerCase().includes('collection')) return catLabel;
+      return `${catLabel} Collection`;
+    }
+
+    if (activeOccasion) {
+      const occ = activeOccasion.replace(/-/g, ' ');
+      return `${occ.charAt(0).toUpperCase() + occ.slice(1).toLowerCase()} Selection`;
+    }
+
+    return 'Collections';
   }, [activeGender, activeCategory, activeOccasion, categories]);
 
   usePageSEO({
@@ -304,6 +367,16 @@ export default function Shop() {
   const [sortBy, setSortBy] = useState<string>("newest");
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
   const [page, setPage] = useState(0);
+
+  // Lock body scroll when mobile filter is open
+  useEffect(() => {
+    if (!isMobileFilterOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [isMobileFilterOpen]);
 
   // -- Resolve active category IDs for the hook -------------------------------
   // If categories haven't loaded yet and a specific category is requested,
@@ -526,12 +599,12 @@ export default function Shop() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 min-h-screen overflow-x-hidden anim-fade-up">
 
       {/* Page Header */}
-      <div className="border-b border-border pb-6 mb-8 flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+      <div className="border-b border-border pb-5 mb-7 flex flex-col md:flex-row md:items-end md:justify-between gap-3">
         <div>
-          <p className="text-[10px] uppercase tracking-[0.25em] text-accent-gold font-bold">
-            Zenphire Catalog
+          <p className="text-[10px] uppercase tracking-[0.25em] text-accent-gold font-medium">
+            Zenphire
           </p>
-          <h1 className="text-3xl font-heading font-medium uppercase mt-1 capitalize">
+          <h1 className="text-xl sm:text-2xl font-mending font-medium tracking-wide text-text-primary mt-1">
             {pageTitle}
           </h1>
         </div>
@@ -541,17 +614,17 @@ export default function Shop() {
       </div>
 
       {/* Control Bar (Sticky & always accessible) */}
-      <div className="sticky top-16 z-30 flex justify-between items-center mb-8 border border-border px-3.5 py-2.5 bg-white/95 backdrop-blur-sm shadow-xs gap-3">
+      <div className="sticky top-16 z-30 flex justify-between items-center mb-8 border border-border/70 px-3 py-2 bg-white/95 backdrop-blur-sm shadow-xs gap-3">
         {/* Mobile filter button */}
         <button
           onClick={() => setIsMobileFilterOpen(true)}
-          title="Filter and Sort"
-          className="btn flex items-center gap-2 px-3 py-1.5 border border-border text-xs font-semibold uppercase tracking-wider md:hidden hover:bg-bg-subtle text-text-primary"
+          title="Filter"
+          className="flex items-center gap-1.5 px-3 py-1.5 border border-border/80 text-xs font-normal md:hidden hover:border-text-primary text-text-primary bg-white transition-colors rounded-xs"
         >
-          <SlidersHorizontal size={14} />
-          <span>Filter & Sort</span>
+          <SlidersHorizontal size={13} />
+          <span>Filter</span>
           {activeFilterCount > 0 && (
-            <span className="bg-accent text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+            <span className="bg-text-primary text-white text-[9px] font-medium px-1.5 py-0.5 rounded-full leading-none">
               {activeFilterCount}
             </span>
           )}
@@ -563,15 +636,15 @@ export default function Shop() {
             <button
               onClick={resetFilters}
               title="Reset all filters"
-              className="flex items-center gap-1.5 text-xs font-semibold text-sale hover:underline uppercase tracking-wider py-1 px-2 border border-sale/30 rounded-xs"
+              className="flex items-center gap-1.5 text-xs font-medium text-sale hover:underline uppercase tracking-wider py-1 px-2 border border-sale/30 rounded-xs"
             >
-              <SlidersHorizontal size={13} />
+              <SlidersHorizontal size={12} />
               <span>Reset Filters</span>
-              <X size={12} strokeWidth={2.5} />
+              <X size={11} strokeWidth={2.5} />
             </button>
           ) : (
-            <div title="No filters active" className="flex items-center gap-1.5 text-xs text-text-secondary/60 uppercase tracking-wider py-1 px-2">
-              <SlidersHorizontal size={13} />
+            <div title="No filters active" className="flex items-center gap-1.5 text-xs text-text-secondary/60 tracking-wider py-1 px-2">
+              <SlidersHorizontal size={12} />
               <span>Filters</span>
             </div>
           )}
@@ -579,7 +652,7 @@ export default function Shop() {
 
         {/* Sort */}
         <div className="flex items-center gap-2 ml-auto">
-          <span className="text-[10px] uppercase tracking-wider font-bold text-text-secondary hidden sm:inline-block">
+          <span className="text-xs text-text-secondary font-normal hidden sm:inline-block">
             Sort:
           </span>
           <div className="relative">
@@ -588,13 +661,13 @@ export default function Shop() {
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
               title="Sort"
-              className="appearance-none bg-white border border-border/80 rounded-xs text-[11px] uppercase tracking-wider font-semibold py-1.5 pl-3 pr-7 focus:outline-none focus:border-accent cursor-pointer text-text-primary hover:border-accent transition-colors min-h-[38px]"
+              className="appearance-none bg-white border border-border/80 rounded-xs text-xs font-normal py-1.5 pl-2.5 pr-6 focus:outline-none focus:border-text-primary cursor-pointer text-text-primary hover:border-text-primary transition-colors"
             >
               <option value="newest">New Arrivals</option>
               <option value="price-asc">Price: Low to High</option>
               <option value="price-desc">Price: High to Low</option>
             </select>
-            <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-text-secondary" />
+            <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-text-secondary/70" />
           </div>
         </div>
       </div>
@@ -781,7 +854,8 @@ export default function Shop() {
                       <ProductImage
                         src={imgCard(product.coverImageUrl)}
                         alt={product.name}
-                        lazy={idx >= 4}
+                        lazy={idx >= 8}
+                        priority={idx < 4}
                       />
                       {/* Hover accent line */}
                       <div className="gold-accent-line z-10" />
@@ -845,198 +919,178 @@ export default function Shop() {
         </main>
       </div>
 
-      {/* MOBILE FILTER BOTTOM SHEET */}
-      <AnimatePresence>
-        {isMobileFilterOpen && (
-          <div className="fixed inset-0 z-[100] md:hidden">
-            <motion.div
-              key="filter-backdrop"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: DUR.base, ease: EASE }}
-              onClick={() => setIsMobileFilterOpen(false)}
-              className="fixed inset-0 bg-black/40"
-            />
-            <motion.div
-              key="filter-sheet"
-              initial={{ y: '100%', opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: '100%', opacity: 0 }}
-              transition={{ type: 'tween', duration: DUR.base, ease: EASE_ENTER }}
-              className="fixed bottom-0 left-0 right-0 max-h-[82vh] bg-white border-t border-border flex flex-col p-6 space-y-6 overflow-y-auto shadow-2xl"
-            >
-            <div className="flex justify-between items-center pb-3 border-b border-border">
-              <h2 className="font-heading font-black text-base uppercase tracking-widest">
-                Filters & Sort
-              </h2>
-              <button
+      {/* MOBILE FILTER BOTTOM SHEET — Portaled to document.body so it is always fixed to viewport without transform parent bugs */}
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {isMobileFilterOpen && (
+            <div className="fixed inset-0 z-[200] md:hidden">
+              <motion.div
+                key="filter-backdrop"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: DUR.base, ease: EASE }}
                 onClick={() => setIsMobileFilterOpen(false)}
-                aria-label="Close filters"
-                className="btn-icon min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-bg-subtle rounded-full"
+                className="fixed inset-0 bg-black/40"
+              />
+              <motion.div
+                key="filter-sheet"
+                initial={{ y: '100%', opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: '100%', opacity: 0 }}
+                transition={{ type: 'tween', duration: DUR.base, ease: EASE_ENTER }}
+                className="fixed bottom-0 left-0 right-0 max-h-[85vh] bg-white border-t border-border/80 flex flex-col p-5 space-y-5 overflow-y-auto shadow-2xl z-[201]"
               >
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Sort Controls (Instant mobile sorting without scrolling) */}
-            <div>
-              <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-primary mb-2.5">
-                Sort By
-              </h3>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { value: 'newest', label: 'Newest' },
-                  { value: 'price-asc', label: 'Price: Low' },
-                  { value: 'price-desc', label: 'Price: High' },
-                ].map((opt) => (
+                <div className="flex justify-between items-center pb-3 border-b border-border/70">
+                  <h2 className="font-heading font-normal text-base tracking-wide text-text-primary">
+                    Filters
+                  </h2>
                   <button
-                    key={opt.value}
-                    onClick={() => setSortBy(opt.value)}
-                    className={`py-2 px-1 text-[10px] font-bold uppercase tracking-wider rounded-xs border text-center transition-all ${
-                      sortBy === opt.value
-                        ? 'bg-text-primary text-white border-text-primary shadow-xs'
-                        : 'bg-white border-border text-text-secondary hover:border-accent'
-                    }`}
+                    onClick={() => setIsMobileFilterOpen(false)}
+                    aria-label="Close filters"
+                    className="w-8 h-8 flex items-center justify-center rounded-full text-text-secondary hover:text-text-primary hover:bg-neutral-100 transition-colors"
                   >
-                    {opt.label}
+                    <X size={18} strokeWidth={1.5} />
                   </button>
-                ))}
-              </div>
-            </div>
+                </div>
 
-            {/* Gender Filter */}
-            <div>
-              <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-primary mb-2.5">
-                Gender
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {availableGenders.map((g) => {
-                  const isActive = activeGender === g.id;
-                  return (
-                    <button
-                      key={g.id}
-                      onClick={() => handleGenderChange(g.id)}
-                      className={`px-3.5 py-1.5 border text-[11px] font-semibold uppercase tracking-wider rounded-xs transition-all ${
-                        isActive
-                          ? "filter-chip-active bg-white"
-                          : "border-border bg-white text-text-primary hover:border-accent"
-                      }`}
-                    >
-                      {g.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Collections Filter (Gender-aware) */}
-            {displayedCategories.length > 0 && (
-              <div>
-                <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-primary mb-2.5">
-                  Collections
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  {["all", ...displayedCategories].map(
-                    (c: any) => {
-                      const slug = typeof c === "string" ? c : c.slug;
-                      const label = typeof c === "string" ? "All" : c.name;
-                      const isActive = activeCategory === slug;
+                {/* Gender Filter */}
+                <div>
+                  <h3 className="text-[10px] font-semibold uppercase tracking-widest text-text-primary mb-2">
+                    Gender
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {availableGenders.map((g) => {
+                      const isActive = activeGender === g.id;
                       return (
                         <button
-                          key={slug}
-                          onClick={() => handleCategoryChange(slug)}
-                          className={`btn px-3.5 py-1.5 border text-[11px] font-semibold uppercase tracking-wider rounded-xs ${
+                          key={g.id}
+                          onClick={() => handleGenderChange(g.id)}
+                          className={`px-3 py-1.5 border text-xs font-normal rounded-xs transition-all ${
                             isActive
                               ? "filter-chip-active bg-white"
-                              : "border-border bg-white text-text-primary hover:border-accent"
+                              : "border-border/80 bg-white text-text-primary hover:border-text-primary"
                           }`}
                         >
-                          {label}
+                          {g.label}
                         </button>
                       );
-                    }
+                    })}
+                  </div>
+                </div>
+
+                {/* Collections Filter (Gender-aware) */}
+                {displayedCategories.length > 0 && (
+                  <div>
+                    <h3 className="text-[10px] font-semibold uppercase tracking-widest text-text-primary mb-2">
+                      Collections
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {["all", ...displayedCategories].map(
+                        (c: any) => {
+                          const slug = typeof c === "string" ? c : c.slug;
+                          const label = typeof c === "string" ? "All" : c.name;
+                          const isActive = activeCategory === slug;
+                          return (
+                            <button
+                              key={slug}
+                              onClick={() => handleCategoryChange(slug)}
+                              className={`px-3 py-1.5 border text-xs font-normal rounded-xs capitalize ${
+                                isActive
+                                  ? "filter-chip-active bg-white"
+                                  : "border-border/80 bg-white text-text-primary hover:border-text-primary"
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          );
+                        }
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Size Filter */}
+                <div>
+                  <h3 className="text-[10px] font-semibold uppercase tracking-widest text-text-primary mb-2.5 flex items-center justify-between">
+                    <span>Size</span>
+                    {sizesList.length > 0 && selectedSizes.length > 0 && (
+                      <button
+                        onClick={() => setSelectedSizes([])}
+                        className="text-[9px] font-semibold text-text-secondary hover:text-sale transition-colors uppercase tracking-widest"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </h3>
+                  {queryState.status === 'loading' || queryState.status === 'slow' ? (
+                    <div className="flex flex-wrap gap-2">
+                      {[1,2,3,4].map(i => (
+                        <div key={i} className="w-9 h-9 bg-border/40 animate-pulse" />
+                      ))}
+                    </div>
+                  ) : sizesList.length === 0 ? (
+                    <p className="text-[10px] text-text-secondary/50 italic">No sizes available</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {sizesList.map((size) => {
+                        const isSel = selectedSizes.includes(size);
+                        return (
+                          <button
+                            key={size}
+                            onClick={() => handleSizeToggle(size)}
+                            className={`size-btn w-9 h-9 border text-xs font-normal flex items-center justify-center rounded-xs ${isSel
+                                ? "ambient-green-gradient text-white border-transparent selected"
+                                : "border-border/80 text-text-primary bg-white hover:border-text-primary"
+                              }`}
+                          >
+                            {size}
+                          </button>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
-              </div>
-            )}
 
-            <div>
-              <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-primary mb-3 flex items-center justify-between">
-                <span>Size</span>
-                {sizesList.length > 0 && selectedSizes.length > 0 && (
+                {/* Max Price Filter */}
+                <div>
+                  <div className="flex justify-between items-center mb-2.5">
+                    <h3 className="text-[10px] font-semibold uppercase tracking-widest text-text-primary">
+                      Max Price
+                    </h3>
+                    <span className="text-xs font-medium text-text-primary">
+                      ₹{maxPrice.toLocaleString()}
+                    </span>
+                  </div>
+                  <input
+                    type="range" min="100" max="15000" step="100"
+                    value={maxPrice}
+                    onChange={(e) => setMaxPrice(parseInt(e.target.value))}
+                    className="w-full accent-[#00221A] h-1 cursor-pointer"
+                  />
+                </div>
+
+                {/* Bottom Actions */}
+                <div className="flex gap-3 pt-3 border-t border-border/70">
                   <button
-                    onClick={() => setSelectedSizes([])}
-                    className="text-[9px] font-bold text-text-secondary hover:text-sale transition-colors duration-150 uppercase tracking-widest"
+                    onClick={resetFilters}
+                    className="flex-1 py-2.5 border border-border/80 text-xs font-normal uppercase tracking-wider text-text-secondary hover:text-text-primary rounded-xs transition-colors"
                   >
-                    Clear
+                    Reset
                   </button>
-                )}
-              </h3>
-              {queryState.status === 'loading' || queryState.status === 'slow' ? (
-                <div className="flex flex-wrap gap-2">
-                  {[1,2,3,4].map(i => (
-                    <div key={i} className="w-10 h-10 bg-border/40 animate-pulse" />
-                  ))}
+                  <button
+                    onClick={() => setIsMobileFilterOpen(false)}
+                    className="flex-1 py-2.5 bg-[#00221A] hover:bg-[#063A2C] text-white text-xs font-medium uppercase tracking-wider rounded-xs transition-colors shadow-xs"
+                  >
+                    Apply
+                  </button>
                 </div>
-              ) : sizesList.length === 0 ? (
-                <p className="text-[10px] text-text-secondary/50 italic">No sizes available</p>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {sizesList.map((size) => {
-                    const isSel = selectedSizes.includes(size);
-                    return (
-                      <button
-                        key={size}
-                        onClick={() => handleSizeToggle(size)}
-                        className={`size-btn w-10 h-10 border text-xs font-semibold flex items-center justify-center ${isSel
-                            ? "ambient-green-gradient text-white border-transparent selected"
-                            : "border-border text-text-primary bg-white hover:border-accent"
-                          }`}
-                      >
-                        {size}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+              </motion.div>
             </div>
-
-            <div>
-              <div className="flex justify-between items-center mb-3">
-                <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-primary">
-                  Max Price
-                </h3>
-                <span className="text-xs font-bold text-text-primary">
-                  ₹{maxPrice.toLocaleString()}
-                </span>
-              </div>
-              <input
-                type="range" min="100" max="15000" step="100"
-                value={maxPrice}
-                onChange={(e) => setMaxPrice(parseInt(e.target.value))}
-                className="w-full accent-accent h-1 cursor-pointer"
-              />
-            </div>
-
-            <div className="flex gap-3 pt-3 border-t border-border">
-              <button
-                onClick={resetFilters}
-                className="btn btn-secondary flex-1 py-3 text-[10px] font-bold uppercase tracking-widest"
-              >
-                Reset
-              </button>
-              <button
-                onClick={() => setIsMobileFilterOpen(false)}
-                className="btn btn-primary flex-1 py-3 text-[10px] font-bold uppercase tracking-widest"
-              >
-                Apply
-              </button>
-            </div>
-          </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 }

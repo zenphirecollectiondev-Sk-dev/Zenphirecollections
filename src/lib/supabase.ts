@@ -25,6 +25,29 @@ export interface ProductWithDetails extends ProductRow {
 // -------------------------------------------------------------
 
 /**
+ * Safely delete an image from Supabase storage given its public URL.
+ */
+export async function deleteStorageImage(url: string | null | undefined) {
+  if (!url) return;
+  try {
+    // Expected format: https://[project].supabase.co/storage/v1/object/public/[bucket]/[filePath]
+    const match = url.match(/\/storage\/v1\/object\/public\/([^/]+)\/(.+)$/);
+    if (match) {
+      const bucket = match[1];
+      const filePath = match[2];
+      const { error } = await supabase.storage.from(bucket).remove([filePath]);
+      if (error) {
+        console.warn(`Failed to delete storage image: ${filePath}`, error);
+      } else {
+        console.log(`Deleted storage image: ${filePath}`);
+      }
+    }
+  } catch (err) {
+    console.warn('Error extracting or deleting storage image:', err);
+  }
+}
+
+/**
  * Fetch active products for the home page listing.
  * Only selects the 6 fields the home page actually renders — no variants
  * (never used on home), narrowed image columns (url + sort_order only).

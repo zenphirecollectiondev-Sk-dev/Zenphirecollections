@@ -151,7 +151,7 @@ function AppContent() {
 
           {/* Center Logo */}
           <div className="absolute left-1/2 transform -translate-x-1/2">
-            <Link to="/" className={`text-xl font-heading font-normal tracking-[0.2em] uppercase select-none transition-colors duration-150 ${isCustomerPage ? 'text-accent-gold hover:text-accent-gold' : 'text-text-primary hover:text-accent'}`}>
+            <Link to="/" className={`text-xl font-heading font-normal tracking-[0.2em] uppercase select-none transition-colors duration-150 ${isCustomerPage ? 'zenphire-title-animated hover:opacity-80' : 'text-text-primary hover:text-accent'}`}>
               Zenphire
             </Link>
           </div>
@@ -321,33 +321,59 @@ function AppContent() {
 
       {/* Footer (Customer Pages Only) */}
       {isCustomerPage && (
-        <footer className="relative ambient-green-gradient border-t border-white/10 py-12 px-4 mt-auto text-white/70 shadow-[0_-8px_30px_rgba(0,0,0,0.15)]">
-          <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div>
-              <h3 className="font-heading font-normal uppercase tracking-wider text-sm mb-4 text-accent-gold">Zenphire Collections</h3>
-              <p className="text-white/70 text-sm max-w-xs leading-relaxed">
-                Premium modern apparel. Redefining minimal fashion for the everyday wardrobe.
-              </p>
-            </div>
-            <div>
-              <h3 className="font-heading font-normal uppercase tracking-wider text-sm mb-4 text-accent-gold">Customer Care</h3>
-              <ul className="space-y-3 text-sm text-white/70">
-                <li><Link to="/faq" className="inline-block py-1 hover:text-accent-gold transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)]">Help & FAQ</Link></li>
-                <li><Link to="/shipping" className="inline-block py-1 hover:text-accent-gold transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)]">Shipping & Returns</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-heading font-normal uppercase tracking-wider text-sm mb-4 text-accent-gold">Legal</h3>
-              <ul className="space-y-3 text-sm text-white/70">
-                <li><Link to="/privacy" className="inline-block py-1 hover:text-accent-gold transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)]">Privacy Policy</Link></li>
-                <li><Link to="/terms" className="inline-block py-1 hover:text-accent-gold transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)]">Terms of Service</Link></li>
-              </ul>
+        <footer className="relative ambient-green-gradient border-t border-white/10 mt-auto text-white shadow-[0_-8px_30px_rgba(0,0,0,0.15)] overflow-hidden">
+          {/* Subtle gold line on top */}
+          <div className="absolute top-0 left-0 right-0 h-[1px] gold-accent-line opacity-70" />
+          
+          <div className="max-w-7xl mx-auto px-6 lg:px-8 py-16">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-12 md:gap-8">
+              
+              {/* Brand Section */}
+              <div className="md:col-span-6 lg:col-span-5 space-y-6">
+                <h3 className="font-heading text-2xl md:text-3xl tracking-[0.15em] text-accent-gold uppercase zenphire-title-animated" style={{ animationDuration: '8s' }}>
+                  Zenphire
+                </h3>
+                <p className="text-white/70 text-sm max-w-sm leading-relaxed font-sans">
+                  Premium modern apparel. Redefining minimal fashion for the everyday wardrobe with precision cuts and artisan craftsmanship.
+                </p>
+                <div className="pt-2">
+                  <p className="text-[10px] md:text-xs uppercase tracking-widest text-white/40 font-semibold">Elevate your essentials.</p>
+                </div>
+              </div>
+              
+              {/* Spacer for large screens */}
+              <div className="hidden lg:block lg:col-span-1"></div>
+
+              {/* Links Sections */}
+              <div className="md:col-span-3">
+                <h4 className="font-heading text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] mb-6 text-accent-gold">Customer Care</h4>
+                <ul className="space-y-4 text-sm text-white/70 font-medium">
+                  <li><Link to="/faq" className="inline-block hover:text-white transition-colors duration-200">Help & FAQ</Link></li>
+                  <li><Link to="/shipping" className="inline-block hover:text-white transition-colors duration-200">Shipping & Returns</Link></li>
+                </ul>
+              </div>
+              
+              <div className="md:col-span-3">
+                <h4 className="font-heading text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] mb-6 text-accent-gold">Legal</h4>
+                <ul className="space-y-4 text-sm text-white/70 font-medium">
+                  <li><Link to="/privacy" className="inline-block hover:text-white transition-colors duration-200">Privacy Policy</Link></li>
+                  <li><Link to="/terms" className="inline-block hover:text-white transition-colors duration-200">Terms of Service</Link></li>
+                </ul>
+              </div>
+              
             </div>
           </div>
-          <div className="max-w-7xl mx-auto mt-8 pt-8 border-t border-white/10 flex justify-center items-center">
-            <p className="text-xs text-white/50 text-center">
-              &copy; {new Date().getFullYear()} Zenphire Collections. All rights reserved.
-            </p>
+          
+          {/* Bottom Bar */}
+          <div className="border-t border-white/5 bg-black/20">
+            <div className="max-w-7xl mx-auto px-6 lg:px-8 py-6 flex flex-col md:flex-row justify-between items-center gap-4">
+              <p className="text-[10px] text-white/40 font-semibold tracking-widest uppercase">
+                &copy; {new Date().getFullYear()} Zenphire Collections. All rights reserved.
+              </p>
+              <div className="flex items-center gap-4 text-white/30 text-[10px] font-semibold tracking-widest uppercase">
+                <span>Crafted for the modern wardrobe</span>
+              </div>
+            </div>
           </div>
         </footer>
       )}

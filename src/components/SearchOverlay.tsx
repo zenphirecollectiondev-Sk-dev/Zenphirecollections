@@ -130,7 +130,7 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Search Catalog"
+        aria-label="Search Zenphire"
         className="fixed inset-0 z-[200] flex flex-col justify-start sm:items-center overflow-y-auto"
       >
         {/* Soft, airy frosted backdrop */}
@@ -157,9 +157,9 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
           {/* ── Top Bar: Search Input Header ── */}
           <div className="flex-shrink-0 px-5 sm:px-6 pt-5 pb-4 border-b border-neutral-100 bg-white">
             {/* Header label & close affordance */}
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] tracking-[0.25em] uppercase font-sans font-semibold text-neutral-400">
-                Search Catalog
+                Search Zenphire
               </span>
               <button
                 onClick={onClose}
@@ -170,16 +170,10 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
               </button>
             </div>
 
-            {/* Input Row — clean white surface with restrained gold focus ring */}
-            <div
-              className={`flex items-center gap-3.5 px-4 py-3 rounded-xl border transition-all duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] bg-white ${
-                isFocused
-                  ? 'border-[#B8975A] ring-2 ring-[#B8975A]/20 shadow-[0_2px_12px_rgba(184,151,90,0.08)]'
-                  : 'border-neutral-200 hover:border-neutral-300'
-              }`}
-            >
+            {/* Input Row — clean, borderless search line without inner box */}
+            <div className="flex items-center gap-3 py-1.5 px-0.5 bg-transparent">
               <Search
-                size={18}
+                size={19}
                 strokeWidth={1.75}
                 className={`flex-shrink-0 transition-colors duration-150 ${
                   isFocused ? 'text-[#B8975A]' : 'text-neutral-400'
@@ -199,8 +193,8 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                   }
                 }}
                 placeholder="Search collections, linen, jackets, cargo..."
-                className="w-full bg-transparent text-sm sm:text-base font-normal text-neutral-900 focus:outline-none placeholder:text-neutral-400 placeholder:font-light"
-                style={{ caretColor: '#B8975A' }}
+                className="w-full bg-transparent text-sm sm:text-base font-normal text-neutral-900 border-none outline-none focus:outline-none focus:ring-0 placeholder:text-neutral-400 placeholder:font-light shadow-none"
+                style={{ caretColor: '#B8975A', boxShadow: 'none' }}
               />
 
               {/* Clear button */}

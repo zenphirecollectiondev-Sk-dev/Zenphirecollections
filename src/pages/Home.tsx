@@ -108,12 +108,32 @@ export default function Home() {
   };
 
   const bestSellersScrollRef = useRef<HTMLDivElement>(null);
+  const genderScrollRef = useRef<HTMLDivElement>(null);
+
+  const scrollCategories = (direction: 'left' | 'right') => {
+    if (categoryScrollRef.current) {
+      const container = categoryScrollRef.current;
+      const firstCard = container.querySelector('.category-card') as HTMLElement;
+      const offset = firstCard ? firstCard.offsetWidth : 320;
+      container.scrollBy({ left: direction === 'left' ? -offset : offset, behavior: 'smooth' });
+    }
+  };
+
+  const scrollGenderCollections = (direction: 'left' | 'right') => {
+    if (genderScrollRef.current) {
+      const container = genderScrollRef.current;
+      const firstCard = container.querySelector('.product-card') as HTMLElement;
+      const offset = firstCard ? (firstCard.offsetWidth + 24) : 320;
+      container.scrollBy({ left: direction === 'left' ? -offset : offset, behavior: 'smooth' });
+    }
+  };
 
   const scrollBestSellers = (direction: 'left' | 'right') => {
     if (bestSellersScrollRef.current) {
-      const { scrollLeft, clientWidth } = bestSellersScrollRef.current;
-      const offset = direction === 'left' ? -clientWidth * 0.6 : clientWidth * 0.6;
-      bestSellersScrollRef.current.scrollTo({ left: scrollLeft + offset, behavior: 'smooth' });
+      const container = bestSellersScrollRef.current;
+      const firstCard = container.querySelector('.product-card') as HTMLElement;
+      const offset = firstCard ? (firstCard.offsetWidth + 24) : 320;
+      container.scrollBy({ left: direction === 'left' ? -offset : offset, behavior: 'smooth' });
     }
   };
 
@@ -323,19 +343,36 @@ export default function Home() {
       {/* ── 3. SHOP BY CATEGORY ── */}
       {sortedCategories.length > 0 && (
         <section className="max-w-7xl mx-auto py-16 border-t border-border anim-fade-up">
-          <div className="px-4 sm:px-6 lg:px-8 mb-10 text-center md:text-left">
-            <span className="text-[10px] uppercase tracking-[0.3em] text-accent-gold font-bold block mb-1">
-              COLLECTIONS
-            </span>
-            <h2 className="text-xl font-mending font-medium tracking-widest uppercase text-text-primary">
-              SHOP BY CATEGORY
-            </h2>
+          <div className="px-4 sm:px-6 lg:px-8 mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4">
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.25em] subheading-primary font-bold">Collections</p>
+              <h2 className="heading-primary text-2xl md:text-3xl font-mending font-medium mt-1 inline-block">
+                Shop by Category
+              </h2>
+            </div>
+            {/* Desktop-only sliding arrows — strictly hidden on mobile */}
+            <div className="hidden md:flex items-center gap-2">
+              <button
+                onClick={() => scrollCategories('left')}
+                className="btn-icon w-9 h-9 rounded-full border border-border flex items-center justify-center text-text-secondary hover:text-accent-gold hover:border-accent-gold transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] focus:outline-none cursor-pointer"
+                aria-label="Scroll categories left"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <button
+                onClick={() => scrollCategories('right')}
+                className="btn-icon w-9 h-9 rounded-full border border-border flex items-center justify-center text-text-secondary hover:text-accent-gold hover:border-accent-gold transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] focus:outline-none cursor-pointer"
+                aria-label="Scroll categories right"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
           </div>
 
           <div
             ref={categoryScrollRef}
             onScroll={handleCategoryScroll}
-            className="flex overflow-x-auto snap-x snap-mandatory scrollbar-none scroll-smooth -space-x-3 md:-space-x-4 px-[10vw] pb-6"
+            className="flex overflow-x-auto snap-x snap-mandatory scrollbar-none scroll-smooth -space-x-3 md:-space-x-4 px-[10vw] md:px-4 sm:md:px-6 lg:md:px-8 pb-6"
             style={{ scrollPadding: '0 10vw' }}
           >
             {sortedCategories.map((cat, idx) => {
@@ -354,7 +391,7 @@ export default function Home() {
                 <Link
                   key={cat.id}
                   to={`/shop?category=${cat.slug}`}
-                  className="category-card group block relative flex-shrink-0 w-60 md:w-80 snap-center"
+                  className="category-card group block relative flex-shrink-0 w-60 md:w-80 snap-center transition-all duration-300"
                   style={{
                     opacity: isActive ? 1 : 0.75,
                     transform: isActive ? 'scale(1.0)' : 'scale(0.92)',
@@ -383,14 +420,14 @@ export default function Home() {
                   </div>
 
                   <div className="mt-4 text-center">
-                    <h3 className="text-xs uppercase tracking-widest font-medium text-neutral-800 transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] group-hover:text-accent-gold">
+                    <h3 className="text-xs md:text-sm uppercase tracking-widest font-heading font-bold text-text-primary transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] group-hover:text-accent-gold">
                       {cat.name}
                     </h3>
                   </div>
                 </Link>
               );
             })}
-            <div className="flex-shrink-0 w-[10vw]" />
+            <div className="flex-shrink-0 w-[10vw] md:w-4" />
           </div>
         </section>
       )}
@@ -591,49 +628,49 @@ export default function Home() {
               ))}
             </div>
 
-            {/* DESKTOP: horizontal scroll */}
-            <div
-              ref={bestSellersScrollRef}
-              className="hidden md:flex overflow-x-auto custom-scrollbar gap-0 pl-4 sm:pl-6 lg:px-8 pb-5 scroll-smooth"
-            >
-              {bestSellers.map((product: any) => (
-                <Link
-                  key={product.id}
-                  to={`/product/${product.slug}`}
-                  className="group product-card flex-shrink-0 flex flex-col pr-4 md:pr-6"
-                  style={{ width: 'clamp(200px, 26vw, 300px)' }}
-                >
-                  <div className="aspect-[3/4] w-full bg-bg-subtle overflow-hidden border border-border relative">
-                    {product.product_images?.[0]?.url ? (
-                      <img
-                        src={imgCard(product.product_images[0].url)}
-                        alt={product.name}
-                        loading="lazy"
-                        decoding="async"
-                        className="card-img w-full h-full object-cover object-top block relative z-10 group-hover:scale-105"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-bg-subtle">
-                        <Image size={20} className="text-text-secondary/20" />
-                      </div>
-                    )}
-                    <div className="gold-accent-line" />
-                    <button
-                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleWishlist(product.id); }}
-                      aria-label="Toggle Wishlist"
-                      className={`wishlist-btn absolute top-2.5 right-2.5 min-w-[36px] min-h-[36px] flex items-center justify-center p-2 bg-white/90 border border-border/60 rounded-full z-10 shadow-xs ${heartId === product.id ? 'anim-heart-pop' : ''}`}
-                    >
-                      <Heart size={14} className={isWishlisted(product.id) ? 'fill-sale stroke-sale' : 'stroke-text-primary'} />
-                    </button>
-                  </div>
-                  <div className="p-3.5 space-y-1">
-                    <p className="text-[9px] uppercase tracking-widest text-text-secondary font-bold">Zenphire</p>
-                    <h3 className="text-xs font-medium text-text-primary group-hover:text-accent-gold transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] truncate">{product.name}</h3>
-                    <p className="text-xs font-semibold text-text-primary">₹{Number(product.base_price || 0).toFixed(2)}</p>
-                  </div>
-                </Link>
-              ))}
-              <div className="flex-shrink-0 w-20 md:w-32" />
+            {/* DESKTOP: horizontal scroll aligned with Gender Collections */}
+            <div className="hidden md:block max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div
+                ref={bestSellersScrollRef}
+                className="flex overflow-x-auto custom-scrollbar gap-4 md:gap-6 pb-5 scroll-smooth"
+              >
+                {bestSellers.map((product: any) => (
+                  <Link
+                    key={product.id}
+                    to={`/product/${product.slug}`}
+                    className="group product-card flex-shrink-0 w-64 md:w-80 snap-start block bg-bg-subtle border border-border overflow-hidden"
+                  >
+                    <div className="aspect-[3/4] w-full bg-bg-subtle overflow-hidden relative">
+                      {product.product_images?.[0]?.url ? (
+                        <img
+                          src={imgCard(product.product_images[0].url)}
+                          alt={product.name}
+                          loading="lazy"
+                          decoding="async"
+                          className="card-img w-full h-full object-cover object-top block relative z-10 group-hover:scale-105"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-bg-subtle">
+                          <Image size={20} className="text-text-secondary/20" />
+                        </div>
+                      )}
+                      <div className="gold-accent-line" />
+                      <button
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleWishlist(product.id); }}
+                        aria-label="Toggle Wishlist"
+                        className={`wishlist-btn absolute top-2.5 right-2.5 min-w-[36px] min-h-[36px] flex items-center justify-center p-2 bg-white/90 border border-border/60 rounded-full z-10 shadow-xs ${heartId === product.id ? 'anim-heart-pop' : ''}`}
+                      >
+                        <Heart size={14} className={isWishlisted(product.id) ? 'fill-sale stroke-sale' : 'stroke-text-primary'} />
+                      </button>
+                    </div>
+                    <div className="p-3.5 space-y-1">
+                      <p className="text-[9px] uppercase tracking-widest text-text-secondary font-bold">Zenphire</p>
+                      <h3 className="text-xs font-medium text-text-primary group-hover:text-accent-gold transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] truncate">{product.name}</h3>
+                      <p className="text-xs font-semibold text-text-primary">₹{Number(product.base_price || 0).toFixed(2)}</p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
             </div>
           </div>
         </section>

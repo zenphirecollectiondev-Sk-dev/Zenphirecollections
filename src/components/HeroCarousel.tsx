@@ -483,8 +483,8 @@ export default function HeroCarousel({
               {String(activeIdx + 1).padStart(2, '0')} / {String(slides.length).padStart(2, '0')}
             </span>
 
-            {/* Arrow buttons (desktop) */}
-            <div className="flex items-center gap-1.5 ml-auto md:ml-4">
+            {/* Arrow buttons (desktop only) */}
+            <div className="hidden md:flex items-center gap-1.5 ml-auto md:ml-4">
               <button
                 onClick={goPrev}
                 aria-label="Previous slide"

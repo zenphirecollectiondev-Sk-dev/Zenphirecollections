@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, deleteStorageImage } from '../lib/supabase';
 import { dataCache } from '../lib/dataCache';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -892,12 +892,31 @@ export default function Admin() {
           deleteOldStorageAsset(previousUrl);
         }
         assignUrl(publicUrl);
+
+        // Auto-save the new mockup to the database instantly
+        if (!isSpecificCategory && type !== 'category' && type !== 'sizeguide') {
+          const fieldMap: Record<string, string> = {
+            edit: 'the_edit_image_url',
+            men: 'men_collection_image_url',
+            women: 'women_collection_image_url',
+            unisex: 'unisex_collection_image_url',
+            shirt: 'shirt_category_image_url',
+            tshirt: 'tshirt_category_image_url',
+            coords: 'coords_category_image_url',
+            pants: 'pants_category_image_url',
+          };
+          const dbField = fieldMap[type];
+          if (dbField) {
+            supabase.from('homepage_config' as any).update({ [dbField]: publicUrl }).eq('id', 'global').then();
+          }
+        }
+
         if (isSpecificCategory) {
           triggerNotification(`${readableName} mockup updated and saved successfully!`);
         } else if (type === 'category') {
           triggerNotification('Category cover image uploaded. Click "Save Category" to persist.');
         } else {
-          triggerNotification(`${readableName} image uploaded! Click "Save Homepage Settings" to persist.`);
+          triggerNotification(`${readableName} image uploaded and saved automatically!`);
         }
       } else {
         // Safe compressed Data URL fallback
@@ -1254,6 +1273,19 @@ export default function Admin() {
       setHeroSlidesList(prev => {
         const copy = [...prev];
         copy[slideIdx] = { ...copy[slideIdx], url: finalUrl };
+        
+        // Auto-save to DB instantly
+        if (publicUrl) {
+          const validSlides = copy.filter(s => s.url && s.url.trim());
+          const combinedHeroUrl = validSlides.map(s => s.url.trim()).join(':::') || null;
+          const combinedHeroPos = validSlides.map(s => s.position || 'center').join(':::') || 'center';
+          supabase.from('homepage_config' as any).update({
+            hero_slides: validSlides.length > 0 ? validSlides : copy,
+            hero_image_url: combinedHeroUrl,
+            hero_image_position: combinedHeroPos
+          }).eq('id', 'global').then();
+        }
+
         return copy;
       });
       if (slideIdx === 0) setHeroImageUrl(finalUrl);
@@ -1639,7 +1671,21 @@ export default function Admin() {
           .eq('id', productId);
         if (updateErr) throw new Error(`Failed to update product: ${updateErr.message}`);
 
-        // 2. Delete existing images (with error check)
+        // 1.5. Fetch existing images to delete the removed ones from storage
+        const { data: existingImages } = await supabase
+          .from('product_images')
+          .select('url')
+          .eq('product_id', productId);
+        
+        if (existingImages) {
+          const newImageUrls = prodImages.map(img => img.url);
+          const imagesToDelete = existingImages.filter(img => !newImageUrls.includes(img.url));
+          for (const img of imagesToDelete) {
+            await deleteStorageImage(img.url);
+          }
+        }
+
+        // 2. Delete existing images from DB (with error check)
         const { error: delImgErr } = await supabase
           .from('product_images')
           .delete()
@@ -1731,6 +1777,19 @@ export default function Admin() {
   const handleDeleteProduct = async (id: string) => {
     if (!confirm('Are you sure you want to delete this product? All variants and images will be lost.')) return;
     try {
+      // 1. Fetch images to delete from storage
+      const { data: existingImages } = await supabase
+        .from('product_images')
+        .select('url')
+        .eq('product_id', id);
+
+      if (existingImages) {
+        for (const img of existingImages) {
+          await deleteStorageImage(img.url);
+        }
+      }
+
+      // 2. Delete product from DB
       const { error } = await supabase.from('products').delete().eq('id', id);
       if (error) throw error;
       triggerNotification('Product deleted successfully');
@@ -1807,8 +1866,15 @@ export default function Admin() {
   const handleDeleteCategory = async (id: string) => {
     if (!confirm('Are you sure you want to delete this category?')) return;
     try {
+      const categoryToDelete = categories.find(c => c.id === id);
+      
       const { error } = await supabase.from('categories').delete().eq('id', id);
       if (error) throw error;
+
+      if (categoryToDelete?.image_url) {
+        await deleteOldStorageAsset(categoryToDelete.image_url);
+      }
+
       dataCache.delete('categories');
       dataCache.invalidate('categories');
       triggerNotification('Category deleted successfully');

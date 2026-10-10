@@ -156,8 +156,10 @@ export function useCategoryProducts({
     },
     // Disable the query entirely while categories/occasions are still loading
     enabled: !isAwaitingCategories && !isAwaitingOccasion,
-    staleTime: (resolvedCategoryIds || resolvedProductIds) ? 0 : 5 * 60 * 1000,
-    gcTime: (resolvedCategoryIds || resolvedProductIds) ? 30 * 1000 : 5 * 60 * 1000,
+    // 3 minutes staleTime for all queries — cached data renders instantly on repeat visits,
+    // a background re-fetch only runs if the data is actually stale
+    staleTime: 3 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
     placeholderData: keepPreviousData,
     retry: 2,
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10_000),
