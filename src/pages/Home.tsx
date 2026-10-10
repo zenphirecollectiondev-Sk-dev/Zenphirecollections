@@ -108,22 +108,12 @@ export default function Home() {
   };
 
   const bestSellersScrollRef = useRef<HTMLDivElement>(null);
-  const genderScrollRef = useRef<HTMLDivElement>(null);
 
   const scrollCategories = (direction: 'left' | 'right') => {
     if (categoryScrollRef.current) {
       const container = categoryScrollRef.current;
       const firstCard = container.querySelector('.category-card') as HTMLElement;
       const offset = firstCard ? firstCard.offsetWidth : 320;
-      container.scrollBy({ left: direction === 'left' ? -offset : offset, behavior: 'smooth' });
-    }
-  };
-
-  const scrollGenderCollections = (direction: 'left' | 'right') => {
-    if (genderScrollRef.current) {
-      const container = genderScrollRef.current;
-      const firstCard = container.querySelector('.product-card') as HTMLElement;
-      const offset = firstCard ? (firstCard.offsetWidth + 24) : 320;
       container.scrollBy({ left: direction === 'left' ? -offset : offset, behavior: 'smooth' });
     }
   };
