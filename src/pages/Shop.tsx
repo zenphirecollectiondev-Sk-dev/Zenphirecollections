@@ -368,6 +368,67 @@ export default function Shop() {
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
   const [page, setPage] = useState(0);
 
+  // -- Dynamic Product Filters (configured in Admin) -------------------------
+  const [allProductFilters, setAllProductFilters] = useState<any[]>([]);
+  const [selectedDynamicFilters, setSelectedDynamicFilters] = useState<Record<string, string[]>>({});
+  const [productFilterValues, setProductFilterValues] = useState<Record<string, string[]>>({});
+
+  // 1. Fetch active product filters on mount
+  useEffect(() => {
+    (supabase as any)
+      .from('product_filters')
+      .select(`
+        id,
+        name,
+        slug,
+        filter_type,
+        gender_scope,
+        is_active,
+        sort_order,
+        filter_options ( id, filter_id, value, sort_order ),
+        filter_category_scope ( category_id )
+      `)
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+      .then(({ data, error }: any) => {
+        if (!error && data) {
+          setAllProductFilters(data);
+        }
+      })
+      .catch((err: any) => console.warn('Product filters not loaded yet:', err));
+  }, []);
+
+  // 2. Filter visible dynamic filters based on active category & active gender
+  const visibleDynamicFilters = useMemo(() => {
+    if (allProductFilters.length === 0) return [];
+
+    let currentCatId: string | null = null;
+    if (activeCategory !== 'all') {
+      const match = categories.find((c: any) => c.slug === activeCategory || c.name?.toLowerCase() === activeCategory.toLowerCase());
+      if (match) currentCatId = match.id;
+    }
+
+    return allProductFilters.filter((filter) => {
+      // 1. Gender scope check
+      if (activeGender !== 'all') {
+        const targetGender = activeGender.toLowerCase();
+        const gScope = filter.gender_scope || [];
+        if (gScope.length > 0 && !gScope.map((g: string) => g.toLowerCase()).includes(targetGender)) {
+          return false;
+        }
+      }
+
+      // 2. Category scope check
+      const scopes = filter.filter_category_scope || [];
+      if (scopes.length === 0) return true;
+      if (!currentCatId) return true;
+      const scopeIds = new Set(scopes.map((s: any) => s.category_id));
+      if (scopeIds.has(currentCatId)) return true;
+      const familyIds = categories.filter((c: any) => c.parent_category_id === currentCatId).map((c: any) => c.id);
+      return familyIds.some(fid => scopeIds.has(fid));
+    });
+  }, [allProductFilters, activeCategory, activeGender, categories]);
+
   // Lock body scroll when mobile filter is open
   useEffect(() => {
     if (!isMobileFilterOpen) return;
@@ -460,6 +521,36 @@ export default function Shop() {
     productIds: occasionProductIds,
     page,
   });
+
+  // 3. Fetch product filter assignments whenever queryState changes
+  useEffect(() => {
+    if (queryState.status !== 'success') {
+      setProductFilterValues({});
+      return;
+    }
+    const products = queryState.products;
+    if (products.length === 0) {
+      setProductFilterValues({});
+      return;
+    }
+    const pids = products.map(p => p.id);
+    (supabase as any)
+      .from('product_filter_values')
+      .select('product_id, filter_option_id')
+      .in('product_id', pids)
+      .then(({ data, error }: any) => {
+        if (!error && data) {
+          const map: Record<string, string[]> = {};
+          data.forEach((row: any) => {
+            if (!map[row.product_id]) map[row.product_id] = [];
+            map[row.product_id].push(row.filter_option_id);
+          });
+          setProductFilterValues(map);
+        }
+      })
+      .catch((err: any) => console.warn('Product filter values error:', err));
+  }, [queryState]);
+
   const filteredProducts = useMemo((): GridProduct[] => {
     if (queryState.status !== "success") return [];
     let result = [...queryState.products];
@@ -470,10 +561,19 @@ export default function Shop() {
         selectedSizes.some((s) => p.availableSizes.includes(s))
       );
     }
+    // Dynamic DB filters filtering
+    Object.entries(selectedDynamicFilters).forEach(([_, optIds]) => {
+      if (optIds.length > 0) {
+        result = result.filter(p => {
+          const assigned = productFilterValues[p.id] || [];
+          return optIds.some(id => assigned.includes(id));
+        });
+      }
+    });
     if (sortBy === "price-asc") result.sort((a, b) => a.base_price - b.base_price);
     else if (sortBy === "price-desc") result.sort((a, b) => b.base_price - a.base_price);
     return result;
-  }, [queryState, maxPrice, sortBy, selectedSizes]);
+  }, [queryState, maxPrice, sortBy, selectedSizes, selectedDynamicFilters, productFilterValues]);
 
   // -- Sane page title -------------------------------------------------------
   const pageTitle = shopTitle;
@@ -535,6 +635,21 @@ export default function Shop() {
     );
   };
 
+  const handleDynamicFilterToggle = (filterId: string, optionId: string) => {
+    setSelectedDynamicFilters(prev => {
+      const current = prev[filterId] || [];
+      const updated = current.includes(optionId)
+        ? current.filter(id => id !== optionId)
+        : [...current, optionId];
+      if (updated.length === 0) {
+        const copy = { ...prev };
+        delete copy[filterId];
+        return copy;
+      }
+      return { ...prev, [filterId]: updated };
+    });
+  };
+
   const resetFilters = () => {
     const newParams = new URLSearchParams(searchParams);
     newParams.delete("category");
@@ -542,6 +657,7 @@ export default function Shop() {
     newParams.delete("occasion");
     setSearchParams(newParams);
     setSelectedSizes([]);
+    setSelectedDynamicFilters({});
     setMaxPrice(15000);
     setSortBy("newest");
     setPage(0);
@@ -583,11 +699,14 @@ export default function Shop() {
     }
   }, [sizesList, selectedSizes]);
 
+  const dynamicFilterCount = Object.values(selectedDynamicFilters).reduce((acc, list) => acc + list.length, 0);
+
   const activeFilterCount =
     (selectedSizes.length > 0 ? selectedSizes.length : 0) +
     (activeCategory !== "all" ? 1 : 0) +
     (activeGender !== "all" ? 1 : 0) +
-    (maxPrice < 15000 ? 1 : 0);
+    (maxPrice < 15000 ? 1 : 0) +
+    dynamicFilterCount;
 
   const resultCount =
     queryState.status === "success" ? filteredProducts.length : null;
@@ -730,6 +849,50 @@ export default function Shop() {
               </ul>
             </div>
           )}
+
+          {/* Dynamic Category-Scoped Filters (Fit, Fabric, Pattern, etc.) */}
+          {visibleDynamicFilters.map((filter) => {
+            const options = (filter.filter_options || []).sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0));
+            if (options.length === 0) return null;
+            const selected = selectedDynamicFilters[filter.id] || [];
+            return (
+              <div key={filter.id}>
+                <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-primary mb-3 pb-2 border-b border-border flex items-center justify-between">
+                  <span>{filter.name}</span>
+                  {selected.length > 0 && (
+                    <button
+                      onClick={() => setSelectedDynamicFilters(prev => {
+                        const next = { ...prev };
+                        delete next[filter.id];
+                        return next;
+                      })}
+                      className="text-[9px] font-bold text-text-secondary hover:text-sale transition-colors duration-150 uppercase tracking-widest"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </h3>
+                <div className="flex flex-wrap gap-1.5">
+                  {options.map((opt: any) => {
+                    const isSel = selected.includes(opt.id);
+                    return (
+                      <button
+                        key={opt.id}
+                        onClick={() => handleDynamicFilterToggle(filter.id, opt.id)}
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-xs border transition-all duration-150 ${
+                          isSel
+                            ? "bg-text-primary text-white border-text-primary shadow-xs"
+                            : "border-border text-text-secondary hover:text-text-primary hover:border-accent bg-white"
+                        }`}
+                      >
+                        {opt.value}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
 
           <div>
             <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-primary mb-4 pb-2 border-b border-border flex items-center justify-between">
@@ -923,7 +1086,14 @@ export default function Shop() {
       {typeof document !== 'undefined' && createPortal(
         <AnimatePresence>
           {isMobileFilterOpen && (
-            <div className="fixed inset-0 z-[200] md:hidden">
+            <motion.div
+              key="mobile-filter-wrapper"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: DUR.base, ease: EASE }}
+              className="fixed inset-0 z-[200] md:hidden"
+            >
               <motion.div
                 key="filter-backdrop"
                 initial={{ opacity: 0 }}
@@ -1010,6 +1180,52 @@ export default function Shop() {
                   </div>
                 )}
 
+                {/* Dynamic Category-Scoped Filters */}
+                {visibleDynamicFilters.map((filter) => {
+                  const options = (filter.filter_options || []).sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0));
+                  if (options.length === 0) return null;
+                  const selected = selectedDynamicFilters[filter.id] || [];
+                  return (
+                    <div key={filter.id}>
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-[10px] font-semibold uppercase tracking-widest text-text-primary">
+                          {filter.name}
+                        </h3>
+                        {selected.length > 0 && (
+                          <button
+                            onClick={() => setSelectedDynamicFilters(prev => {
+                              const next = { ...prev };
+                              delete next[filter.id];
+                              return next;
+                            })}
+                            className="text-[9px] font-semibold text-text-secondary hover:text-sale transition-colors uppercase tracking-widest"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {options.map((opt: any) => {
+                          const isSel = selected.includes(opt.id);
+                          return (
+                            <button
+                              key={opt.id}
+                              onClick={() => handleDynamicFilterToggle(filter.id, opt.id)}
+                              className={`px-3 py-1.5 border text-xs font-normal rounded-xs capitalize ${
+                                isSel
+                                  ? "filter-chip-active bg-white"
+                                  : "border-border/80 bg-white text-text-primary hover:border-text-primary"
+                              }`}
+                            >
+                              {opt.value}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+
                 {/* Size Filter */}
                 <div>
                   <h3 className="text-[10px] font-semibold uppercase tracking-widest text-text-primary mb-2.5 flex items-center justify-between">
@@ -1086,7 +1302,7 @@ export default function Shop() {
                   </button>
                 </div>
               </motion.div>
-            </div>
+            </motion.div>
           )}
         </AnimatePresence>,
         document.body

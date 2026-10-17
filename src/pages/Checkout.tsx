@@ -606,13 +606,20 @@ export default function Checkout() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-start">
 
           {/* ─────────────────────────────────────────────────────────────
-              LEFT COLUMN: Form / Review Content
+              LEFT COLUMN: Form / Review Content with Step Transitions
              ───────────────────────────────────────────────────────────── */}
           <div className="lg:col-span-7 xl:col-span-8 space-y-6">
-
-            {/* ── STEP 1: SHIPPING ADDRESS ── */}
-            {step === 'SHIPPING' && (
-              <form onSubmit={handleShippingSubmit} className="space-y-6">
+            <AnimatePresence mode="wait" initial={false}>
+              {/* ── STEP 1: SHIPPING ADDRESS ── */}
+              {step === 'SHIPPING' && (
+                <motion.div
+                  key="checkout-step-shipping"
+                  initial={{ opacity: 0, x: -12 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 12 }}
+                  transition={{ duration: 0.22, ease: EASE_ENTER }}
+                >
+                  <form onSubmit={handleShippingSubmit} className="space-y-6">
                 <div>
                   <h2 className="text-sm font-heading font-medium uppercase tracking-wider text-text-primary mb-1">
                     Shipping Address
@@ -881,11 +888,19 @@ export default function Checkout() {
                   </button>
                 </div>
               </form>
-            )}
+            </motion.div>
+          )}
 
-            {/* ── STEP 2: REVIEW & PAYMENT ── */}
-            {step === 'REVIEW' && (
-              <div className="space-y-5">
+          {/* ── STEP 2: REVIEW & PAYMENT ── */}
+          {step === 'REVIEW' && (
+            <motion.div
+              key="checkout-step-review"
+              initial={{ opacity: 0, x: 12 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -12 }}
+              transition={{ duration: 0.22, ease: EASE_ENTER }}
+              className="space-y-5"
+            >
                 <div>
                   <h2 className="text-sm font-heading font-semibold uppercase tracking-wider text-text-primary mb-1">
                     Review & Pay
@@ -1030,9 +1045,10 @@ export default function Checkout() {
                     )}
                   </button>
                 </div>
-              </div>
+              </motion.div>
             )}
-          </div>
+          </AnimatePresence>
+        </div>
 
           {/* ─────────────────────────────────────────────────────────────
               RIGHT COLUMN: Desktop Sticky Order Summary
@@ -1233,13 +1249,43 @@ export default function Checkout() {
       )}
 
       {/* Payment processing overlay — shown while verifying payment server-side */}
-      {paymentLoading && (
-        <div className="fixed inset-0 z-[400] flex flex-col items-center justify-center bg-black/60 backdrop-blur-xs">
-          <RefreshCw size={28} className="animate-spin text-white mb-3" />
-          <p className="text-white text-xs font-semibold tracking-wider uppercase">Verifying Payment…</p>
-          <p className="text-white/60 text-[11px] mt-1">Please do not close this window</p>
-        </div>
-      )}
+      <AnimatePresence>
+        {paymentLoading && (
+          <motion.div
+            key="payment-loading-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.22, ease: EASE }}
+            className="fixed inset-0 z-[400] flex flex-col items-center justify-center bg-black/65 backdrop-blur-sm p-4 select-none"
+          >
+            <motion.div
+              key="payment-loading-card"
+              initial={{ opacity: 0, scale: 0.94, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.94, y: 12 }}
+              transition={{ duration: 0.25, ease: EASE_ENTER }}
+              className="bg-white rounded-2xl p-7 max-w-sm w-full text-center shadow-2xl border border-border/80 flex flex-col items-center space-y-4"
+            >
+              <div className="w-14 h-14 rounded-full ambient-green-gradient flex items-center justify-center text-accent-gold shadow-md">
+                <RefreshCw size={24} className="animate-spin text-accent-gold" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="font-heading text-sm font-semibold uppercase tracking-wider text-text-primary">
+                  Processing Payment
+                </h3>
+                <p className="text-xs text-text-secondary leading-relaxed">
+                  Connecting to secure payment gateway. Please do not refresh or close this window.
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5 text-[10px] text-emerald-700 font-semibold tracking-wider uppercase pt-2 border-t border-border/50 w-full justify-center">
+                <ShieldCheck size={13} className="text-emerald-600" />
+                <span>256-Bit SSL Encrypted</span>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

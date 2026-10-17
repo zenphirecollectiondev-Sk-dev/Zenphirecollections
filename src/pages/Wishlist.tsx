@@ -4,6 +4,8 @@ import { Heart, Trash2, ArrowRight, Image } from 'lucide-react';
 import { useWishlistStore } from '../store/useWishlistStore';
 import { getProductsByIds } from '../lib/supabase';
 import { imgCard } from '../lib/imgTransform';
+import { motion, AnimatePresence } from 'framer-motion';
+import { EASE } from '../lib/motion';
 
 export default function Wishlist() {
   const { productIds, toggleWishlist } = useWishlistStore();
@@ -82,58 +84,67 @@ export default function Wishlist() {
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 sm:gap-4 md:gap-8">
-          {wishlistProducts.map((product) => (
-            <div key={product.id} className="group product-card block bg-bg-subtle border border-border overflow-hidden">
-              <div className="aspect-[3/4] w-full bg-bg-subtle overflow-hidden relative">
-                <Link to={`/product/${product.slug}`}>
-                  {product.product_images?.[0]?.url ? (
-                    <img
-                      src={imgCard(product.product_images[0].url)}
-                      alt={product.name}
-                      loading="lazy"
-                      decoding="async"
-                      className="card-img w-full h-full object-cover object-top block relative z-10"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-bg-subtle">
-                      <Image size={24} className="text-text-secondary/20" />
-                    </div>
-                  )}
-                </Link>
-                <div className="gold-accent-line" />
-                <button
-                  onClick={() => toggleWishlist(product.id)}
-                  aria-label="Remove from wishlist"
-                  className="wishlist-btn absolute top-2.5 right-2.5 min-w-[36px] min-h-[36px] flex items-center justify-center p-2 bg-white/90 text-sale border border-border/60 rounded-full shadow-xs"
-                >
-                  <Trash2 size={15} className="stroke-[1.5]" />
-                </button>
-              </div>
-
-              {/* Text info */}
-              <div className="p-3.5 space-y-1">
-                <p className="text-[9px] uppercase tracking-widest text-text-secondary font-bold">
-                  Zenphire
-                </p>
-                <Link to={`/product/${product.slug}`}>
-                  <h3 className="text-xs font-medium text-text-primary group-hover:text-accent-gold transition-colors duration-150 truncate">
-                    {product.name}
-                  </h3>
-                </Link>
-                <div className="flex justify-between items-center pt-0.5">
-                  <p className="text-xs font-semibold text-text-primary">
-                    ₹{Number(product.base_price || 0).toFixed(2)}
-                  </p>
-                  <Link
-                    to={`/product/${product.slug}`}
-                    className="text-[10px] uppercase tracking-wider font-bold text-text-secondary hover:text-text-primary transition-colors duration-150 underline underline-offset-4"
-                  >
-                    View
+          <AnimatePresence initial={false}>
+            {wishlistProducts.map((product) => (
+              <motion.div
+                key={product.id}
+                layout
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.92, transition: { duration: 0.2, ease: EASE } }}
+                className="group product-card block bg-bg-subtle border border-border overflow-hidden"
+              >
+                <div className="aspect-[3/4] w-full bg-bg-subtle overflow-hidden relative">
+                  <Link to={`/product/${product.slug}`}>
+                    {product.product_images?.[0]?.url ? (
+                      <img
+                        src={imgCard(product.product_images[0].url)}
+                        alt={product.name}
+                        loading="lazy"
+                        decoding="async"
+                        className="card-img w-full h-full object-cover object-top block relative z-10"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-bg-subtle">
+                        <Image size={24} className="text-text-secondary/20" />
+                      </div>
+                    )}
                   </Link>
+                  <div className="gold-accent-line" />
+                  <button
+                    onClick={() => toggleWishlist(product.id)}
+                    aria-label="Remove from wishlist"
+                    className="wishlist-btn absolute top-2.5 right-2.5 min-w-[36px] min-h-[36px] flex items-center justify-center p-2 bg-white/90 text-sale border border-border/60 rounded-full shadow-xs"
+                  >
+                    <Trash2 size={15} className="stroke-[1.5]" />
+                  </button>
                 </div>
-              </div>
-            </div>
-          ))}
+
+                {/* Text info */}
+                <div className="p-3.5 space-y-1">
+                  <p className="text-[9px] uppercase tracking-widest text-text-secondary font-bold">
+                    Zenphire
+                  </p>
+                  <Link to={`/product/${product.slug}`}>
+                    <h3 className="text-xs font-medium text-text-primary group-hover:text-accent-gold transition-colors duration-150 truncate">
+                      {product.name}
+                    </h3>
+                  </Link>
+                  <div className="flex justify-between items-center pt-0.5">
+                    <p className="text-xs font-semibold text-text-primary">
+                      ₹{Number(product.base_price || 0).toFixed(2)}
+                    </p>
+                    <Link
+                      to={`/product/${product.slug}`}
+                      className="text-[10px] uppercase tracking-wider font-bold text-text-secondary hover:text-text-primary transition-colors duration-150 underline underline-offset-4"
+                    >
+                      View
+                    </Link>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </AnimatePresence>
         </div>
       )}
     </div>

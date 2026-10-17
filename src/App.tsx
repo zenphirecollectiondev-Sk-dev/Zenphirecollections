@@ -262,61 +262,72 @@ function AppContent() {
         )}
       </AnimatePresence>
 
-      {/* Main Content Area */}
-      <main className="flex-grow">
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/shop" element={<Shop />} />
-          <Route path="/product/:id" element={
-            <ErrorBoundary>
-              <ProductDetail />
-            </ErrorBoundary>
-          } />
-          <Route path="/cart" element={<Cart />} />
+      {/* Main Content Area with Minimal Modern Page Transition */}
+      <main className="flex-grow flex flex-col relative">
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={location.pathname}
+            initial={{ opacity: 0, y: 7 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -5 }}
+            transition={{ duration: 0.2, ease: EASE_ENTER }}
+            className="flex-grow flex flex-col w-full"
+          >
+            <Routes location={location}>
+              <Route path="/" element={<Home />} />
+              <Route path="/shop" element={<Shop />} />
+              <Route path="/product/:id" element={
+                <ErrorBoundary>
+                  <ProductDetail />
+                </ErrorBoundary>
+              } />
+              <Route path="/cart" element={<Cart />} />
 
-          {/* Protected Checkout & Account */}
-          <Route
-            path="/checkout"
-            element={
-              <ProtectedRoute>
-                <Checkout />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/account"
-            element={
-              <ProtectedRoute>
-                <Account />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="/onboarding" element={<Onboarding />} />
-          <Route path="/auth/callback" element={<AuthCallback />} />
+              {/* Protected Checkout & Account */}
+              <Route
+                path="/checkout"
+                element={
+                  <ProtectedRoute>
+                    <Checkout />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/account"
+                element={
+                  <ProtectedRoute>
+                    <Account />
+                  </ProtectedRoute>
+                }
+              />
+              <Route path="/onboarding" element={<Onboarding />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
 
-          <Route path="/wishlist" element={<Wishlist />} />
+              <Route path="/wishlist" element={<Wishlist />} />
 
-          {/* Static Informational Pages */}
-          <Route path="/faq" element={<FAQ />} />
-          <Route path="/shipping" element={<ShippingReturns />} />
-          <Route path="/privacy" element={<PrivacyPolicy />} />
-          <Route path="/terms" element={<Terms />} />
+              {/* Static Informational Pages */}
+              <Route path="/faq" element={<FAQ />} />
+              <Route path="/shipping" element={<ShippingReturns />} />
+              <Route path="/privacy" element={<PrivacyPolicy />} />
+              <Route path="/terms" element={<Terms />} />
 
-          {/* Protected Admin Console */}
-          <Route
-            path="/admin"
-            element={
-              <ProtectedRoute allowedRoles={['admin']}>
-                <Admin />
-              </ProtectedRoute>
-            }
-          />
+              {/* Protected Admin Console */}
+              <Route
+                path="/admin"
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <Admin />
+                  </ProtectedRoute>
+                }
+              />
 
-          {/* Auth Routes */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-        </Routes>
+              {/* Auth Routes */}
+              <Route path="/login" element={<Login />} />
+              <Route path="/signup" element={<Signup />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+            </Routes>
+          </motion.div>
+        </AnimatePresence>
       </main>
 
       {/* Footer (Customer Pages Only) */}
@@ -482,7 +493,14 @@ function MobileMenuDrawer({ onClose, openSections, toggleSection, wishlistCount,
   }, [categories]);
 
   return (
-    <>
+    <motion.div
+      key="mobile-drawer-root"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.25, ease: EASE }}
+      className="fixed inset-0 z-[60] md:hidden"
+    >
       {/* Backdrop */}
       <motion.div
         key="backdrop"
@@ -491,7 +509,7 @@ function MobileMenuDrawer({ onClose, openSections, toggleSection, wishlistCount,
         exit={{ opacity: 0 }}
         transition={{ duration: DUR.base, ease: EASE }}
         onClick={onClose}
-        className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm md:hidden"
+        className="fixed inset-0 bg-black/70 backdrop-blur-sm"
       />
 
       {/* Drawer Panel */}
@@ -665,6 +683,6 @@ function MobileMenuDrawer({ onClose, openSections, toggleSection, wishlistCount,
           </p>
         </div>
       </motion.div>
-    </>
+    </motion.div>
   );
 }

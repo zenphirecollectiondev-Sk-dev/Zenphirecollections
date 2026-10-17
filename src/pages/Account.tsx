@@ -4,6 +4,8 @@ import { useAuthStore } from '../store/useAuthStore';
 import { supabase, getUserAddresses, getUserOrders } from '../lib/supabase';
 import type { AddressRow } from '../lib/supabase';
 import { z } from 'zod';
+import { motion, AnimatePresence } from 'framer-motion';
+import { EASE, EASE_ENTER } from '../lib/motion';
 import {
   User,
   Phone,
@@ -436,9 +438,17 @@ export default function Account() {
         </button>
       </div>
 
-      {/* Tab Contents */}
-      {activeTab === 'profile' ? (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      {/* Tab Contents with Clean Transition */}
+      <AnimatePresence mode="wait" initial={false}>
+        {activeTab === 'profile' ? (
+          <motion.div
+            key="tab-profile"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.22, ease: EASE_ENTER }}
+            className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start"
+          >
 
           {/* Left Column: Personal Profile Card */}
           <div className="lg:col-span-5 bg-white border border-border/60 rounded-2xl p-6 md:p-7 shadow-xs hover:shadow-sm transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]">
@@ -653,12 +663,21 @@ export default function Account() {
                 )}
               </div>
 
-              {/* Address Form (Inline toggled) */}
-              {addressFormOpen && (
-                <div className="rounded-xl border border-border/80 p-5 bg-bg-subtle/70 mb-6 space-y-4 shadow-2xs">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-text-primary">
-                    {editingAddressId ? 'Edit Saved Address' : 'Add New Address'}
-                  </h3>
+              {/* Address Form (Inline toggled with clean slide & fade) */}
+              <AnimatePresence>
+                {addressFormOpen && (
+                  <motion.div
+                    key="account-address-form"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0, overflow: 'hidden' }}
+                    transition={{ duration: 0.22, ease: EASE }}
+                    className="overflow-hidden"
+                  >
+                    <div className="rounded-xl border border-border/80 p-5 bg-bg-subtle/70 mb-6 space-y-4 shadow-2xs">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-text-primary">
+                        {editingAddressId ? 'Edit Saved Address' : 'Add New Address'}
+                      </h3>
 
                   {addressError && (
                     <div className="p-3 bg-sale/10 border border-sale/30 text-sale text-xs rounded-lg flex items-center gap-2 font-medium">
@@ -832,7 +851,9 @@ export default function Account() {
                     </div>
                   </form>
                 </div>
-              )}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
               {/* Address List */}
               {loadingAddresses ? (
@@ -936,10 +957,17 @@ export default function Account() {
               )}
             </div>
           </div>
-        </div>
+        </motion.div>
       ) : (
         /* Tab 2: Orders History */
-        <div className="bg-white border border-border/60 rounded-2xl p-6 md:p-8 shadow-xs hover:shadow-sm transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]">
+        <motion.div
+          key="tab-orders"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
+          transition={{ duration: 0.22, ease: EASE_ENTER }}
+          className="bg-white border border-border/60 rounded-2xl p-6 md:p-8 shadow-xs hover:shadow-sm transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
+        >
           <div className="border-b border-border/60 pb-4 mb-6">
             <h2 className="text-base font-heading font-bold uppercase tracking-wider text-text-primary">
               Order Transactions
@@ -1199,8 +1227,9 @@ export default function Account() {
               })}
             </div>
           )}
-        </div>
+        </motion.div>
       )}
-    </div>
+    </AnimatePresence>
+  </div>
   );
 }

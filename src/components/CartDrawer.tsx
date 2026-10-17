@@ -27,10 +27,15 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
   return (
     <AnimatePresence>
       {isOpen && (
-        <div
+        <motion.div
+          key="cart-drawer-container"
           role="dialog"
           aria-modal="true"
           aria-label="Shopping Cart"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: DUR.base, ease: EASE }}
           className="fixed inset-0 z-[150] flex justify-end"
         >
           {/* Backdrop — fades in on open, fades out on close */}
@@ -88,63 +93,73 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                 </div>
               ) : (
                 <div className="divide-y divide-border/60">
-                  {items.map((item) => (
-                    <div key={item.id} className="py-4 flex gap-3.5 sm:gap-4 first:pt-0 last:pb-0 items-start">
-                      {/* Item Image */}
-                      <img
-                        src={item.image}
-                        alt={item.name}
-                        className="w-16 sm:w-20 aspect-[2/3] object-cover object-top bg-neutral-50 border border-border/60 rounded-xs flex-shrink-0"
-                      />
+                  <AnimatePresence initial={false}>
+                    {items.map((item) => (
+                      <motion.div
+                        key={item.id}
+                        layout
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0, overflow: 'hidden' }}
+                        transition={{ duration: 0.22, ease: EASE }}
+                        className="py-4 flex gap-3.5 sm:gap-4 first:pt-0 last:pb-0 items-start"
+                      >
+                        {/* Item Image */}
+                        <img
+                          src={item.image}
+                          alt={item.name}
+                          className="w-16 sm:w-20 aspect-[2/3] object-cover object-top bg-neutral-50 border border-border/60 rounded-xs flex-shrink-0"
+                        />
 
-                      {/* Item Details */}
-                      <div className="flex-1 min-w-0 flex flex-col justify-between self-stretch py-0.5">
-                        <div>
-                          <div className="flex justify-between items-start gap-2">
-                            <h3 className="text-xs sm:text-sm font-medium text-text-primary truncate">
-                              {item.name}
-                            </h3>
-                            <p className="text-xs sm:text-sm font-medium text-text-primary flex-shrink-0">
-                              ₹{(item.price * item.quantity).toFixed(2)}
+                        {/* Item Details */}
+                        <div className="flex-1 min-w-0 flex flex-col justify-between self-stretch py-0.5">
+                          <div>
+                            <div className="flex justify-between items-start gap-2">
+                              <h3 className="text-xs sm:text-sm font-medium text-text-primary truncate">
+                                {item.name}
+                              </h3>
+                              <p className="text-xs sm:text-sm font-medium text-text-primary flex-shrink-0">
+                                ₹{(item.price * item.quantity).toFixed(2)}
+                              </p>
+                            </div>
+                            <p className="text-[11px] text-text-secondary mt-0.5 font-light">
+                              Size: {item.size} {item.color && <>• Color: {item.color}</>}
                             </p>
                           </div>
-                          <p className="text-[11px] text-text-secondary mt-0.5 font-light">
-                            Size: {item.size} {item.color && <>• Color: {item.color}</>}
-                          </p>
-                        </div>
 
-                        {/* Quantity adjustments and Remove action */}
-                        <div className="flex justify-between items-center mt-3 pt-1">
-                          <div className="flex items-center border border-border/70 rounded-xs bg-white">
+                          {/* Quantity adjustments and Remove action */}
+                          <div className="flex justify-between items-center mt-3 pt-1">
+                            <div className="flex items-center border border-border/70 rounded-xs bg-white">
+                              <button
+                                onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                                aria-label="Decrease quantity"
+                                className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center text-text-secondary hover:text-text-primary transition-colors"
+                              >
+                                <Minus size={12} />
+                              </button>
+                              <span className="px-2 min-w-[24px] text-center text-xs font-normal select-none">
+                                {item.quantity}
+                              </span>
+                              <button
+                                onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                                aria-label="Increase quantity"
+                                className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center text-text-secondary hover:text-text-primary transition-colors"
+                              >
+                                <Plus size={12} />
+                              </button>
+                            </div>
                             <button
-                              onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                              aria-label="Decrease quantity"
-                              className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center text-text-secondary hover:text-text-primary transition-colors"
+                              onClick={() => removeItem(item.id)}
+                              className="p-1.5 text-text-secondary/60 hover:text-sale transition-colors rounded-full"
+                              aria-label="Remove item"
                             >
-                              <Minus size={12} />
-                            </button>
-                            <span className="px-2 min-w-[24px] text-center text-xs font-normal select-none">
-                              {item.quantity}
-                            </span>
-                            <button
-                              onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                              aria-label="Increase quantity"
-                              className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center text-text-secondary hover:text-text-primary transition-colors"
-                            >
-                              <Plus size={12} />
+                              <Trash2 size={14} />
                             </button>
                           </div>
-                          <button
-                            onClick={() => removeItem(item.id)}
-                            className="p-1.5 text-text-secondary/60 hover:text-sale transition-colors rounded-full"
-                            aria-label="Remove item"
-                          >
-                            <Trash2 size={14} />
-                          </button>
                         </div>
-                      </div>
-                    </div>
-                  ))}
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
                 </div>
               )}
             </div>
@@ -173,7 +188,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
               </div>
             )}
           </motion.div>
-        </div>
+        </motion.div>
       )}
     </AnimatePresence>
   );

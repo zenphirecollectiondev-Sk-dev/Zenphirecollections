@@ -458,15 +458,21 @@ export default function ProductDetail() {
             onTouchEnd={handleTouchEnd}
           >
             {product.product_images[activeImageIdx]?.url ? (
-              <img
-                key={product.product_images[activeImageIdx]?.url || activeImageIdx}
-                src={imgHero(product.product_images[activeImageIdx].url)}
-                alt={product.name}
-                fetchPriority="high"
-                loading="eager"
-                decoding="async"
-                className="w-full h-full object-cover object-top block transition-opacity duration-200"
-              />
+              <AnimatePresence mode="wait">
+                <motion.img
+                  key={product.product_images[activeImageIdx]?.url || activeImageIdx}
+                  src={imgHero(product.product_images[activeImageIdx].url)}
+                  alt={product.name}
+                  fetchPriority="high"
+                  loading="eager"
+                  decoding="async"
+                  initial={{ opacity: 0.6, scale: 0.99 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0.6 }}
+                  transition={{ duration: 0.2, ease: EASE }}
+                  className="w-full h-full object-cover object-top block"
+                />
+              </AnimatePresence>
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-bg-subtle">
                 <Image size={36} className="text-text-secondary/20" />
@@ -727,7 +733,14 @@ export default function ProductDetail() {
       {typeof document !== 'undefined' && createPortal(
         <AnimatePresence>
           {isSizeModalOpen && (
-            <div className="fixed inset-0 z-[99998] flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <motion.div
+              key="size-modal-wrapper"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2, ease: EASE }}
+              className="fixed inset-0 z-[99998] flex items-end sm:items-center justify-center p-0 sm:p-4"
+            >
               {/* Backdrop */}
               <motion.div
                 initial={{ opacity: 0 }}
@@ -897,7 +910,7 @@ export default function ProductDetail() {
                   </button>
                 </div>
               </motion.div>
-            </div>
+            </motion.div>
           )}
         </AnimatePresence>,
         document.body
@@ -907,7 +920,14 @@ export default function ProductDetail() {
       {typeof document !== 'undefined' && createPortal(
         <AnimatePresence>
           {isSizeGuideOpen && (
-            <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
+            <motion.div
+              key="size-guide-modal-wrapper"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2, ease: EASE }}
+              className="fixed inset-0 z-[99999] flex items-center justify-center p-4"
+            >
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -974,7 +994,7 @@ export default function ProductDetail() {
                   </button>
                 </div>
               </motion.div>
-            </div>
+            </motion.div>
           )}
         </AnimatePresence>,
         document.body

@@ -112,8 +112,6 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
     return () => clearTimeout(timer);
   }, [query, products]);
 
-  if (!isOpen) return null;
-
   const handleResultClick = (slug: string) => {
     navigate(`/product/${slug}`);
     onClose();
@@ -127,12 +125,18 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
 
   return (
     <AnimatePresence>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Search Zenphire"
-        className="fixed inset-0 z-[200] flex flex-col justify-start sm:items-center overflow-y-auto"
-      >
+      {isOpen && (
+        <motion.div
+          key="search-overlay-wrapper"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Search Zenphire"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: DUR.fast, ease: EASE }}
+          className="fixed inset-0 z-[200] flex flex-col justify-start sm:items-center overflow-y-auto"
+        >
         {/* Soft, airy frosted backdrop */}
         <motion.div
           key="backdrop"
@@ -395,7 +399,8 @@ export default function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
             </span>
           </div>
         </motion.div>
-      </div>
-    </AnimatePresence>
+      </motion.div>
+    )}
+  </AnimatePresence>
   );
 }

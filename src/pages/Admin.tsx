@@ -29,6 +29,9 @@ import {
   ArrowUp,
   ArrowDown,
   ChevronDown,
+  SlidersHorizontal,
+  Filter,
+  GripVertical,
 } from 'lucide-react';
 
 
@@ -77,8 +80,27 @@ interface SizeGuideTemplate {
 
 
 
+// ─── Filter system types ───────────────────────────────────────────────────
+interface ProductFilter {
+  id: string;
+  name: string;
+  slug: string;
+  filter_type: 'multi-select' | 'single-select' | 'boolean';
+  gender_scope?: string[];
+  is_active: boolean;
+  sort_order: number;
+  filter_options?: FilterOption[];
+  filter_category_scope?: { category_id: string }[];
+}
+interface FilterOption {
+  id: string;
+  filter_id: string;
+  value: string;
+  sort_order: number;
+}
+
 export default function Admin() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'categories' | 'inventory' | 'orders' | 'coupons' | 'couriers' | 'homepage' | 'occasions'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'categories' | 'inventory' | 'orders' | 'coupons' | 'couriers' | 'homepage' | 'occasions' | 'filters'>('overview');
 
   // Coupons state
   const [coupons, setCoupons] = useState<any[]>([]);
@@ -261,6 +283,30 @@ export default function Admin() {
   const [selectedOccasion, setSelectedOccasion] = useState<'casuals' | 'formal' | 'ethnic' | 'party-wear'>('casuals');
   const [occasionSearch, setOccasionSearch] = useState('');
   const [isAddingOccasion, setIsAddingOccasion] = useState(false);
+
+  // ── Filter system state ─────────────────────────────────────────────────────
+  const [productFilters, setProductFilters] = useState<ProductFilter[]>([]);
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+  const [editingFilter, setEditingFilter] = useState<ProductFilter | null>(null);
+  // Filter builder form
+  const [filterBuilderStep, setFilterBuilderStep] = useState<1 | 2 | 3>(1);
+  const [filterName, setFilterName] = useState('');
+  const [filterSlug, setFilterSlug] = useState('');
+  const [filterType, setFilterType] = useState<'multi-select' | 'single-select' | 'boolean'>('multi-select');
+  const [filterIsActive, setFilterIsActive] = useState(true);
+  const [filterGenderScope, setFilterGenderScope] = useState<string[]>([]); // e.g. ['male', 'female'] or [] for all
+  const [filterScopeIds, setFilterScopeIds] = useState<string[]>([]); // selected category ids
+  const [filterOptions, setFilterOptions] = useState<{ tempId: string; value: string }[]>([]);
+  const [filterOptionInput, setFilterOptionInput] = useState('');
+  const [isSavingFilter, setIsSavingFilter] = useState(false);
+  // Product-level filter values (for product modal)
+  const [prodFilterValues, setProdFilterValues] = useState<Record<string, string[]>>({}); // { filterSlug: [optionId, ...] }
+  const [scopedFilters, setScopedFilters] = useState<ProductFilter[]>([]); // filters for current product category
+  // Bulk assign
+  const [bulkAssignFilter, setBulkAssignFilter] = useState('');
+  const [bulkAssignOption, setBulkAssignOption] = useState('');
+  const [bulkAssignProductIds, setBulkAssignProductIds] = useState<string[]>([]);
+  const [isBulkAssigning, setIsBulkAssigning] = useState(false);
 
 
   // Fetch Dashboard Stats & Data
@@ -510,10 +556,258 @@ export default function Admin() {
         console.warn('size_guides table fetch failed or not created yet.', sgErr);
       }
 
+      // 10. Fetch Product Filters with their options and category scope
+      try {
+        const { data: filtersData, error: filtersErr } = await (supabase as any)
+          .from('product_filters')
+          .select(`
+            *,
+            filter_options ( id, filter_id, value, sort_order ),
+            filter_category_scope ( category_id )
+          `)
+          .order('sort_order', { ascending: true });
+        if (!filtersErr && filtersData) {
+          setProductFilters(filtersData as any);
+        }
+      } catch (fErr) {
+        console.warn('product_filters table not yet created. Run the migration SQL first.', fErr);
+      }
+
     } catch (err: any) {
       console.error('Error fetching admin data:', err);
     } finally {
       setLoadingData(false);
+    }
+  };
+
+  // ── Fetch filters scoped to a given parent category & optional gender ─────
+  const fetchScopedFilters = async (parentCategoryId: string, productGender?: string) => {
+    if (!parentCategoryId) { setScopedFilters([]); setProdFilterValues({}); return; }
+    try {
+      // Find the parent category and all its children
+      const familyIds = categories
+        .filter(c => c.id === parentCategoryId || c.parent_category_id === parentCategoryId)
+        .map(c => c.id);
+
+      const { data, error } = await (supabase as any)
+        .from('product_filters')
+        .select(`
+          *,
+          filter_options ( id, filter_id, value, sort_order ),
+          filter_category_scope!inner ( category_id )
+        `)
+        .eq('is_active', true)
+        .in('filter_category_scope.category_id', familyIds.length > 0 ? familyIds : ['__none__'])
+        .order('sort_order', { ascending: true });
+
+      if (!error && data) {
+        let list = data as any[];
+        if (productGender) {
+          const norm = productGender.toLowerCase();
+          list = list.filter((f: any) => {
+            const gScope = f.gender_scope || [];
+            if (gScope.length === 0) return true; // applies to all genders
+            return gScope.map((g: string) => g.toLowerCase()).includes(norm);
+          });
+        }
+        setScopedFilters(list);
+      } else {
+        setScopedFilters([]);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch scoped filters:', err);
+      setScopedFilters([]);
+    }
+  };
+
+  // ── Load existing filter values for a product being edited ──────────────────
+  const loadProductFilterValues = async (productId: string) => {
+    try {
+      const { data, error } = await (supabase as any)
+        .from('product_filter_values')
+        .select('filter_option_id, filter_options ( id, filter_id, value, product_filters ( slug ) )')
+        .eq('product_id', productId);
+      if (error || !data) return;
+      const grouped: Record<string, string[]> = {};
+      (data as any[]).forEach((row: any) => {
+        const slug = row.filter_options?.product_filters?.slug;
+        if (slug) {
+          if (!grouped[slug]) grouped[slug] = [];
+          grouped[slug].push(row.filter_option_id);
+        }
+      });
+      setProdFilterValues(grouped);
+    } catch (err) {
+      console.warn('Failed to load product filter values:', err);
+    }
+  };
+
+  // ── Save product filter values (called inside handleProductSubmit) ──────────
+  const saveProductFilterValues = async (productId: string) => {
+    try {
+      // Delete existing assignments
+      await (supabase as any).from('product_filter_values').delete().eq('product_id', productId);
+      // Build new assignments
+      const rows: any[] = [];
+      Object.values(prodFilterValues).forEach(optionIds => {
+        optionIds.forEach(optionId => {
+          rows.push({ product_id: productId, filter_option_id: optionId });
+        });
+      });
+      if (rows.length > 0) {
+        await (supabase as any).from('product_filter_values').insert(rows);
+      }
+    } catch (err) {
+      console.warn('Failed to save product filter values (non-critical):', err);
+    }
+  };
+
+  // ── Filter CRUD handlers ────────────────────────────────────────────────────
+
+  const openNewFilterModal = () => {
+    setEditingFilter(null);
+    setFilterBuilderStep(1);
+    setFilterName('');
+    setFilterSlug('');
+    setFilterType('multi-select');
+    setFilterIsActive(true);
+    setFilterGenderScope([]);
+    setFilterScopeIds([]);
+    setFilterOptions([]);
+    setFilterOptionInput('');
+    setIsFilterModalOpen(true);
+  };
+
+  const openEditFilterModal = (f: ProductFilter) => {
+    setEditingFilter(f);
+    setFilterBuilderStep(1);
+    setFilterName(f.name);
+    setFilterSlug(f.slug);
+    setFilterType(f.filter_type);
+    setFilterIsActive(f.is_active);
+    setFilterGenderScope(f.gender_scope || []);
+    setFilterScopeIds((f.filter_category_scope || []).map(s => s.category_id));
+    setFilterOptions(
+      (f.filter_options || [])
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .map(o => ({ tempId: o.id, value: o.value }))
+    );
+    setFilterOptionInput('');
+    setIsFilterModalOpen(true);
+  };
+
+  const handleAddFilterOption = () => {
+    const val = filterOptionInput.trim();
+    if (!val) return;
+    if (filterOptions.some(o => o.value.toLowerCase() === val.toLowerCase())) {
+      triggerNotification('This option already exists.', true);
+      return;
+    }
+    setFilterOptions(prev => [...prev, { tempId: `tmp-${Date.now()}`, value: val }]);
+    setFilterOptionInput('');
+  };
+
+  const handleRemoveFilterOption = (tempId: string) => {
+    setFilterOptions(prev => prev.filter(o => o.tempId !== tempId));
+  };
+
+  const handleMoveFilterOption = (idx: number, dir: 'up' | 'down') => {
+    const target = dir === 'up' ? idx - 1 : idx + 1;
+    if (target < 0 || target >= filterOptions.length) return;
+    setFilterOptions(prev => {
+      const copy = [...prev];
+      [copy[idx], copy[target]] = [copy[target], copy[idx]];
+      return copy;
+    });
+  };
+
+  const handleSaveFilter = async () => {
+    if (!filterName.trim()) { triggerNotification('Filter name is required.', true); return; }
+    setIsSavingFilter(true);
+    try {
+      const slug = filterSlug.trim() || generateSlug(filterName);
+      let filterId = editingFilter?.id;
+
+      if (editingFilter) {
+        const { error } = await (supabase as any)
+          .from('product_filters')
+          .update({ name: filterName.trim(), slug, filter_type: filterType, is_active: filterIsActive, gender_scope: filterGenderScope })
+          .eq('id', filterId);
+        if (error) throw error;
+      } else {
+        const { data, error } = await (supabase as any)
+          .from('product_filters')
+          .insert({ name: filterName.trim(), slug, filter_type: filterType, is_active: filterIsActive, gender_scope: filterGenderScope, sort_order: productFilters.length })
+          .select().single();
+        if (error) throw error;
+        filterId = (data as any).id;
+      }
+
+      // Sync scope
+      await (supabase as any).from('filter_category_scope').delete().eq('filter_id', filterId);
+      if (filterScopeIds.length > 0) {
+        await (supabase as any).from('filter_category_scope').insert(
+          filterScopeIds.map(catId => ({ filter_id: filterId, category_id: catId }))
+        );
+      }
+
+      // Sync options (delete all, re-insert in order)
+      await (supabase as any).from('filter_options').delete().eq('filter_id', filterId);
+      if (filterOptions.length > 0) {
+        await (supabase as any).from('filter_options').insert(
+          filterOptions.map((o, i) => ({ filter_id: filterId, value: o.value, sort_order: i }))
+        );
+      }
+
+      triggerNotification(`Filter "${filterName}" saved successfully.`);
+      setIsFilterModalOpen(false);
+      fetchData();
+    } catch (err: any) {
+      triggerNotification(err.message || 'Failed to save filter.', true);
+    } finally {
+      setIsSavingFilter(false);
+    }
+  };
+
+  const handleDeleteFilter = async (filterId: string, filterNameLabel: string) => {
+    if (!confirm(`Delete filter "${filterNameLabel}"? This will also remove all option assignments from products.`)) return;
+    try {
+      const { error } = await (supabase as any).from('product_filters').delete().eq('id', filterId);
+      if (error) throw error;
+      triggerNotification(`Filter "${filterNameLabel}" deleted.`);
+      fetchData();
+    } catch (err: any) {
+      triggerNotification(err.message || 'Failed to delete filter.', true);
+    }
+  };
+
+  const handleToggleFilterActive = async (filterId: string, current: boolean) => {
+    try {
+      await (supabase as any).from('product_filters').update({ is_active: !current }).eq('id', filterId);
+      setProductFilters(prev => prev.map(f => f.id === filterId ? { ...f, is_active: !current } : f));
+    } catch (err: any) {
+      triggerNotification('Failed to toggle filter.', true);
+    }
+  };
+
+  const handleBulkAssign = async () => {
+    if (!bulkAssignFilter || !bulkAssignOption || bulkAssignProductIds.length === 0) {
+      triggerNotification('Select a filter, option, and at least one product.', true);
+      return;
+    }
+    setIsBulkAssigning(true);
+    try {
+      const rows = bulkAssignProductIds.map(pid => ({
+        product_id: pid,
+        filter_option_id: bulkAssignOption
+      }));
+      await (supabase as any).from('product_filter_values').upsert(rows, { onConflict: 'product_id,filter_option_id' });
+      triggerNotification(`Assigned to ${bulkAssignProductIds.length} product(s) successfully.`);
+      setBulkAssignProductIds([]);
+    } catch (err: any) {
+      triggerNotification(err.message || 'Bulk assign failed.', true);
+    } finally {
+      setIsBulkAssigning(false);
     }
   };
 
@@ -1468,6 +1762,13 @@ export default function Admin() {
     setNewParentCatName('');
     setWizardStep(3); // Start directly at step 3 when editing
     setIsProductModalOpen(true);
+    // Load filters scoped to this product's category and gender
+    const parentId = productCategoryObj?.parent_category_id
+      ? productCategoryObj.parent_category_id
+      : productCategoryObj?.id || '';
+    const prodGender = productCategoryObj?.parent_category_id ? productCategoryObj.name : selectedGender;
+    fetchScopedFilters(parentId, prodGender);
+    loadProductFilterValues(prod.id);
   };
 
   // Open Add Product form
@@ -1494,6 +1795,8 @@ export default function Admin() {
     setSelectedParentCatId('');
     setSelectedGender('');
     setNewParentCatName('');
+    setScopedFilters([]);
+    setProdFilterValues({});
     setIsProductModalOpen(true);
   };
 
@@ -1761,6 +2064,9 @@ export default function Admin() {
       } catch (occSyncErr: any) {
         console.warn('Occasion sync non-critical warning:', occSyncErr);
       }
+
+      // 7. Sync Filter values
+      await saveProductFilterValues(productId);
 
       setIsProductModalOpen(false);
       triggerNotification(`✅ Product "${prodName}" saved successfully!`);
@@ -2100,6 +2406,7 @@ export default function Admin() {
             { key: 'categories', label: 'Categories',  Icon: Layers },
             { key: 'inventory',  label: 'Inventory',   Icon: ClipboardList },
             { key: 'occasions',  label: 'Occasions',   Icon: Sparkles },
+            { key: 'filters',    label: 'Filters',     Icon: SlidersHorizontal, badge: productFilters.length },
             { key: 'couriers',   label: 'Couriers',    Icon: Truck, badge: courierPartners.length },
           ] as { key: typeof activeTab; label: string; Icon: any; badge?: number }[]).map(({ key, label, Icon, badge }) => (
             <button
@@ -2141,6 +2448,7 @@ export default function Admin() {
             <option value="categories">Categories</option>
             <option value="inventory">Inventory</option>
             <option value="occasions">Occasions</option>
+            <option value="filters">Filters ({productFilters.length})</option>
             <option value="couriers">Couriers ({courierPartners.length})</option>
           </select>
         </div>
@@ -4264,6 +4572,554 @@ export default function Admin() {
         )}
       </div>
 
+        {/* ==========================================
+            FILTERS TAB
+            ========================================== */}
+        {activeTab === 'filters' && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-8"
+          >
+            {/* Header */}
+            <div className="bg-white border border-border/80 p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h3 className="text-xs font-heading font-black uppercase tracking-wider text-text-primary pb-1">
+                  Dynamic Filter Configurator
+                </h3>
+                <p className="text-[10px] text-text-secondary">
+                  Create filters (Material, Fit, Sleeve…) scoped to specific categories. Filters appear in the Shop sidebar and product form automatically.
+                </p>
+              </div>
+              <button
+                onClick={openNewFilterModal}
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-accent text-white text-[11px] font-bold uppercase tracking-widest hover:bg-accent-hover transition-colors shadow-sm flex-shrink-0"
+              >
+                <Plus size={13} />
+                New Filter
+              </button>
+            </div>
+
+            {/* Filter List */}
+            <div className="bg-white border border-border/80 p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)]">
+              <h4 className="text-[10px] font-black uppercase tracking-widest text-text-primary pb-3 border-b border-border mb-4">
+                All Filters ({productFilters.length})
+              </h4>
+              {productFilters.length === 0 ? (
+                <div className="text-center py-12">
+                  <Filter size={32} className="mx-auto text-text-secondary/30 mb-3" />
+                  <p className="text-sm text-text-secondary font-medium">No filters created yet.</p>
+                  <p className="text-[10px] text-text-secondary/60 mt-1">Click "New Filter" to create your first dynamic filter.</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-border">
+                  {productFilters.map((f) => {
+                    const scopeNames = (f.filter_category_scope || [])
+                      .map(s => categories.find(c => c.id === s.category_id)?.name || '?')
+                      .filter(Boolean);
+                    const options = (f.filter_options || []).sort((a, b) => a.sort_order - b.sort_order);
+                    return (
+                      <div key={f.id} className="py-4 flex flex-col sm:flex-row sm:items-start gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-bold text-text-primary">{f.name}</span>
+                            <span className="text-[9px] font-mono bg-bg-subtle border border-border px-1.5 py-0.5 text-text-secondary">{f.slug}</span>
+                            <span className={`text-[9px] font-bold px-1.5 py-0.5 uppercase tracking-wider ${f.is_active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-zinc-50 text-zinc-400 border border-zinc-200'}`}>
+                              {f.is_active ? 'Active' : 'Inactive'}
+                            </span>
+                            <span className="text-[9px] bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 uppercase font-bold">{f.filter_type}</span>
+                            {f.gender_scope && f.gender_scope.length > 0 ? (
+                              <span className="text-[9px] bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 uppercase font-bold">
+                                {f.gender_scope.map(g => g === 'male' ? 'Men' : g === 'female' ? 'Women' : 'Unisex').join(', ')}
+                              </span>
+                            ) : (
+                              <span className="text-[9px] bg-zinc-50 text-zinc-600 border border-zinc-200 px-1.5 py-0.5 uppercase font-bold">
+                                All Genders
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            {options.map(o => (
+                              <span key={o.id} className="text-[10px] bg-bg-subtle border border-border px-2 py-0.5 text-text-primary font-medium">
+                                {o.value}
+                              </span>
+                            ))}
+                            {options.length === 0 && (
+                              <span className="text-[10px] text-text-secondary/50 italic">No options yet</span>
+                            )}
+                          </div>
+                          {scopeNames.length > 0 && (
+                            <p className="text-[10px] text-text-secondary mt-1.5">
+                              Scoped to: <span className="font-semibold text-text-primary">{scopeNames.join(', ')}</span>
+                            </p>
+                          )}
+                          {scopeNames.length === 0 && (
+                            <p className="text-[10px] text-amber-600 mt-1.5 font-semibold">⚠ No categories assigned — won't appear in Shop</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <button
+                            onClick={() => handleToggleFilterActive(f.id, f.is_active)}
+                            className={`px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider border transition-colors ${f.is_active ? 'border-zinc-200 text-zinc-500 hover:bg-zinc-50' : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50'}`}
+                          >
+                            {f.is_active ? 'Deactivate' : 'Activate'}
+                          </button>
+                          <button
+                            onClick={() => openEditFilterModal(f)}
+                            className="p-2 text-text-secondary hover:text-accent border border-border hover:border-accent transition-colors"
+                          >
+                            <Edit2 size={13} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteFilter(f.id, f.name)}
+                            className="p-2 text-text-secondary hover:text-sale border border-border hover:border-sale transition-colors"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Bulk Assign Section */}
+            <div className="bg-white border border-border/80 p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)]">
+              <h4 className="text-[10px] font-black uppercase tracking-widest text-text-primary pb-3 border-b border-border mb-4">
+                Bulk Assign Filter Values
+              </h4>
+              <p className="text-[10px] text-text-secondary mb-4">
+                Assign a filter value to multiple existing products at once — useful for backfilling products created before filters existed.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                <div>
+                  <label className="block text-[9px] font-bold uppercase tracking-wider text-text-secondary mb-1">Filter</label>
+                  <select
+                    value={bulkAssignFilter}
+                    onChange={(e) => { setBulkAssignFilter(e.target.value); setBulkAssignOption(''); }}
+                    className="w-full px-2 py-1.5 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent"
+                  >
+                    <option value="">-- Select Filter --</option>
+                    {productFilters.filter(f => f.is_active).map(f => (
+                      <option key={f.id} value={f.id}>{f.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[9px] font-bold uppercase tracking-wider text-text-secondary mb-1">Value</label>
+                  <select
+                    value={bulkAssignOption}
+                    onChange={(e) => setBulkAssignOption(e.target.value)}
+                    disabled={!bulkAssignFilter}
+                    className="w-full px-2 py-1.5 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent disabled:opacity-50"
+                  >
+                    <option value="">-- Select Value --</option>
+                    {(productFilters.find(f => f.id === bulkAssignFilter)?.filter_options || [])
+                      .sort((a, b) => a.sort_order - b.sort_order)
+                      .map(o => (
+                        <option key={o.id} value={o.id}>{o.value}</option>
+                      ))
+                    }
+                  </select>
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-[9px] font-bold uppercase tracking-wider text-text-secondary mb-1">
+                    Selected Products ({bulkAssignProductIds.length})
+                  </label>
+                  <button
+                    onClick={handleBulkAssign}
+                    disabled={isBulkAssigning || !bulkAssignFilter || !bulkAssignOption || bulkAssignProductIds.length === 0}
+                    className="w-full px-4 py-1.5 bg-accent text-white text-xs font-bold uppercase tracking-widest hover:bg-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {isBulkAssigning ? <><Loader2 size={12} className="animate-spin" /> Assigning...</> : `Assign to ${bulkAssignProductIds.length} Product(s)`}
+                  </button>
+                </div>
+              </div>
+              {/* Product multi-select list */}
+              <div className="border border-border max-h-56 overflow-y-auto divide-y divide-border/50">
+                {products.map(p => (
+                  <label key={p.id} className="flex items-center gap-3 px-3 py-2 hover:bg-bg-subtle cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={bulkAssignProductIds.includes(p.id)}
+                      onChange={(e) => {
+                        setBulkAssignProductIds(prev =>
+                          e.target.checked ? [...prev, p.id] : prev.filter(id => id !== p.id)
+                        );
+                      }}
+                      className="w-3.5 h-3.5 accent-accent"
+                    />
+                    <span className="text-xs text-text-primary font-medium truncate">{p.name}</span>
+                    <span className="text-[9px] text-text-secondary ml-auto font-mono">{p.slug}</span>
+                  </label>
+                ))}
+              </div>
+              <button
+                onClick={() => setBulkAssignProductIds(products.map(p => p.id))}
+                className="mt-2 text-[10px] text-accent hover:underline font-bold uppercase tracking-wider"
+              >
+                Select All Products
+              </button>
+            </div>
+          </motion.div>
+        )}
+
+      {/* ==========================================
+          FILTER BUILDER MODAL
+          ========================================== */}
+      <AnimatePresence>
+        {isFilterModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsFilterModalOpen(false)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+              className="relative z-10 bg-white w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl"
+            >
+              <div className="p-6 border-b border-border flex items-center justify-between">
+                <div>
+                  <span className="text-[9px] uppercase tracking-widest text-text-secondary font-black bg-bg-subtle px-2 py-0.5 border border-border">
+                    {editingFilter ? 'Edit Filter' : 'New Filter'}
+                  </span>
+                  <h3 className="text-lg font-heading font-black uppercase mt-1 text-text-primary">
+                    Filter Configurator
+                  </h3>
+                </div>
+                <button onClick={() => setIsFilterModalOpen(false)} className="p-1.5 text-text-secondary hover:text-text-primary hover:bg-bg-subtle transition-colors rounded-full">
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Step Indicators */}
+              <div className="px-6 pt-5 pb-3 flex gap-4 items-center border-b border-border">
+                {([
+                  { step: 1, label: 'Filter Details' },
+                  { step: 2, label: 'Category Scope' },
+                  { step: 3, label: 'Options' },
+                ] as { step: 1 | 2 | 3; label: string }[]).map(({ step, label }, idx) => (
+                  <div key={step} className="flex items-center gap-2">
+                    {idx > 0 && <span className="text-border text-sm">/</span>}
+                    <div className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider ${filterBuilderStep === step ? 'text-accent' : 'text-text-secondary'}`}>
+                      <span className={`w-5 h-5 flex items-center justify-center rounded-full text-[9px] font-black ${filterBuilderStep === step ? 'bg-accent text-white' : filterBuilderStep > step ? 'bg-emerald-500 text-white' : 'bg-bg-subtle border border-border'}`}>
+                        {filterBuilderStep > step ? '✓' : step}
+                      </span>
+                      {label}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="p-6 space-y-6">
+                {/* STEP 1: Filter Details */}
+                {filterBuilderStep === 1 && (
+                  <div className="space-y-5">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
+                        Filter Name <span className="text-sale">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={filterName}
+                        onChange={(e) => {
+                          setFilterName(e.target.value);
+                          if (!editingFilter) setFilterSlug(generateSlug(e.target.value));
+                        }}
+                        className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent"
+                        placeholder="e.g. Material, Fit, Sleeve Length"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">Slug (URL key)</label>
+                      <input
+                        type="text"
+                        value={filterSlug}
+                        onChange={(e) => setFilterSlug(e.target.value)}
+                        className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent font-mono"
+                        placeholder="material"
+                      />
+                      <p className="text-[9px] text-text-secondary mt-1">Auto-generated from name. Used in URLs and filter logic.</p>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-2">Filter Type</label>
+                      <div className="grid grid-cols-3 gap-3">
+                        {([
+                          { type: 'multi-select', label: 'Multi-Select', desc: 'User can pick multiple values' },
+                          { type: 'single-select', label: 'Single-Select', desc: 'User picks one value only' },
+                          { type: 'boolean', label: 'Boolean', desc: 'Simple Yes / No toggle' },
+                        ] as { type: 'multi-select' | 'single-select' | 'boolean'; label: string; desc: string }[]).map(({ type, label, desc }) => (
+                          <button
+                            key={type}
+                            type="button"
+                            onClick={() => setFilterType(type)}
+                            className={`p-4 border text-left text-[10px] font-bold uppercase tracking-wider transition-all ${filterType === type ? 'bg-accent border-accent text-white' : 'bg-white border-border text-text-primary hover:border-accent'}`}
+                          >
+                            <div className="font-black mb-1">{label}</div>
+                            <div className={`text-[9px] normal-case font-normal ${filterType === type ? 'text-white/80' : 'text-text-secondary'}`}>{desc}</div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 pt-2">
+                      <input
+                        id="filter-active"
+                        type="checkbox"
+                        checked={filterIsActive}
+                        onChange={(e) => setFilterIsActive(e.target.checked)}
+                        className="w-4 h-4 accent-accent"
+                      />
+                      <label htmlFor="filter-active" className="text-[10px] font-bold uppercase tracking-wider text-text-primary select-none cursor-pointer">
+                        Active — Show in Shop & Product Form
+                      </label>
+                    </div>
+                    <div className="flex justify-end pt-2">
+                      <button
+                        type="button"
+                        disabled={!filterName.trim()}
+                        onClick={() => setFilterBuilderStep(2)}
+                        className="px-6 py-2.5 bg-accent text-white text-xs font-bold uppercase tracking-widest hover:bg-accent-hover transition-colors disabled:opacity-50"
+                      >
+                        Continue →
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* STEP 2: Category & Gender Scope */}
+                {filterBuilderStep === 2 && (
+                  <div className="space-y-6">
+                    {/* Target Audience / Gender Scope */}
+                    <div>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-text-primary mb-1">
+                        1. Target Audience / Gender Scope
+                      </h4>
+                      <p className="text-[10px] text-text-secondary mb-3">
+                        Choose which genders this filter applies to. Leave as "All Genders" if it applies to everyone.
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setFilterGenderScope([])}
+                          className={`px-3.5 py-2 text-xs font-bold uppercase tracking-wider border transition-colors ${
+                            filterGenderScope.length === 0
+                              ? 'bg-accent text-white border-accent shadow-xs'
+                              : 'bg-white text-text-primary border-border hover:border-accent'
+                          }`}
+                        >
+                          All Genders
+                        </button>
+                        {[
+                          { id: 'male', label: 'Men / Male' },
+                          { id: 'female', label: 'Women / Female' },
+                          { id: 'unisex', label: 'Unisex' }
+                        ].map((g) => {
+                          const isSel = filterGenderScope.includes(g.id);
+                          return (
+                            <button
+                              key={g.id}
+                              type="button"
+                              onClick={() => {
+                                setFilterGenderScope(prev =>
+                                  prev.includes(g.id)
+                                    ? prev.filter(x => x !== g.id)
+                                    : [...prev, g.id]
+                                );
+                              }}
+                              className={`px-3.5 py-2 text-xs font-bold uppercase tracking-wider border transition-colors ${
+                                isSel
+                                  ? 'bg-accent text-white border-accent shadow-xs'
+                                  : 'bg-white text-text-primary border-border hover:border-accent'
+                              }`}
+                            >
+                              {g.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Category Scope */}
+                    <div className="border-t border-border pt-4">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-text-primary mb-1">
+                        2. Category / Product Type Scope
+                      </h4>
+                      <p className="text-[10px] text-text-secondary mb-3">
+                        The filter will appear in the Shop sidebar and product form only for products in these categories. Leave empty for all collections.
+                      </p>
+                      <div className="border border-border divide-y divide-border max-h-56 overflow-y-auto">
+                        {categories
+                          .filter(c => !c.parent_category_id ||
+                            !['male', 'female', 'unisex'].includes(c.name?.toLowerCase() || ''))
+                          .map(c => (
+                            <label key={c.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-bg-subtle cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={filterScopeIds.includes(c.id)}
+                                onChange={(e) => {
+                                  setFilterScopeIds(prev =>
+                                    e.target.checked ? [...prev, c.id] : prev.filter(id => id !== c.id)
+                                  );
+                                }}
+                                className="w-3.5 h-3.5 accent-accent"
+                              />
+                              <span className="text-xs text-text-primary font-medium">{c.name}</span>
+                              {c.parent_category_id && (
+                                <span className="text-[9px] text-text-secondary ml-auto">sub-category</span>
+                              )}
+                            </label>
+                          ))}
+                      </div>
+                      <div className="flex gap-2 mt-2">
+                        <button
+                          type="button"
+                          onClick={() => setFilterScopeIds(
+                            categories
+                              .filter(c => !c.parent_category_id || !['male', 'female', 'unisex'].includes(c.name?.toLowerCase() || ''))
+                              .map(c => c.id)
+                          )}
+                          className="text-[10px] text-accent hover:underline font-bold uppercase tracking-wider"
+                        >
+                          Select All
+                        </button>
+                        <span className="text-text-secondary text-[10px]">·</span>
+                        <button
+                          type="button"
+                          onClick={() => setFilterScopeIds([])}
+                          className="text-[10px] text-text-secondary hover:underline font-bold uppercase tracking-wider"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex justify-between pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setFilterBuilderStep(1)}
+                        className="px-6 py-2.5 border border-border bg-white text-text-primary text-xs font-bold uppercase tracking-widest hover:bg-bg-subtle transition-colors"
+                      >
+                        Back
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFilterBuilderStep(3)}
+                        className="px-6 py-2.5 bg-accent text-white text-xs font-bold uppercase tracking-widest hover:bg-accent-hover transition-colors"
+                      >
+                        Continue →
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* STEP 3: Filter Options */}
+                {filterBuilderStep === 3 && (
+                  <div className="space-y-5">
+                    <div>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-text-primary mb-1">
+                        Filter Options (values users can pick)
+                      </h4>
+                      <p className="text-[10px] text-text-secondary">
+                        Add each selectable value. Drag ↑↓ to reorder.
+                      </p>
+                    </div>
+
+                    {/* Add new option input */}
+                    {filterType !== 'boolean' && (
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={filterOptionInput}
+                          onChange={(e) => setFilterOptionInput(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddFilterOption(); } }}
+                          className="flex-1 px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent"
+                          placeholder="e.g. Cotton, Regular Fit, Half Sleeve…"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleAddFilterOption}
+                          className="px-4 py-2 bg-accent text-white text-xs font-bold uppercase tracking-wider hover:bg-accent-hover transition-colors"
+                        >
+                          <Plus size={13} />
+                        </button>
+                      </div>
+                    )}
+                    {filterType === 'boolean' && (
+                      <div className="bg-bg-subtle border border-border p-3 text-[10px] text-text-secondary">
+                        Boolean filters automatically use <strong>Yes / No</strong> as options — no manual values needed.
+                      </div>
+                    )}
+
+                    {/* Options list */}
+                    <div className="border border-border divide-y divide-border/50 max-h-56 overflow-y-auto">
+                      {filterOptions.length === 0 ? (
+                        <p className="text-[10px] text-text-secondary/50 text-center py-6 italic">No options added yet.</p>
+                      ) : (
+                        filterOptions.map((o, idx) => (
+                          <div key={o.tempId} className="flex items-center gap-3 px-3 py-2.5">
+                            <GripVertical size={12} className="text-text-secondary/40 flex-shrink-0" />
+                            <span className="text-xs text-text-primary font-medium flex-1">{o.value}</span>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                disabled={idx === 0}
+                                onClick={() => handleMoveFilterOption(idx, 'up')}
+                                className="p-1 text-text-secondary hover:text-text-primary disabled:opacity-20 transition-colors"
+                              >
+                                <ArrowUp size={12} />
+                              </button>
+                              <button
+                                type="button"
+                                disabled={idx === filterOptions.length - 1}
+                                onClick={() => handleMoveFilterOption(idx, 'down')}
+                                className="p-1 text-text-secondary hover:text-text-primary disabled:opacity-20 transition-colors"
+                              >
+                                <ArrowDown size={12} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveFilterOption(o.tempId)}
+                                className="p-1 text-text-secondary hover:text-sale transition-colors"
+                              >
+                                <X size={12} />
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    <div className="flex justify-between pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setFilterBuilderStep(2)}
+                        className="px-6 py-2.5 border border-border bg-white text-text-primary text-xs font-bold uppercase tracking-widest hover:bg-bg-subtle transition-colors"
+                      >
+                        Back
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSaveFilter}
+                        disabled={isSavingFilter}
+                        className="px-6 py-2.5 bg-accent text-white text-xs font-bold uppercase tracking-widest hover:bg-accent-hover transition-colors disabled:opacity-60 flex items-center gap-2"
+                      >
+                        {isSavingFilter ? <><Loader2 size={12} className="animate-spin" /> Saving...</> : (editingFilter ? 'Update Filter' : 'Save Filter')}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* ==========================================
           PRODUCT EDIT/ADD DIALOG MODAL
           ========================================== */}
@@ -4342,6 +5198,7 @@ export default function Admin() {
                           type="button"
                           onClick={() => {
                             setSelectedParentCatId(c.id);
+                            fetchScopedFilters(c.id);
                             setNewParentCatName('');
                             setWizardStep(2);
                           }}
@@ -4408,6 +5265,7 @@ export default function Admin() {
                           type="button"
                           onClick={() => {
                             setSelectedGender(gender as any);
+                            fetchScopedFilters(selectedParentCatId, gender);
                             setWizardStep(3);
                           }}
                           className={`p-6 border text-center font-bold uppercase tracking-wider text-[11px] transition-all flex flex-col justify-center items-center h-28 rounded-none ${selectedGender === gender
@@ -4773,7 +5631,94 @@ export default function Admin() {
                       )}
                     </div>
 
-                    {/* 5. Variant details (SKU inventory list) */}
+                    {/* 5. Dynamic Filter Attributes */}
+                    {scopedFilters.length > 0 && (
+                      <div className="border border-border p-4 bg-bg-subtle space-y-4">
+                        <div>
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-text-primary">
+                            Product Filter Attributes
+                          </h4>
+                          <p className="text-[10px] text-text-secondary mt-0.5">
+                            Assign filter values for this product. These drive the Shop sidebar filters.
+                          </p>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {scopedFilters.map((f) => {
+                            const options = (f.filter_options || []).sort((a, b) => a.sort_order - b.sort_order);
+                            const selected = prodFilterValues[f.slug] || [];
+                            if (f.filter_type === 'boolean') {
+                              return (
+                                <div key={f.id}>
+                                  <label className="block text-[9px] font-bold uppercase tracking-wider text-text-secondary mb-1">{f.name}</label>
+                                  <div className="flex gap-2">
+                                    {['yes', 'no'].map(val => {
+                                      const isOn = selected.includes(val);
+                                      return (
+                                        <button
+                                          key={val}
+                                          type="button"
+                                          onClick={() => setProdFilterValues(prev => ({ ...prev, [f.slug]: isOn ? [] : [val] }))}
+                                          className={`px-4 py-1.5 text-xs font-bold uppercase tracking-wider border transition-colors ${isOn ? 'bg-accent text-white border-accent' : 'bg-white text-text-primary border-border hover:border-accent'}`}
+                                        >
+                                          {val}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            }
+                            if (f.filter_type === 'single-select') {
+                              return (
+                                <div key={f.id}>
+                                  <label className="block text-[9px] font-bold uppercase tracking-wider text-text-secondary mb-1">{f.name}</label>
+                                  <select
+                                    value={selected[0] || ''}
+                                    onChange={(e) => setProdFilterValues(prev => ({
+                                      ...prev,
+                                      [f.slug]: e.target.value ? [e.target.value] : []
+                                    }))}
+                                    className="w-full px-2 py-1.5 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent"
+                                  >
+                                    <option value="">-- None --</option>
+                                    {options.map(o => <option key={o.id} value={o.id}>{o.value}</option>)}
+                                  </select>
+                                </div>
+                              );
+                            }
+                            // multi-select
+                            return (
+                              <div key={f.id}>
+                                <label className="block text-[9px] font-bold uppercase tracking-wider text-text-secondary mb-1">{f.name} <span className="font-normal normal-case">(multi)</span></label>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {options.map(o => {
+                                    const isSel = selected.includes(o.id);
+                                    return (
+                                      <button
+                                        key={o.id}
+                                        type="button"
+                                        onClick={() => setProdFilterValues(prev => ({
+                                          ...prev,
+                                          [f.slug]: isSel
+                                            ? (prev[f.slug] || []).filter(id => id !== o.id)
+                                            : [...(prev[f.slug] || []), o.id]
+                                        }))}
+                                        className={`px-2.5 py-1 text-[10px] font-bold border transition-colors ${isSel ? 'bg-accent text-white border-accent' : 'bg-white text-text-primary border-border hover:border-accent'}`}
+                                      >
+                                        {o.value}
+                                      </button>
+                                    );
+                                  })}
+                                  {options.length === 0 && <span className="text-[10px] text-text-secondary/50 italic">No options configured</span>}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 6. Variant details (SKU inventory list) */}
                     <div className="border border-border p-4 bg-bg-subtle space-y-4">
                       <div>
                         <h4 className="text-xs font-bold uppercase tracking-wider text-text-primary">

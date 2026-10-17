@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
 import { ShoppingBag, Plus, Minus, ArrowRight } from 'lucide-react';
 import { useCartStore } from '../store/useCartStore';
+import { motion, AnimatePresence } from 'framer-motion';
+import { EASE } from '../lib/motion';
 
 export default function Cart() {
   const { items, removeItem, updateQuantity } = useCartStore();
@@ -43,74 +45,84 @@ export default function Cart() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
           {/* Main items listing */}
           <div className="lg:col-span-7 xl:col-span-8 divide-y divide-border/60">
-            {items.map((item) => (
-              <div key={item.id} className="py-6 first:pt-0 last:pb-0 flex gap-4 sm:gap-6 items-start">
-                {/* Thumbnail */}
-                <Link to={`/product/${item.productId}`} className="flex-shrink-0 group">
-                  <img
-                    src={item.image}
-                    alt={item.name}
-                    className="w-20 sm:w-24 aspect-[2/3] object-cover object-top rounded-sm border border-border/60 bg-[#FAFAFA] transition-opacity group-hover:opacity-90"
-                  />
-                </Link>
+            <AnimatePresence initial={false}>
+              {items.map((item) => (
+                <motion.div
+                  key={item.id}
+                  layout
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0, overflow: 'hidden' }}
+                  transition={{ duration: 0.22, ease: EASE }}
+                  className="py-6 first:pt-0 last:pb-0 flex gap-4 sm:gap-6 items-start"
+                >
+                  {/* Thumbnail */}
+                  <Link to={`/product/${item.productId}`} className="flex-shrink-0 group">
+                    <img
+                      src={item.image}
+                      alt={item.name}
+                      className="w-20 sm:w-24 aspect-[2/3] object-cover object-top rounded-sm border border-border/60 bg-[#FAFAFA] transition-opacity group-hover:opacity-90"
+                    />
+                  </Link>
 
-                {/* Details & Controls */}
-                <div className="flex-1 min-w-0 flex flex-col justify-between self-stretch py-0.5">
-                  <div className="space-y-1">
-                    <div className="flex justify-between items-start gap-3">
-                      <Link
-                        to={`/product/${item.productId}`}
-                        className="text-sm font-medium text-text-primary hover:text-text-secondary transition-colors truncate"
-                      >
-                        {item.name}
-                      </Link>
-                      <span className="text-sm font-semibold text-text-primary flex-shrink-0">
-                        ₹{(item.price * item.quantity).toFixed(2)}
-                      </span>
+                  {/* Details & Controls */}
+                  <div className="flex-1 min-w-0 flex flex-col justify-between self-stretch py-0.5">
+                    <div className="space-y-1">
+                      <div className="flex justify-between items-start gap-3">
+                        <Link
+                          to={`/product/${item.productId}`}
+                          className="text-sm font-medium text-text-primary hover:text-text-secondary transition-colors truncate"
+                        >
+                          {item.name}
+                        </Link>
+                        <span className="text-sm font-semibold text-text-primary flex-shrink-0">
+                          ₹{(item.price * item.quantity).toFixed(2)}
+                        </span>
+                      </div>
+
+                      <p className="text-xs text-text-secondary">
+                        Size: {item.size} {item.color && <>• Color: {item.color}</>}
+                      </p>
+                      <p className="text-[11px] text-text-secondary/70">
+                        ₹{item.price.toFixed(2)} each
+                      </p>
                     </div>
 
-                    <p className="text-xs text-text-secondary">
-                      Size: {item.size} {item.color && <>• Color: {item.color}</>}
-                    </p>
-                    <p className="text-[11px] text-text-secondary/70">
-                      ₹{item.price.toFixed(2)} each
-                    </p>
-                  </div>
+                    {/* Quantity and Remove */}
+                    <div className="flex items-center justify-between pt-4">
+                      {/* Minimal Quantity Stepper */}
+                      <div className="flex items-center border border-border/80 rounded-sm bg-white">
+                        <button
+                          onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                          aria-label="Decrease quantity"
+                          className="w-8 h-8 flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-subtle transition-colors"
+                        >
+                          <Minus size={12} />
+                        </button>
+                        <span className="w-8 text-center text-xs font-medium select-none">
+                          {item.quantity}
+                        </span>
+                        <button
+                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                          aria-label="Increase quantity"
+                          className="w-8 h-8 flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-subtle transition-colors"
+                        >
+                          <Plus size={12} />
+                        </button>
+                      </div>
 
-                  {/* Quantity and Remove */}
-                  <div className="flex items-center justify-between pt-4">
-                    {/* Minimal Quantity Stepper */}
-                    <div className="flex items-center border border-border/80 rounded-sm bg-white">
+                      {/* Discreet Remove */}
                       <button
-                        onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                        aria-label="Decrease quantity"
-                        className="w-8 h-8 flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-subtle transition-colors"
+                        onClick={() => removeItem(item.id)}
+                        className="text-xs text-text-secondary/70 hover:text-sale transition-colors font-normal py-1"
                       >
-                        <Minus size={12} />
-                      </button>
-                      <span className="w-8 text-center text-xs font-medium select-none">
-                        {item.quantity}
-                      </span>
-                      <button
-                        onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                        aria-label="Increase quantity"
-                        className="w-8 h-8 flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-subtle transition-colors"
-                      >
-                        <Plus size={12} />
+                        Remove
                       </button>
                     </div>
-
-                    {/* Discreet Remove */}
-                    <button
-                      onClick={() => removeItem(item.id)}
-                      className="text-xs text-text-secondary/70 hover:text-sale transition-colors font-normal py-1"
-                    >
-                      Remove
-                    </button>
                   </div>
-                </div>
-              </div>
-            ))}
+                </motion.div>
+              ))}
+            </AnimatePresence>
           </div>
 
           {/* Minimalist Summary Sidebar */}
