@@ -106,11 +106,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // ── STEP 2: Write order to DB ─────────────────────────────
   try {
-    // Generate human-readable order reference
-    const orderRef = `ZP-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
+    // Generate streamlined sequential order reference ID (e.g. ZPN-001, ZPN-002...)
+    let orderNum = 1;
+    try {
+      const countRes = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=id`, {
+        headers: {
+          apikey: SUPABASE_SERVICE_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+          Range: '0-0',
+          Prefer: 'count=exact',
+        },
+      });
+      const contentRange = countRes.headers.get('content-range');
+      if (contentRange) {
+        const totalCount = parseInt(contentRange.split('/')[1] || '0', 10);
+        if (!isNaN(totalCount)) {
+          orderNum = totalCount + 1;
+        }
+      }
+    } catch (countErr) {
+      console.warn('[verify-payment] Warning reading order count, falling back:', countErr);
+    }
 
-    // Insert orders row
-    const orderRows: any[] = await dbPost('orders', {
+    const orderRef = `ZPN-${String(orderNum).padStart(3, '0')}`;
+
+    // Insert orders row (tracking_id is left NULL until courier AWB is updated in Admin)
+    const orderPayload: any = {
       user_id,
       status: 'processing',
       payment_status: 'paid',
@@ -122,8 +143,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       address_id: address_id ?? null,
       razorpay_order_id,
       razorpay_payment_id,
-      tracking_id: orderRef,
-    });
+      tracking_id: null,
+      order_number: orderRef,
+    };
+
+    let orderRows: any[];
+    try {
+      orderRows = await dbPost('orders', orderPayload);
+    } catch (insertErr: any) {
+      const errStr = String(insertErr?.message || insertErr);
+      if (errStr.includes('order_number') || errStr.includes('schema cache')) {
+        console.warn('[verify-payment] order_number column not found in schema cache, inserting without it:', errStr);
+        delete orderPayload.order_number;
+        orderRows = await dbPost('orders', orderPayload);
+      } else {
+        throw insertErr;
+      }
+    }
 
     const order = orderRows[0];
     if (!order) throw new Error('Order insert returned no data.');
@@ -143,13 +179,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // ── STEP 4: Atomic stock decrement via DB function ──────
     // Uses the decrement_stock() function created in stock_fix_migration.sql
-    // which has WHERE stock_qty >= qty — prevents negative stock
-    // even under simultaneous concurrent orders.
-    for (const item of cart_items) {
-      await dbRpc('decrement_stock', {
-        p_variant_id: item.variant_id,
-        p_qty: item.quantity,
-      });
+    // If decrement_stock RPC is not yet created in Supabase, catch warning without aborting verified order
+    try {
+      for (const item of cart_items) {
+        await dbRpc('decrement_stock', {
+          p_variant_id: item.variant_id,
+          p_qty: item.quantity,
+        });
+      }
+    } catch (stockErr: any) {
+      console.warn('[verify-payment] Warning during decrement_stock RPC:', stockErr.message);
     }
 
     // ── STEP 5: Return success ────────────────────────────
@@ -160,12 +199,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
   } catch (err: any) {
-    console.error('[verify-payment] DB write error after verified payment:', err.message);
+    console.error('[verify-payment] DB write error after verified payment:', err);
     // IMPORTANT: Payment IS real (signature verified) but DB write failed.
-    // Return the payment ID so user can contact support.
+    // Return the payment ID and exact error message so it can be fixed or reported.
     return res.status(500).json({
       success: false,
-      error: `Payment received (ID: ${razorpay_payment_id}) but order could not be saved. Please contact support with this payment ID.`,
+      error: `Payment received (ID: ${razorpay_payment_id}) but order could not be saved: ${err.message || 'Database error'}. Please contact support with this payment ID.`,
+      details: err.message || String(err),
       razorpay_payment_id,
     });
   }

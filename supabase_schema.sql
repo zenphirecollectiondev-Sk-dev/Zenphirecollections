@@ -514,7 +514,7 @@ ADD COLUMN IF NOT EXISTS pants_category_image_url text;
 -- Create join table for occasion-to-product mapping
 CREATE TABLE IF NOT EXISTS public.occasion_products (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  occasion text NOT NULL, -- 'casuals', 'formal', 'ethnic', 'party-wear'
+  occasion text NOT NULL, -- references occasion slug
   product_id uuid REFERENCES public.products(id) ON DELETE CASCADE,
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
   UNIQUE(occasion, product_id)
@@ -532,4 +532,36 @@ CREATE POLICY "Allow public read access to occasion_products"
 CREATE POLICY "Allow admin full access to occasion_products"
   ON public.occasion_products FOR ALL
   USING (public.is_admin());
+
+-- -------------------------------------------------------------
+-- OCCASIONS MANAGEMENT TABLE
+-- -------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS public.occasions (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  name text NOT NULL,
+  slug text UNIQUE NOT NULL,
+  is_active boolean DEFAULT true,
+  sort_order integer DEFAULT 0,
+  created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE public.occasions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow public read access to occasions"
+  ON public.occasions FOR SELECT
+  USING (true);
+
+CREATE POLICY "Allow admin full access to occasions"
+  ON public.occasions FOR ALL
+  USING (public.is_admin());
+
+-- Seed initial occasions if not already present
+INSERT INTO public.occasions (name, slug, sort_order)
+VALUES
+  ('Casuals', 'casuals', 1),
+  ('Formal', 'formal', 2),
+  ('Ethnic', 'ethnic', 3),
+  ('Party Wear', 'party-wear', 4)
+ON CONFLICT (slug) DO NOTHING;
 

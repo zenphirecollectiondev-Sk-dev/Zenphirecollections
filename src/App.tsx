@@ -4,7 +4,7 @@ import { ShoppingBag, Heart, User, Search, Shield, LogOut, Menu, X, ChevronDown,
 import { useAuthStore } from './store/useAuthStore';
 import { useCartStore } from './store/useCartStore';
 import { useWishlistStore } from './store/useWishlistStore';
-import { getCategories } from './lib/supabase';
+import { getCategories, getOccasions, type OccasionRow } from './lib/supabase';
 import { dataCache } from './lib/dataCache';
 import ProtectedRoute from './components/ProtectedRoute';
 import SearchOverlay from './components/SearchOverlay';
@@ -416,6 +416,7 @@ function MobileMenuDrawer({ onClose, openSections, toggleSection, wishlistCount,
   }, []);
 
   const [categories, setCategories] = useState<any[]>(() => dataCache.get<any[]>('categories') ?? []);
+  const [occasions, setOccasions] = useState<OccasionRow[]>(() => dataCache.get<OccasionRow[]>('occasions') ?? []);
 
   useEffect(() => {
     const cached = dataCache.get<any[]>('categories');
@@ -425,6 +426,17 @@ function MobileMenuDrawer({ onClose, openSections, toggleSection, wishlistCount,
         if (cats && cats.length > 0) {
           dataCache.set('categories', cats);
           setCategories(cats);
+        }
+      });
+    }
+
+    const cachedOccs = dataCache.get<OccasionRow[]>('occasions');
+    if (cachedOccs && cachedOccs.length > 0) setOccasions(cachedOccs);
+    if (!cachedOccs || dataCache.isStale('occasions')) {
+      getOccasions().then((occs) => {
+        if (occs && occs.length > 0) {
+          dataCache.set('occasions', occs);
+          setOccasions(occs);
         }
       });
     }
@@ -463,16 +475,23 @@ function MobileMenuDrawer({ onClose, openSections, toggleSection, wishlistCount,
       return items;
     };
 
-    return [
-      {
-        key: 'occasions',
-        label: 'Occasions',
-        items: [
+    const occasionItems = (occasions && occasions.length > 0)
+      ? occasions.map(occ => ({
+          name: occ.name,
+          to: `/shop?occasion=${occ.slug}`
+        }))
+      : [
           { name: 'Casuals', to: '/shop?occasion=casuals' },
           { name: 'Formal', to: '/shop?occasion=formal' },
           { name: 'Ethnic', to: '/shop?occasion=ethnic' },
           { name: 'Party Wear', to: '/shop?occasion=party-wear' },
-        ],
+        ];
+
+    return [
+      {
+        key: 'occasions',
+        label: 'Occasions',
+        items: occasionItems,
       },
       {
         key: 'women',
@@ -490,7 +509,7 @@ function MobileMenuDrawer({ onClose, openSections, toggleSection, wishlistCount,
         items: getGenderCategoryItems('unisex', "All Unisex"),
       },
     ];
-  }, [categories]);
+  }, [categories, occasions]);
 
   return (
     <motion.div

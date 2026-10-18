@@ -32,6 +32,7 @@ import {
   SlidersHorizontal,
   Filter,
   GripVertical,
+  Pencil,
 } from 'lucide-react';
 
 
@@ -79,6 +80,14 @@ interface SizeGuideTemplate {
 }
 
 
+
+interface OccasionItem {
+  id: string;
+  name: string;
+  slug: string;
+  is_active: boolean;
+  sort_order: number;
+}
 
 // ─── Filter system types ───────────────────────────────────────────────────
 interface ProductFilter {
@@ -279,10 +288,20 @@ export default function Admin() {
   const [newArrivalsSearch, setNewArrivalsSearch] = useState('');
 
   // Occasions state variables
+  const [occasionsList, setOccasionsList] = useState<OccasionItem[]>([
+    { id: '1', name: 'Casuals', slug: 'casuals', is_active: true, sort_order: 1 },
+    { id: '2', name: 'Formal', slug: 'formal', is_active: true, sort_order: 2 },
+    { id: '3', name: 'Ethnic', slug: 'ethnic', is_active: true, sort_order: 3 },
+    { id: '4', name: 'Party Wear', slug: 'party-wear', is_active: true, sort_order: 4 }
+  ]);
   const [occasionProducts, setOccasionProducts] = useState<any[]>([]);
-  const [selectedOccasion, setSelectedOccasion] = useState<'casuals' | 'formal' | 'ethnic' | 'party-wear'>('casuals');
+  const [selectedOccasion, setSelectedOccasion] = useState<string>('casuals');
   const [occasionSearch, setOccasionSearch] = useState('');
   const [isAddingOccasion, setIsAddingOccasion] = useState(false);
+  const [isOccasionModalOpen, setIsOccasionModalOpen] = useState(false);
+  const [editingOccasion, setEditingOccasion] = useState<OccasionItem | null>(null);
+  const [occFormName, setOccFormName] = useState('');
+  const [occFormSlug, setOccFormSlug] = useState('');
 
   // ── Filter system state ─────────────────────────────────────────────────────
   const [productFilters, setProductFilters] = useState<ProductFilter[]>([]);
@@ -531,7 +550,25 @@ export default function Admin() {
         console.warn('homepage_config table fetch failed or not yet created. Using defaults.', hErr);
       }
 
-      // 8. Fetch Occasion Products
+      // 8. Fetch Occasions & Occasion Products
+      try {
+        const { data: occListData, error: occListErr } = await supabase
+          .from('occasions' as any)
+          .select('*')
+          .order('sort_order', { ascending: true });
+        if (!occListErr && occListData && (occListData as any).length > 0) {
+          const list = occListData as any as OccasionItem[];
+          setOccasionsList(list);
+          // Default selection to first active occasion if current selection is invalid
+          setSelectedOccasion(prev => {
+            const exists = list.some((o: any) => o.slug === prev);
+            return exists ? prev : list[0].slug;
+          });
+        }
+      } catch (occListErr) {
+        console.warn('occasions table fetch warning:', occListErr);
+      }
+
       try {
         const { data: occData, error: occErr } = await supabase
           .from('occasion_products' as any)
@@ -818,7 +855,10 @@ export default function Admin() {
   const fetchOrderDetails = async (order: any) => {
     setSelectedOrder(order);
     setOrderUpdateStatus(order.status);
-    setOrderUpdateTracking(order.tracking_id || '');
+    const existingTracking = order.tracking_id && (order.tracking_id.toUpperCase().startsWith('ZPN-') || order.tracking_id.toUpperCase().startsWith('ZP-'))
+      ? ''
+      : (order.tracking_id || '');
+    setOrderUpdateTracking(existingTracking);
     setSelectedCourierPartner(order.courier_name || '');
     setLoadingOrderItems(true);
     setIsOrderModalOpen(true);
@@ -1707,6 +1747,56 @@ export default function Admin() {
       .replace(/^-+|-+$/g, '');
   };
 
+  // Helper to ensure category slug is unique in DB
+  const getUniqueCategorySlug = async (baseSlug: string, excludeId?: string, parentId?: string | null): Promise<string> => {
+    let cleanBase = generateSlug(baseSlug);
+    if (!cleanBase) cleanBase = 'category';
+
+    let slugCandidate = cleanBase;
+
+    // If subcategory has a parent, try prefixing parent's slug if baseSlug doesn't already contain it
+    if (parentId) {
+      const parentObj = categories.find(c => c.id === parentId);
+      if (parentObj?.slug && !slugCandidate.startsWith(parentObj.slug)) {
+        slugCandidate = `${parentObj.slug}-${slugCandidate}`;
+      }
+    }
+
+    let testSlug = slugCandidate;
+    let counter = 1;
+
+    while (counter < 100) {
+      // 1. Check in client memory state
+      const memoryMatch = categories.find(c => c.slug.toLowerCase() === testSlug.toLowerCase() && c.id !== excludeId);
+      if (memoryMatch) {
+        testSlug = `${slugCandidate}-${counter}`;
+        counter++;
+        continue;
+      }
+
+      // 2. Check directly in Supabase DB
+      const { data, error } = await supabase
+        .from('categories')
+        .select('id')
+        .eq('slug', testSlug)
+        .maybeSingle();
+
+      if (error) {
+        console.warn('Error checking category slug uniqueness in DB:', error);
+        break;
+      }
+
+      if (!data || data.id === excludeId) {
+        return testSlug;
+      }
+
+      testSlug = `${slugCandidate}-${counter}`;
+      counter++;
+    }
+
+    return `${slugCandidate}-${Date.now().toString(36)}`;
+  };
+
   // Open Edit Product form
   const handleOpenEditProduct = (prod: Product) => {
     setEditingProduct(prod);
@@ -1855,38 +1945,68 @@ export default function Admin() {
       // 1. Resolve Category ID from wizard selections
       if (newParentCatName.trim()) {
         const parentSlug = generateSlug(newParentCatName);
-        const existingParent = categories.find(c => c.slug === parentSlug && !c.parent_category_id);
-        let parentId = existingParent?.id;
+        let parentId: string | null = null;
 
-        if (!existingParent) {
-          const { data: newParent, error: parentErr } = await supabase
+        // Check memory or DB for existing parent with same slug
+        const existingParentMem = categories.find(c => c.slug.toLowerCase() === parentSlug.toLowerCase());
+        if (existingParentMem) {
+          parentId = existingParentMem.id;
+        } else {
+          const { data: dbParent } = await supabase
             .from('categories')
-            .insert({
-              name: newParentCatName.trim().toUpperCase(),
-              slug: parentSlug,
-              parent_category_id: null
-            })
-            .select()
-            .single();
-          if (parentErr) throw parentErr;
-          parentId = newParent.id;
-          dataCache.delete('categories');
-          dataCache.invalidate('categories');
+            .select('id')
+            .eq('slug', parentSlug)
+            .maybeSingle();
+
+          if (dbParent) {
+            parentId = dbParent.id;
+          } else {
+            const safeParentSlug = await getUniqueCategorySlug(parentSlug);
+            const { data: newParent, error: parentErr } = await supabase
+              .from('categories')
+              .insert({
+                name: newParentCatName.trim().toUpperCase(),
+                slug: safeParentSlug,
+                parent_category_id: null
+              })
+              .select()
+              .single();
+            if (parentErr) throw parentErr;
+            parentId = newParent.id;
+            dataCache.delete('categories');
+            dataCache.invalidate('categories');
+          }
         }
 
-        if (selectedGender) {
+        if (selectedGender && parentId) {
           const childSlug = `${parentSlug}-${selectedGender.toLowerCase()}`;
-          const { data: newChild, error: childErr } = await supabase
-            .from('categories')
-            .insert({
-              name: selectedGender,
-              slug: childSlug,
-              parent_category_id: parentId
-            })
-            .select()
-            .single();
-          if (childErr) throw childErr;
-          finalCategoryId = newChild.id;
+          const existingChildMem = categories.find(c => c.slug.toLowerCase() === childSlug.toLowerCase());
+          if (existingChildMem) {
+            finalCategoryId = existingChildMem.id;
+          } else {
+            const { data: dbChild } = await supabase
+              .from('categories')
+              .select('id')
+              .eq('slug', childSlug)
+              .maybeSingle();
+
+            if (dbChild) {
+              finalCategoryId = dbChild.id;
+            } else {
+              const safeChildSlug = await getUniqueCategorySlug(childSlug, undefined, parentId);
+              const { data: newChild, error: childErr } = await supabase
+                .from('categories')
+                .insert({
+                  name: selectedGender,
+                  slug: safeChildSlug,
+                  parent_category_id: parentId
+                })
+                .select()
+                .single();
+              if (childErr) throw childErr;
+              finalCategoryId = newChild.id;
+            }
+          }
         } else {
           finalCategoryId = parentId || null;
         }
@@ -1895,22 +2015,32 @@ export default function Admin() {
         if (parentCatObj) {
           if (selectedGender) {
             const childSlug = `${parentCatObj.slug}-${selectedGender.toLowerCase()}`;
-            const existingChild = categories.find(c => c.slug === childSlug && c.parent_category_id === parentCatObj.id);
-
-            if (existingChild) {
-              finalCategoryId = existingChild.id;
+            const existingChildMem = categories.find(c => c.slug.toLowerCase() === childSlug.toLowerCase());
+            if (existingChildMem) {
+              finalCategoryId = existingChildMem.id;
             } else {
-              const { data: newChild, error: childErr } = await supabase
+              const { data: dbChild } = await supabase
                 .from('categories')
-                .insert({
-                  name: selectedGender,
-                  slug: childSlug,
-                  parent_category_id: parentCatObj.id
-                })
-                .select()
-                .single();
-              if (childErr) throw childErr;
-              finalCategoryId = newChild.id;
+                .select('id')
+                .eq('slug', childSlug)
+                .maybeSingle();
+
+              if (dbChild) {
+                finalCategoryId = dbChild.id;
+              } else {
+                const safeChildSlug = await getUniqueCategorySlug(childSlug, undefined, parentCatObj.id);
+                const { data: newChild, error: childErr } = await supabase
+                  .from('categories')
+                  .insert({
+                    name: selectedGender,
+                    slug: safeChildSlug,
+                    parent_category_id: parentCatObj.id
+                  })
+                  .select()
+                  .single();
+                if (childErr) throw childErr;
+                finalCategoryId = newChild.id;
+              }
             }
           } else {
             finalCategoryId = parentCatObj.id;
@@ -2136,9 +2266,12 @@ export default function Admin() {
     }
 
     try {
+      const rawSlug = catSlug.trim() || generateSlug(catName);
+      const safeSlug = await getUniqueCategorySlug(rawSlug, editingCategory?.id, catParent || null);
+
       const payload = {
         name: catName.trim(),
-        slug: catSlug.trim() || generateSlug(catName),
+        slug: safeSlug,
         parent_category_id: catParent || null,
         size_guide_html: catSizeGuide.trim() || null,
         image_url: catImageUrl.trim() || null
@@ -2161,10 +2294,18 @@ export default function Admin() {
       dataCache.invalidate('categories');
 
       setIsCategoryModalOpen(false);
-      triggerNotification(`Category "${catName}" saved successfully`);
+      if (safeSlug !== rawSlug && !editingCategory) {
+        triggerNotification(`Category "${catName}" saved with unique slug "${safeSlug}"`);
+      } else {
+        triggerNotification(`Category "${catName}" saved successfully`);
+      }
       fetchData();
     } catch (err: any) {
-      triggerNotification(err.message || 'Error occurred saving category', true);
+      if (err.message?.includes('categories_slug_key')) {
+        triggerNotification('A category with this slug already exists. Please choose a different slug.', true);
+      } else {
+        triggerNotification(err.message || 'Error occurred saving category', true);
+      }
     }
   };
 
@@ -2746,10 +2887,10 @@ export default function Admin() {
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="grid grid-cols-1 lg:grid-cols-12 gap-8"
+            className="space-y-6"
           >
-            {/* Left: categories table */}
-            <div className="lg:col-span-7 bg-white border border-border/80 p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)]">
+            {/* Categories table */}
+            <div className="bg-white border border-border/80 p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)]">
               <div className="flex justify-between items-center mb-4 pb-2 border-b border-border">
                 <h3 className="text-xs font-heading font-black uppercase tracking-wider text-text-primary">
                   Sizing Categories Listing
@@ -2854,37 +2995,6 @@ export default function Admin() {
                 </div>
               )}
             </div>
-
-            {/* Right: Sizing instructions layout */}
-            <div className="lg:col-span-5 bg-white border border-border/80 p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)] space-y-4">
-              <h3 className="text-xs font-heading font-black uppercase tracking-wider text-text-primary pb-2 border-b border-border">
-                Flexible Size Guide Logic
-              </h3>
-              <p className="text-xs text-text-secondary leading-relaxed">
-                Zenphire Collections implements a flexible, cascading size guide engine:
-              </p>
-              <div className="bg-bg-subtle p-4 border-l-2 border-accent space-y-3">
-                <div className="flex gap-2.5 items-start">
-                  <span className="text-[10px] font-black uppercase bg-accent text-white px-1.5 py-0.5">1</span>
-                  <div className="text-xs text-text-primary leading-snug">
-                    <strong>Custom Product Overrides</strong>: If a product's size guide type is set to <em>Custom</em>, it ignores category fallbacks and displays the custom HTML sizing tables directly.
-                  </div>
-                </div>
-                <div className="flex gap-2.5 items-start">
-                  <span className="text-[10px] font-black uppercase bg-accent text-white px-1.5 py-0.5">2</span>
-                  <div className="text-xs text-text-primary leading-snug">
-                    <strong>Category Sizing Table</strong>: If no custom override exists, the product retrieves the default size guide HTML defined on its parent category.
-                  </div>
-                </div>
-                <div className="flex gap-2.5 items-start">
-                  <span className="text-[10px] font-black uppercase bg-accent text-white px-1.5 py-0.5">3</span>
-                  <div className="text-xs text-text-primary leading-snug">
-                    <strong>Standard Default</strong>: If neither is configured, the system matches keywords in the product name (e.g. Pants vs Shirts) to fall back to general size charts.
-                  </div>
-                </div>
-              </div>
-            </div>
-
           </motion.div>
         )}
 
@@ -3123,52 +3233,97 @@ export default function Admin() {
                         if (!query) return true;
                         const matchId = o.id.toLowerCase().includes(query);
                         const matchName = o.profiles?.name?.toLowerCase().includes(query);
-                        return matchId || matchName;
+                        const matchOrderNum = (o as any).order_number?.toLowerCase()?.includes(query);
+                        const matchTracking = o.tracking_id?.toLowerCase()?.includes(query);
+                        return matchId || matchName || matchOrderNum || matchTracking;
                       })
-                      .map((o) => (
-                        <tr key={o.id} className="hover:bg-bg-subtle">
-                          <td className="py-4 pl-6 font-mono font-bold text-text-primary text-[11px]">
-                            {o.id.slice(0, 8)}...
-                          </td>
-                          <td className="py-4 text-text-primary font-medium">
-                            <div className="font-bold">{o.profiles?.name || 'Guest / Anonymous'}</div>
-                            <div className="text-[10px] text-text-secondary font-mono mt-0.5">{o.profiles?.phone || 'No phone'}</div>
-                          </td>
-                          <td className="py-4 text-text-secondary">
-                            {new Date(o.created_at).toLocaleString()}
-                          </td>
-                          <td className="py-4 text-right font-black text-text-primary">
-                            ₹{Number(o.total || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                          </td>
-                          <td className="py-4 pl-8">
-                            <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 border ${o.status === 'delivered'
-                              ? 'bg-green-50 text-green-700 border-green-200'
-                              : o.status === 'cancelled'
-                                ? 'bg-red-50 text-sale border-red-200'
-                                : o.status === 'shipped'
-                                  ? 'bg-blue-50 text-blue-700 border-blue-200'
-                                  : o.status === 'processing'
-                                    ? 'bg-purple-50 text-purple-700 border-purple-200'
-                                    : 'bg-yellow-50 text-yellow-700 border-yellow-200'
-                              }`}>
-                              {o.status}
-                            </span>
-                          </td>
-                          <td className="py-4 font-mono text-text-secondary text-[11px]">
-                            {o.tracking_id || (
-                              <span className="text-[10px] text-text-secondary/50 italic">Unassigned</span>
-                            )}
-                          </td>
-                          <td className="py-4 pr-6 text-right">
-                            <button
-                              onClick={() => fetchOrderDetails(o)}
-                              className="border border-border bg-white text-text-primary px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider hover:bg-bg-subtle transition-all shadow-xs"
-                            >
-                              View Details
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
+                      .map((o, idx) => {
+                        const orderRef = (o as any).order_number?.trim() ||
+                          (o.tracking_id && (o.tracking_id.toUpperCase().startsWith('ZPN-') || o.tracking_id.toUpperCase().startsWith('ZP-'))
+                            ? o.tracking_id
+                            : `ZPN-${String(recentOrders.length - idx).padStart(3, '0')}`);
+
+                        const isRealTracking = Boolean(
+                          o.tracking_id &&
+                          !o.tracking_id.toUpperCase().startsWith('ZPN-') &&
+                          !o.tracking_id.toUpperCase().startsWith('ZP-')
+                        );
+
+                        return (
+                          <tr key={o.id} className="hover:bg-bg-subtle">
+                            <td className="py-4 pl-6">
+                              <div className="font-mono font-bold text-text-primary text-xs tracking-wider">
+                                #{orderRef}
+                              </div>
+                              <div className="text-[10px] text-text-secondary font-mono mt-0.5">
+                                {o.id.slice(0, 8)}...
+                              </div>
+                            </td>
+                            <td className="py-4 text-text-primary font-medium">
+                              <div className="font-bold">{o.profiles?.name || 'Guest / Anonymous'}</div>
+                              <div className="text-[10px] text-text-secondary font-mono mt-0.5">{o.profiles?.phone || 'No phone'}</div>
+                            </td>
+                            <td className="py-4 text-text-secondary text-xs">
+                              {new Date(o.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              <div className="text-[10px] text-text-secondary/70">
+                                {new Date(o.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                              </div>
+                            </td>
+                            <td className="py-4 text-right">
+                              <div className="font-black text-text-primary text-xs">
+                                ₹{Number(o.total || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                              </div>
+                              <div className="mt-1">
+                                <span className={`inline-block text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
+                                  (o as any).payment_status === 'paid'
+                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                    : 'bg-amber-50 text-amber-800 border-amber-200'
+                                }`}>
+                                  {(o as any).payment_status === 'paid' ? 'Paid' : 'Not Paid'}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="py-4 pl-8">
+                              <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 border ${o.status === 'delivered'
+                                ? 'bg-green-50 text-green-700 border-green-200'
+                                : o.status === 'cancelled'
+                                  ? 'bg-red-50 text-sale border-red-200'
+                                  : o.status === 'shipped'
+                                    ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                    : o.status === 'processing'
+                                      ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                      : 'bg-yellow-50 text-yellow-700 border-yellow-200'
+                                }`}>
+                                {o.status}
+                              </span>
+                            </td>
+                            <td className="py-4 text-[11px]">
+                              {isRealTracking ? (
+                                <div>
+                                  <div className="font-mono font-bold text-text-primary text-xs">
+                                    {o.tracking_id}
+                                  </div>
+                                  {(o as any).courier_name && (
+                                    <span className="text-[9px] text-text-secondary uppercase tracking-wider block mt-0.5">
+                                      via {(o as any).courier_name}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-[10px] text-text-secondary/50 italic">Awaiting Dispatch</span>
+                              )}
+                            </td>
+                            <td className="py-4 pr-6 text-right">
+                              <button
+                                onClick={() => fetchOrderDetails(o)}
+                                className="border border-border bg-white text-text-primary px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider hover:bg-bg-subtle transition-all shadow-xs"
+                              >
+                                View Details
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     {recentOrders.length === 0 && (
                       <tr>
                         <td colSpan={7} className="py-12 text-center text-xs text-text-secondary">
@@ -4312,35 +4467,103 @@ export default function Admin() {
           >
             {/* Left Column: Manage Products inside the selected Occasion */}
             <div className="lg:col-span-8 space-y-8 bg-white border border-border/80 p-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)]">
-              <div>
-                <h3 className="text-xs font-heading font-black uppercase tracking-wider text-text-primary pb-2 border-b border-border">
-                  Occasion Collection Manager
-                </h3>
+              {/* Header with Title and Add Occasion Type Button */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-border">
+                <div>
+                  <h3 className="text-xs font-heading font-black uppercase tracking-wider text-text-primary">
+                    Occasion Collection Manager
+                  </h3>
+                  <p className="text-[10px] text-text-secondary mt-0.5">
+                    Define occasions and assign curated products to each collection.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingOccasion(null);
+                    setOccFormName('');
+                    setOccFormSlug('');
+                    setIsOccasionModalOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-accent text-white text-[10px] font-bold uppercase tracking-wider hover:bg-accent-hover transition-colors shadow-sm self-start sm:self-auto"
+                >
+                  <Plus size={12} />
+                  Add Occasion Type
+                </button>
               </div>
 
               {/* Selector tabs for Occasion Category */}
-              <div className="flex flex-wrap gap-2.5">
-                {[
-                  { key: 'casuals', label: 'Casuals' },
-                  { key: 'formal', label: 'Formal' },
-                  { key: 'ethnic', label: 'Ethnic' },
-                  { key: 'party-wear', label: 'Party Wear' }
-                ].map((occ) => (
-                  <button
-                    key={occ.key}
-                    type="button"
-                    onClick={() => {
-                      setSelectedOccasion(occ.key as any);
-                      setOccasionSearch('');
-                    }}
-                    className={`px-5 py-2.5 text-xs font-bold uppercase tracking-wider border transition-all ${selectedOccasion === occ.key
-                        ? 'bg-accent border-accent text-white shadow-sm'
-                        : 'bg-white border-border text-text-secondary hover:border-accent hover:text-text-primary'
+              <div className="flex flex-wrap items-center gap-2">
+                {occasionsList.map((occ) => {
+                  const isSelected = selectedOccasion === occ.slug;
+                  return (
+                    <div
+                      key={occ.id || occ.slug}
+                      className={`group relative flex items-center border transition-all ${
+                        isSelected
+                          ? 'bg-accent border-accent text-white shadow-sm'
+                          : 'bg-white border-border text-text-secondary hover:border-accent hover:text-text-primary'
                       }`}
-                  >
-                    {occ.label}
-                  </button>
-                ))}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedOccasion(occ.slug);
+                          setOccasionSearch('');
+                        }}
+                        className="px-4 py-2 text-xs font-bold uppercase tracking-wider"
+                      >
+                        {occ.name}
+                      </button>
+
+                      {/* Quick Edit / Delete buttons */}
+                      <div className="flex items-center pr-1.5 gap-0.5 opacity-70 group-hover:opacity-100 transition-opacity">
+                        <button
+                          type="button"
+                          title="Edit Occasion"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingOccasion(occ);
+                            setOccFormName(occ.name);
+                            setOccFormSlug(occ.slug);
+                            setIsOccasionModalOpen(true);
+                          }}
+                          className={`p-1 hover:scale-110 transition-transform ${isSelected ? 'text-white/80 hover:text-white' : 'text-text-secondary hover:text-accent'}`}
+                        >
+                          <Pencil size={11} />
+                        </button>
+                        <button
+                          type="button"
+                          title="Delete Occasion"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (confirm(`Are you sure you want to delete occasion "${occ.name}"? Products mapped to this occasion will also be unlinked.`)) {
+                              try {
+                                await supabase
+                                  .from('occasion_products' as any)
+                                  .delete()
+                                  .eq('occasion', occ.slug);
+                                const { error } = await supabase
+                                  .from('occasions' as any)
+                                  .delete()
+                                  .eq('id', occ.id);
+                                if (error) throw error;
+                                triggerNotification(`Occasion "${occ.name}" deleted.`);
+                                fetchData();
+                              } catch (delErr: any) {
+                                console.error('Error deleting occasion:', delErr);
+                                alert(delErr.message || 'Failed to delete occasion.');
+                              }
+                            }
+                          }}
+                          className={`p-1 hover:scale-110 transition-transform ${isSelected ? 'text-white/80 hover:text-sale' : 'text-text-secondary hover:text-sale'}`}
+                        >
+                          <Trash2 size={11} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
 
               {/* Add product by name search */}
@@ -4348,7 +4571,7 @@ export default function Admin() {
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary">
                   Add Product to{' '}
                   <span className="text-accent">
-                    {selectedOccasion === 'party-wear' ? 'Party Wear' : selectedOccasion.charAt(0).toUpperCase() + selectedOccasion.slice(1)}
+                    {occasionsList.find(o => o.slug === selectedOccasion)?.name || selectedOccasion.replace(/-/g, ' ')}
                   </span>
                 </label>
 
@@ -5372,10 +5595,11 @@ export default function Admin() {
                           className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent uppercase tracking-wider font-semibold"
                         >
                           <option value="">-- None (General) --</option>
-                          <option value="casuals">Casuals</option>
-                          <option value="formal">Formal</option>
-                          <option value="ethnic">Ethnic</option>
-                          <option value="party-wear">Party Wear</option>
+                          {occasionsList.map((occ) => (
+                            <option key={occ.id || occ.slug} value={occ.slug}>
+                              {occ.name}
+                            </option>
+                          ))}
                         </select>
                       </div>
                     </div>
@@ -5942,6 +6166,11 @@ export default function Admin() {
                     className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent font-mono"
                     placeholder="shirts"
                   />
+                  {catSlug.trim() && categories.some(c => c.slug.toLowerCase() === catSlug.trim().toLowerCase() && c.id !== editingCategory?.id) && (
+                    <p className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded mt-1 font-medium">
+                      Note: Slug &quot;{catSlug.trim()}&quot; is already in use. It will automatically be suffixed (e.g. &quot;{catSlug.trim()}-1&quot;) on save to keep it unique.
+                    </p>
+                  )}
                 </div>
 
                 {/* Parent category */}
@@ -5951,7 +6180,19 @@ export default function Admin() {
                   </label>
                   <select
                     value={catParent}
-                    onChange={(e) => setCatParent(e.target.value)}
+                    onChange={(e) => {
+                      const newParentId = e.target.value;
+                      setCatParent(newParentId);
+                      if (!editingCategory && catName.trim()) {
+                        const parentObj = categories.find(c => c.id === newParentId);
+                        const base = generateSlug(catName);
+                        if (parentObj?.slug && !base.startsWith(parentObj.slug)) {
+                          setCatSlug(`${parentObj.slug}-${base}`);
+                        } else {
+                          setCatSlug(base);
+                        }
+                      }
+                    }}
                     className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent uppercase font-semibold"
                   >
                     <option value="">None (Top Level — Visible on Homepage &amp; Shop Filters)</option>
@@ -6080,8 +6321,11 @@ export default function Admin() {
                     Transaction Detail Explorer
                   </span>
                   <h3 className="text-lg font-heading font-black uppercase mt-1 text-text-primary">
-                    Order ID: {selectedOrder.id}
+                    Order Ref: #{selectedOrder.order_number || (selectedOrder.tracking_id && (selectedOrder.tracking_id.toUpperCase().startsWith('ZPN-') || selectedOrder.tracking_id.toUpperCase().startsWith('ZP-')) ? selectedOrder.tracking_id : `ZPN-${selectedOrder.id.slice(0, 4).toUpperCase()}`)}
                   </h3>
+                  <p className="text-[10px] text-text-secondary font-mono mt-0.5">
+                    UUID: {selectedOrder.id}
+                  </p>
                 </div>
                 <button
                   onClick={() => setIsOrderModalOpen(false)}
@@ -6133,9 +6377,18 @@ export default function Admin() {
 
                   {/* Financial Breakdown / Coupon info */}
                   <div className="bg-bg-subtle p-5 border border-border">
-                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-text-primary mb-3 pb-1 border-b border-border">
-                      Financial Transaction Receipt
-                    </h4>
+                    <div className="flex justify-between items-center mb-3 pb-1 border-b border-border">
+                      <h4 className="text-[10px] font-bold uppercase tracking-wider text-text-primary">
+                        Financial Transaction Receipt
+                      </h4>
+                      <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
+                        selectedOrder.payment_status === 'paid'
+                          ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                          : 'bg-amber-50 text-amber-800 border-amber-200'
+                      }`}>
+                        {selectedOrder.payment_status === 'paid' ? 'Paid' : 'Not Paid'}
+                      </span>
+                    </div>
                     <div className="space-y-2 text-xs">
                       <div className="flex justify-between">
                         <span className="text-text-secondary">Subtotal:</span>
@@ -6249,15 +6502,18 @@ export default function Admin() {
                     {/* Tracking ID */}
                     <div>
                       <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
-                        Shipping Tracking ID
+                        Courier Tracking Number / AWB
                       </label>
                       <input
                         type="text"
                         value={orderUpdateTracking}
                         onChange={(e) => setOrderUpdateTracking(e.target.value)}
                         className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent font-mono"
-                        placeholder="e.g. TRK123456789"
+                        placeholder="e.g. DEL123456789"
                       />
+                      <p className="text-[10px] text-text-secondary mt-1">
+                        Once saved, this tracking number will immediately appear on the client's order history dashboard.
+                      </p>
                     </div>
                   </div>
 
@@ -6497,6 +6753,142 @@ export default function Admin() {
                     className="px-4 py-2 bg-accent text-white text-[10px] font-bold uppercase tracking-wider hover:bg-accent-hover transition-colors shadow-sm"
                   >
                     Save Partner
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ==========================================
+          OCCASION TYPE ADD / EDIT MODAL
+          ========================================== */}
+      <AnimatePresence>
+        {isOccasionModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsOccasionModalOpen(false)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="relative w-full max-w-md bg-white border border-border p-6 shadow-2xl z-10 flex flex-col"
+            >
+              <div className="flex justify-between items-center border-b border-border pb-3 mb-4">
+                <div>
+                  <span className="text-[9px] uppercase tracking-widest text-text-secondary font-black bg-bg-subtle px-2 py-0.5 border border-border">
+                    {editingOccasion ? 'Edit Occasion' : 'New Occasion'}
+                  </span>
+                  <h3 className="text-sm font-heading font-black uppercase mt-1 text-text-primary">
+                    {editingOccasion ? 'Modify Occasion Type' : 'Create Occasion Type'}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsOccasionModalOpen(false)}
+                  className="p-1.5 text-text-secondary hover:text-text-primary hover:bg-bg-subtle transition-colors rounded-full"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!occFormName.trim()) {
+                    alert('Occasion name is required.');
+                    return;
+                  }
+                  const slug = (occFormSlug.trim() || occFormName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''));
+                  try {
+                    if (editingOccasion) {
+                      const { error } = await supabase
+                        .from('occasions' as any)
+                        .update({
+                          name: occFormName.trim(),
+                          slug: slug
+                        })
+                        .eq('id', editingOccasion.id);
+                      if (error) throw error;
+                      triggerNotification(`Occasion "${occFormName}" updated!`);
+                    } else {
+                      const nextOrder = occasionsList.length > 0 ? Math.max(...occasionsList.map(o => o.sort_order || 0)) + 1 : 1;
+                      const { error } = await supabase
+                        .from('occasions' as any)
+                        .insert({
+                          name: occFormName.trim(),
+                          slug: slug,
+                          sort_order: nextOrder,
+                          is_active: true
+                        });
+                      if (error) throw error;
+                      triggerNotification(`Occasion "${occFormName}" created!`);
+                      setSelectedOccasion(slug);
+                    }
+                    setIsOccasionModalOpen(false);
+                    fetchData();
+                  } catch (saveErr: any) {
+                    console.error('Error saving occasion:', saveErr);
+                    alert(saveErr.message || 'Error saving occasion. Make sure table "occasions" exists in Supabase.');
+                  }
+                }}
+                className="space-y-4"
+              >
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
+                    Occasion Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={occFormName}
+                    onChange={(e) => {
+                      setOccFormName(e.target.value);
+                      if (!editingOccasion) {
+                        setOccFormSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''));
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent font-semibold"
+                    placeholder="e.g. Festive, Wedding, Vacation..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-text-primary mb-1">
+                    Slug / URL Key
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={occFormSlug}
+                    onChange={(e) => setOccFormSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, ''))}
+                    className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs focus:outline-none focus:border-accent font-mono"
+                    placeholder="e.g. festive, wedding"
+                  />
+                  <p className="text-[10px] text-text-secondary mt-1">
+                    This is used in the shop link, e.g. <span className="font-mono text-accent">/shop?occasion={occFormSlug || 'slug'}</span>
+                  </p>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-3 border-t border-border">
+                  <button
+                    type="button"
+                    onClick={() => setIsOccasionModalOpen(false)}
+                    className="px-4 py-2 border border-border bg-white text-text-primary text-[10px] font-bold uppercase tracking-wider hover:bg-bg-subtle transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-accent text-white text-[10px] font-bold uppercase tracking-wider hover:bg-accent-hover transition-colors shadow-sm"
+                  >
+                    {editingOccasion ? 'Update Occasion' : 'Create Occasion'}
                   </button>
                 </div>
               </form>

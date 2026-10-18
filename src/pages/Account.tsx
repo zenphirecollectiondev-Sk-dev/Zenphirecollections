@@ -20,7 +20,9 @@ import {
   Check,
   Package,
   AlertCircle,
-  Copy
+  Copy,
+  ExternalLink,
+  Truck
 } from 'lucide-react';
 
 interface OrderItem {
@@ -40,9 +42,13 @@ interface OrderItem {
 
 interface OrderWithItems {
   id: string;
+  order_number?: string | null;
   status: string;
+  payment_status?: string | null;
   total: number;
   tracking_id: string | null;
+  courier_name?: string | null;
+  courier_tracking_url?: string | null;
   created_at: string;
   order_items: OrderItem[];
 }
@@ -995,8 +1001,18 @@ export default function Account() {
             </div>
           ) : (
             <div className="space-y-6">
-              {orders.map((order) => {
+              {orders.map((order, orderIdx) => {
                 const { steps, activeIndex, isCancelled } = getTimelineInfo(order.status);
+                const orderRefId = order.order_number?.trim() ||
+                  (order.tracking_id && (order.tracking_id.toUpperCase().startsWith('ZPN-') || order.tracking_id.toUpperCase().startsWith('ZP-'))
+                    ? order.tracking_id
+                    : `ZPN-${String(orders.length - orderIdx).padStart(3, '0')}`);
+
+                const isCourierAssigned = Boolean(
+                  order.tracking_id &&
+                  !order.tracking_id.toUpperCase().startsWith('ZPN-') &&
+                  !order.tracking_id.toUpperCase().startsWith('ZP-')
+                );
 
                 return (
                   <div key={order.id} className="border border-border/60 bg-white rounded-2xl overflow-hidden shadow-2xs hover:shadow-xs transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]">
@@ -1017,17 +1033,16 @@ export default function Account() {
                           </p>
                           <div className="flex items-center gap-1.5 mt-0.5">
                             <span className="text-xs text-text-primary font-mono font-bold select-all uppercase">
-                              #{order.tracking_id || `ZP-${new Date(order.created_at).getFullYear()}-${order.id.slice(0, 6).toUpperCase()}`}
+                              #{orderRefId}
                             </span>
                             <button
                               onClick={() => {
-                                const idToCopy = order.tracking_id || `ZP-${new Date(order.created_at).getFullYear()}-${order.id.slice(0, 6).toUpperCase()}`;
-                                navigator.clipboard.writeText(idToCopy);
+                                navigator.clipboard.writeText(orderRefId);
                                 setCopiedOrderId(order.id);
                                 setTimeout(() => setCopiedOrderId(null), 2000);
                               }}
                               className="text-text-secondary hover:text-text-primary p-0.5 rounded transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)]"
-                              title="Copy Order ID"
+                              title="Copy Order Reference ID"
                             >
                               {copiedOrderId === order.id ? (
                                 <Check size={12} className="text-emerald-600" />
@@ -1041,9 +1056,18 @@ export default function Account() {
                           <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
                             Total Value
                           </p>
-                          <p className="text-xs text-text-primary font-bold mt-0.5">
-                            ₹{Number(order.total).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                          </p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <p className="text-xs text-text-primary font-bold">
+                              ₹{Number(order.total).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            </p>
+                            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
+                              order.payment_status?.toLowerCase() === 'paid'
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                : 'bg-amber-50 text-amber-800 border-amber-200'
+                            }`}>
+                              {order.payment_status?.toLowerCase() === 'paid' ? 'Paid' : 'Not Paid'}
+                            </span>
+                          </div>
                         </div>
                       </div>
 
@@ -1113,37 +1137,69 @@ export default function Account() {
                           })}
                         </div>
 
-                        {/* Courier Tracking (Manually set by shop on dispatch) */}
-                        <div className="mt-4 p-4 rounded-xl border border-border/60 bg-bg-subtle/50 space-y-2">
-                          <p className="text-xs uppercase tracking-wider text-text-secondary font-bold pb-2 border-b border-border/60">
-                            Courier Tracking
-                          </p>
-                          {order.tracking_id ? (
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-mono font-bold text-text-primary bg-white border border-border/80 px-3 py-2 select-all flex-1 break-all rounded-lg shadow-2xs">
-                                {order.tracking_id}
+                        {/* Courier Tracking (Updated once Admin assigns courier + AWB) */}
+                        <div className="mt-4 p-4 rounded-xl border border-border/60 bg-bg-subtle/50 space-y-2.5">
+                          <div className="flex items-center justify-between pb-2 border-b border-border/60">
+                            <p className="text-xs uppercase tracking-wider text-text-secondary font-bold flex items-center gap-1.5">
+                              <Truck size={13} className="text-text-primary" />
+                              Courier Tracking
+                            </p>
+                            {order.courier_name && (
+                              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-white border border-border/70 rounded-md text-text-primary">
+                                Carrier: {order.courier_name}
                               </span>
-                              <button
-                                onClick={() => {
-                                  navigator.clipboard.writeText(order.tracking_id || '');
-                                  setCopiedOrderId(order.id);
-                                  setTimeout(() => setCopiedOrderId(null), 2000);
-                                }}
-                                className="px-3.5 py-2 border border-border bg-white hover:bg-bg-subtle text-text-primary text-xs font-bold uppercase tracking-wider transition-all duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] flex-shrink-0 flex items-center gap-1.5 rounded-lg shadow-2xs"
-                                title="Copy Tracking ID"
-                              >
-                                {copiedOrderId === order.id ? (
-                                  <><Check size={13} className="text-emerald-600" /><span className="text-emerald-600 text-xs">Copied</span></>
-                                ) : (
-                                  <><Copy size={13} /><span className="text-xs">Copy AWB</span></>
-                                )}
-                              </button>
+                            )}
+                          </div>
+                          {isCourierAssigned ? (
+                            <div className="space-y-2.5">
+                              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                                <span className="text-xs font-mono font-bold text-text-primary bg-white border border-border/80 px-3 py-2 select-all flex-1 break-all rounded-lg shadow-2xs">
+                                  AWB: {order.tracking_id}
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(order.tracking_id || '');
+                                      setCopiedOrderId(order.id);
+                                      setTimeout(() => setCopiedOrderId(null), 2000);
+                                    }}
+                                    className="px-3 py-2 border border-border bg-white hover:bg-bg-subtle text-text-primary text-xs font-bold uppercase tracking-wider transition-all duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] flex-shrink-0 flex items-center gap-1.5 rounded-lg shadow-2xs"
+                                    title="Copy Tracking ID"
+                                  >
+                                    {copiedOrderId === order.id ? (
+                                      <><Check size={13} className="text-emerald-600" /><span className="text-emerald-600 text-xs">Copied</span></>
+                                    ) : (
+                                      <><Copy size={13} /><span className="text-xs">Copy AWB</span></>
+                                    )}
+                                  </button>
+                                  {order.courier_tracking_url && (
+                                    <a
+                                      href={
+                                        order.courier_tracking_url.includes('{id}') || order.courier_tracking_url.includes('{tracking_id}')
+                                          ? order.courier_tracking_url.replace('{id}', encodeURIComponent(order.tracking_id || '')).replace('{tracking_id}', encodeURIComponent(order.tracking_id || ''))
+                                          : order.courier_tracking_url.endsWith('=') || order.courier_tracking_url.endsWith('/')
+                                            ? `${order.courier_tracking_url}${encodeURIComponent(order.tracking_id || '')}`
+                                            : order.courier_tracking_url
+                                      }
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="px-3.5 py-2 bg-accent hover:bg-accent-hover text-white text-xs font-bold uppercase tracking-wider transition-all duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] flex-shrink-0 flex items-center gap-1.5 rounded-lg shadow-2xs"
+                                    >
+                                      <span>Track Package</span>
+                                      <ExternalLink size={13} />
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
+                              <p className="text-[11px] text-text-secondary leading-tight">
+                                Your consignment has been dispatched via {order.courier_name || 'courier'}. Use the AWB number above to track live shipment.
+                              </p>
                             </div>
                           ) : (
-                            <p className="text-xs text-text-secondary font-medium flex items-center gap-2">
-                              <Package size={14} className="flex-shrink-0 text-text-secondary/70" />
-                              Tracking number will be updated here once your order is dispatched.
-                            </p>
+                            <div className="py-2 flex items-center gap-2.5 text-xs text-text-secondary font-medium">
+                              <Package size={15} className="flex-shrink-0 text-text-secondary/70" />
+                              <span>Courier tracking number will appear here once dispatched by our logistics team.</span>
+                            </div>
                           )}
                         </div>
 
@@ -1152,7 +1208,7 @@ export default function Account() {
                           <AlertCircle size={15} className="text-accent flex-shrink-0 mt-0.5" />
                           <div>
                             <span className="font-semibold text-text-primary block">Need Support with this Order?</span>
-                            Share Order Reference ID <span className="font-mono font-bold text-text-primary">ZP-{new Date(order.created_at).getFullYear()}-{order.id.slice(0, 6).toUpperCase()}</span> with our customer care team.
+                            Share Order Reference ID <span className="font-mono font-bold text-text-primary">#{orderRefId}</span> with our customer care team.
                           </div>
                         </div>
                       </div>
@@ -1163,9 +1219,9 @@ export default function Account() {
                           <h4 className="text-xs font-bold uppercase tracking-wider text-text-secondary">
                             Delivery Timeline
                           </h4>
-                          {order.tracking_id && (
-                            <span className="text-xs font-mono bg-bg-subtle px-2.5 py-1 text-text-secondary border border-border/60 rounded-md">
-                              TRK: {order.tracking_id}
+                          {isCourierAssigned && (
+                            <span className="text-xs font-mono bg-bg-subtle px-2.5 py-1 text-text-primary border border-border/60 rounded-md font-semibold">
+                              {order.courier_name ? `${order.courier_name}: ` : 'AWB: '}{order.tracking_id}
                             </span>
                           )}
                         </div>

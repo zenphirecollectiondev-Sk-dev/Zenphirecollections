@@ -28,9 +28,24 @@ ALTER TABLE public.coupons
 CREATE INDEX IF NOT EXISTS idx_coupons_is_active
   ON public.coupons(is_active);
 
+-- 3. Add streamlined order reference number column (e.g. ZPN-001)
+ALTER TABLE public.orders
+  ADD COLUMN IF NOT EXISTS order_number text;
+
+CREATE INDEX IF NOT EXISTS idx_orders_order_number
+  ON public.orders(order_number);
+
+-- Populate sequential ZPN-001, ZPN-002... for existing orders if empty
+WITH numbered AS (
+  SELECT id, 'ZPN-' || LPAD(ROW_NUMBER() OVER (ORDER BY created_at ASC)::text, 3, '0') as gen_ref
+  FROM public.orders
+)
+UPDATE public.orders o
+SET order_number = n.gen_ref
+FROM numbered n
+WHERE o.id = n.id AND (o.order_number IS NULL OR o.order_number = '');
+
 -- ============================================================
 -- Verify with:
--- SELECT column_name FROM information_schema.columns
---   WHERE table_name = 'orders' AND table_schema = 'public'
---   ORDER BY ordinal_position;
+-- SELECT id, order_number, payment_status, tracking_id, courier_name FROM public.orders;
 -- ============================================================

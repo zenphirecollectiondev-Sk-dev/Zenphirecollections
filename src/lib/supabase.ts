@@ -134,6 +134,43 @@ export async function getCategories(): Promise<CategoryRow[]> {
   return data || [];
 }
 
+export interface OccasionRow {
+  id: string;
+  name: string;
+  slug: string;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+}
+
+/**
+ * Fetch all occasions
+ */
+export async function getOccasions(): Promise<OccasionRow[]> {
+  const { data, error } = await supabase
+    .from('occasions' as any)
+    .select('*')
+    .eq('is_active', true)
+    .order('sort_order', { ascending: true });
+
+  if (error) {
+    console.warn('Error fetching occasions from database (table may not exist yet):', error.message);
+    return [
+      { id: '1', name: 'Casuals', slug: 'casuals', is_active: true, sort_order: 1, created_at: '' },
+      { id: '2', name: 'Formal', slug: 'formal', is_active: true, sort_order: 2, created_at: '' },
+      { id: '3', name: 'Ethnic', slug: 'ethnic', is_active: true, sort_order: 3, created_at: '' },
+      { id: '4', name: 'Party Wear', slug: 'party-wear', is_active: true, sort_order: 4, created_at: '' }
+    ];
+  }
+
+  return (data && (data as any).length > 0) ? (data as any as OccasionRow[]) : [
+    { id: '1', name: 'Casuals', slug: 'casuals', is_active: true, sort_order: 1, created_at: '' },
+    { id: '2', name: 'Formal', slug: 'formal', is_active: true, sort_order: 2, created_at: '' },
+    { id: '3', name: 'Ethnic', slug: 'ethnic', is_active: true, sort_order: 3, created_at: '' },
+    { id: '4', name: 'Party Wear', slug: 'party-wear', is_active: true, sort_order: 4, created_at: '' }
+  ];
+}
+
 /**
  * Fetch user's cart items with variants and products
  */
@@ -223,11 +260,7 @@ export async function getUserOrders(userId: string) {
   const { data, error } = await supabase
     .from('orders')
     .select(`
-      id,
-      status,
-      total,
-      tracking_id,
-      created_at,
+      *,
       order_items (
         id,
         quantity,
