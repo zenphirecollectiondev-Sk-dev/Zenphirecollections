@@ -32,6 +32,8 @@ export interface GridProduct {
   category_id: string | null;
   /** URL of the first image sorted by sort_order, or null */
   coverImageUrl: string | null;
+  /** URL of the second image sorted by sort_order for hover reveal, or null */
+  hoverImageUrl?: string | null;
   /** True if at least one variant has stock_qty > 0 */
   inStock: boolean;
   /** Unique sizes that have stock > 0, e.g. ["S", "M", "L"] */
@@ -111,6 +113,7 @@ function toGridProduct(raw: RawProduct): GridProduct {
     base_price: raw.base_price,
     category_id: raw.category_id,
     coverImageUrl: sorted[0]?.url ?? null,
+    hoverImageUrl: sorted[1]?.url ?? null,
     inStock: variants.length === 0 || variants.some((v) => v.stock_qty > 0),
     availableSizes: sizesInStock.length > 0 ? sizesInStock : ['S', 'M', 'L', 'XL'],
   };

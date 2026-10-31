@@ -56,7 +56,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'tween', duration: 0.3, ease: EASE_ENTER }}
-            className="relative w-full max-w-full sm:max-w-md bg-white border-l border-border/80 flex flex-col h-full z-50 shadow-2xl"
+            className="relative w-full max-w-full sm:max-w-md bg-white border-l border-border/80 flex flex-col h-full z-50 shadow-2xl overflow-x-hidden"
           >
             {/* Header */}
             <div className="px-5 py-4 sm:px-6 sm:py-5 border-b border-border/70 flex items-center justify-between">
@@ -113,16 +113,16 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
 
                         {/* Item Details */}
                         <div className="flex-1 min-w-0 flex flex-col justify-between self-stretch py-0.5">
-                          <div>
-                            <div className="flex justify-between items-start gap-2">
-                              <h3 className="text-xs sm:text-sm font-medium text-text-primary truncate">
+                          <div className="min-w-0">
+                            <div className="flex justify-between items-start gap-2 min-w-0">
+                              <h3 className="text-xs sm:text-sm font-medium text-text-primary truncate min-w-0 flex-1">
                                 {item.name}
                               </h3>
                               <p className="text-xs sm:text-sm font-medium text-text-primary flex-shrink-0">
                                 ₹{(item.price * item.quantity).toFixed(2)}
                               </p>
                             </div>
-                            <p className="text-[11px] text-text-secondary mt-0.5 font-light">
+                            <p className="text-[11px] text-text-secondary mt-0.5 font-light truncate">
                               Size: {item.size} {item.color && <>• Color: {item.color}</>}
                             </p>
                           </div>

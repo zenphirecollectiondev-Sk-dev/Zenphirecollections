@@ -1,5 +1,4 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import crypto from 'crypto';
 
 // ─────────────────────────────────────────────────────────────
 // POST /api/create-razorpay-order
@@ -44,9 +43,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { cart_items, coupon_code } = req.body as {
+    const { cart_items, coupon_code, user_id, address_id } = req.body as {
       cart_items: { variant_id: string; quantity: number }[];
       coupon_code?: string | null;
+      user_id?: string | null;
+      address_id?: string | null;
     };
 
     if (!cart_items || cart_items.length === 0) {
@@ -65,13 +66,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // ── Step 2: Verify stock & compute subtotal from DB prices ──
     let subtotal = 0;
+    const itemSnapshots: { variant_id: string; quantity: number; price: number }[] = [];
+
     for (const item of cart_items) {
       const variant = variants.find((v: any) => v.id === item.variant_id);
-      if (!variant) return res.status(400).json({ error: `Product variant not found.` });
+      if (!variant) return res.status(400).json({ error: 'Product variant not found.' });
       if (variant.stock_qty < item.quantity) {
-        return res.status(400).json({ error: `Insufficient stock for one of the items. Please update your cart.` });
+        return res.status(400).json({ error: 'Insufficient stock for one of the items. Please update your cart.' });
       }
-      subtotal += (variant.products as any).base_price * item.quantity;
+      const itemPrice = Number((variant.products as any).base_price || 0);
+      subtotal += itemPrice * item.quantity;
+      itemSnapshots.push({
+        variant_id: item.variant_id,
+        quantity: item.quantity,
+        price: itemPrice,
+      });
     }
 
     // ── Step 3: Validate coupon server-side ──
@@ -111,7 +120,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const total = Math.max(0, afterDiscount + shippingCost);
     const totalPaise = Math.round(total * 100); // Razorpay uses paise
 
-    // ── Step 5: Create Razorpay order (server-to-server) ──
+    // ── Step 5: Generate sequential order reference (e.g. ZPN-001) ──
+    let orderNum = 1;
+    try {
+      const countRes = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=id`, {
+        headers: {
+          apikey: SUPABASE_SERVICE_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+          Range: '0-0',
+          Prefer: 'count=exact',
+        },
+      });
+      const contentRange = countRes.headers.get('content-range');
+      if (contentRange) {
+        const totalCount = parseInt(contentRange.split('/')[1] || '0', 10);
+        if (!isNaN(totalCount)) {
+          orderNum = totalCount + 1;
+        }
+      }
+    } catch (countErr) {
+      console.warn('[create-razorpay-order] Warning reading order count:', countErr);
+    }
+    const orderRef = `ZPN-${String(orderNum).padStart(3, '0')}`;
+
+    // ── Step 6: Create Razorpay order (server-to-server) ──
     const rzpBasic = Buffer.from(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`).toString('base64');
     const rzpRes = await fetch('https://api.razorpay.com/v1/orders', {
       method: 'POST',
@@ -123,6 +155,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         amount: totalPaise,
         currency: 'INR',
         receipt: `zp_${Date.now()}`,
+        notes: {
+          order_ref: orderRef,
+          user_id: user_id || '',
+          coupon_code: validatedCouponCode || '',
+        },
       }),
     });
 
@@ -133,11 +170,58 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const rzpOrder = await rzpRes.json();
 
-    // ── Step 6: Return verified amounts to frontend ──
+    // ── Step 7: Pre-create pending order in Supabase as a safety net ──
+    let createdOrderId: string | null = null;
+    if (user_id) {
+      try {
+        const orderPayload: any = {
+          user_id,
+          status: 'pending',
+          payment_status: 'unpaid',
+          subtotal,
+          discount_amount: discountAmount,
+          coupon_code: validatedCouponCode,
+          shipping_cost: shippingCost,
+          total,
+          address_id: address_id || null,
+          razorpay_order_id: rzpOrder.id,
+          order_number: orderRef,
+        };
+
+        const insertedOrders: any[] = await dbQuery('orders', {
+          method: 'POST',
+          body: JSON.stringify(orderPayload),
+        });
+
+        const newOrder = insertedOrders?.[0];
+        if (newOrder?.id) {
+          createdOrderId = newOrder.id;
+
+          // Insert order_items
+          await dbQuery('order_items', {
+            method: 'POST',
+            body: JSON.stringify(
+              itemSnapshots.map((snap) => ({
+                order_id: newOrder.id,
+                variant_id: snap.variant_id,
+                quantity: snap.quantity,
+                price_at_purchase: snap.price,
+              })),
+            ),
+          });
+        }
+      } catch (dbErr: any) {
+        console.warn('[create-razorpay-order] Warning pre-creating pending order (fallback will handle on verify):', dbErr.message);
+      }
+    }
+
+    // ── Step 8: Return verified amounts & identifiers to frontend ──
     return res.status(200).json({
       razorpay_order_id: rzpOrder.id,
       amount_paise: rzpOrder.amount,
       key_id: RAZORPAY_KEY_ID,
+      order_id: createdOrderId,
+      order_ref: orderRef,
       verified_subtotal: subtotal,
       discount_amount: discountAmount,
       shipping_cost: shippingCost,

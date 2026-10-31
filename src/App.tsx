@@ -30,6 +30,7 @@ import FAQ from './pages/FAQ';
 import ShippingReturns from './pages/ShippingReturns';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import Terms from './pages/Terms';
+import ContactUs from './pages/ContactUs';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -263,7 +264,7 @@ function AppContent() {
       </AnimatePresence>
 
       {/* Main Content Area with Minimal Modern Page Transition */}
-      <main className="flex-grow flex flex-col relative">
+      <main className="flex-grow flex flex-col relative w-full max-w-full overflow-x-hidden">
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={location.pathname}
@@ -271,7 +272,7 @@ function AppContent() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -5 }}
             transition={{ duration: 0.2, ease: EASE_ENTER }}
-            className="flex-grow flex flex-col w-full"
+            className="flex-grow flex flex-col w-full max-w-full overflow-x-hidden"
           >
             <Routes location={location}>
               <Route path="/" element={<Home />} />
@@ -310,6 +311,7 @@ function AppContent() {
               <Route path="/shipping" element={<ShippingReturns />} />
               <Route path="/privacy" element={<PrivacyPolicy />} />
               <Route path="/terms" element={<Terms />} />
+              <Route path="/contact" element={<ContactUs />} />
 
               {/* Protected Admin Console */}
               <Route
@@ -359,6 +361,7 @@ function AppContent() {
               <div className="md:col-span-3">
                 <h4 className="font-heading text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] mb-6 text-accent-gold">Customer Care</h4>
                 <ul className="space-y-4 text-sm text-white/70 font-medium">
+                  <li><Link to="/contact" className="inline-block hover:text-white transition-colors duration-200">Contact Us</Link></li>
                   <li><Link to="/faq" className="inline-block hover:text-white transition-colors duration-200">Help & FAQ</Link></li>
                   <li><Link to="/shipping" className="inline-block hover:text-white transition-colors duration-200">Shipping & Returns</Link></li>
                 </ul>

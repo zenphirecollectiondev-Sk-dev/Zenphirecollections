@@ -75,7 +75,6 @@
     overflow-x: hidden;
     width: 100%;
     max-width: 100%;
-    position: relative;
     background-color: #ffffff;
   }
 
@@ -84,7 +83,6 @@
     overflow-x: hidden;
     width: 100%;
     max-width: 100%;
-    position: relative;
     background-color: #ffffff;
   }
 
@@ -101,6 +99,15 @@
   :focus-visible {
     outline: none;
     box-shadow: var(--focus-ring);
+  }
+
+  /* Prevent iOS Safari auto-zoom on input focus by guaranteeing 16px font-size on mobile inputs */
+  @media screen and (max-width: 767px) {
+    input:not([type="checkbox"]):not([type="radio"]),
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
   }
 }
 

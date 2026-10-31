@@ -38,7 +38,7 @@ export default function Terms() {
               <CheckCircle2 size={18} /> 2. Product Availability & Pricing
             </h2>
             <p className="mb-2">
-              All product prices are listed in INR (?) and include applicable taxes. We reserve the right to alter pricing, modify product descriptions, or discontinue items at any time without notice.
+              All product prices are listed in INR (₹) and include applicable taxes. We reserve the right to alter pricing, modify product descriptions, or discontinue items at any time without notice.
             </p>
             <ul className="list-disc list-inside space-y-1 text-white/70 pl-2">
               <li>In the rare event of a pricing error or inventory discrepancy, we reserve the right to cancel affected orders with a full refund.</li>
@@ -51,16 +51,16 @@ export default function Terms() {
               <CheckCircle2 size={18} /> 3. Orders & Payment
             </h2>
             <p>
-              When placing an order, you warrant that all information provided is true and accurate. Orders are subject to acceptance and stock availability. We accept Cash on Delivery (COD), major Credit/Debit Cards, UPI, and Net Banking. Order confirmation does not guarantee immediate stock allocation until payment validation or COD verification is complete.
+              When placing an order, you warrant that all information provided is true and accurate. Orders are subject to acceptance and stock availability. We accept major Credit/Debit Cards, UPI, Net Banking, and Wallets. Order confirmation does not guarantee immediate stock allocation until payment validation is complete.
             </p>
           </section>
 
           <section>
             <h2 className="text-lg font-heading text-accent-gold uppercase tracking-wider mb-3 flex items-center gap-2">
-              <CheckCircle2 size={18} /> 4. Intellectural Property
+              <CheckCircle2 size={18} /> 4. Intellectual Property
             </h2>
             <p>
-              All content on this site�including logos, product designs, imagery, text, code, and graphical layouts�is the exclusive intellectual property of Zenphire Collections. Unauthorized reproduction or commercial use without written permission is strictly prohibited.
+              All content on this site—including logos, product designs, imagery, text, code, and graphical layouts—is the exclusive intellectual property of Zenphire Collections. Unauthorized reproduction or commercial use without written permission is strictly prohibited.
             </p>
           </section>
 

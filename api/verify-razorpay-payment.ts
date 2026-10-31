@@ -53,6 +53,40 @@ async function dbRpc(fn: string, args: object) {
   return res.json();
 }
 
+async function dbPatch(path: string, body: object) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    method: 'PATCH',
+    headers: {
+      apikey: SUPABASE_SERVICE_KEY,
+      Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=representation',
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`DB patch error on ${path}: ${err}`);
+  }
+  return res.json();
+}
+
+async function dbGet(path: string) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    method: 'GET',
+    headers: {
+      apikey: SUPABASE_SERVICE_KEY,
+      Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+      'Content-Type': 'application/json',
+    },
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`DB get error on ${path}: ${err}`);
+  }
+  return res.json();
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -85,28 +119,74 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   };
 
   // ── STEP 1: HMAC-SHA256 Signature Verification ──────────────
-  // This is the cryptographic proof the payment is real.
-  // If a malicious user tampers with the payment IDs, their
-  // signature will NOT match and we reject without creating an order.
+  // Cryptographic proof the payment was authorized by Razorpay with our Key Secret.
   const expectedSignature = crypto
     .createHmac('sha256', RAZORPAY_KEY_SECRET)
     .update(`${razorpay_order_id}|${razorpay_payment_id}`)
     .digest('hex');
 
   if (expectedSignature !== razorpay_signature) {
-    console.error('[verify-payment] SIGNATURE MISMATCH — possible fraud attempt', {
+    console.error('[verify-payment] SIGNATURE MISMATCH — rejected forged payment attempt', {
       razorpay_order_id,
       razorpay_payment_id,
     });
     return res.status(400).json({
       success: false,
-      error: 'Payment verification failed. Please contact support.',
+      error: 'Payment verification failed. Invalid signature.',
     });
   }
 
-  // ── STEP 2: Write order to DB ─────────────────────────────
+  // ── STEP 2: Idempotent Order Resolution & Stock Decrement ───
   try {
-    // Generate streamlined sequential order reference ID (e.g. ZPN-001, ZPN-002...)
+    // 2A. Check if an order already exists for this razorpay_order_id
+    const existingOrders: any[] = await dbGet(
+      `orders?razorpay_order_id=eq.${encodeURIComponent(razorpay_order_id)}&select=id,order_number,payment_status`
+    );
+
+    const existing = existingOrders?.[0];
+
+    // Case 1: Order exists and is ALREADY marked 'paid' (e.g. webhook resolved it first)
+    if (existing && existing.payment_status === 'paid') {
+      console.log(`[verify-payment] Order ${existing.id} (${existing.order_number}) is already marked 'paid'. Returning success idempotently.`);
+      return res.status(200).json({
+        success: true,
+        order_ref: existing.order_number,
+        order_id: existing.id,
+        already_paid: true,
+      });
+    }
+
+    // Case 2: Order was pre-created as pending/unpaid in create-razorpay-order
+    if (existing) {
+      await dbPatch(`orders?id=eq.${existing.id}`, {
+        payment_status: 'paid',
+        status: 'processing',
+        razorpay_payment_id,
+        ...(address_id ? { address_id } : {}),
+      });
+
+      // Atomic stock decrement
+      if (cart_items && cart_items.length > 0) {
+        for (const item of cart_items) {
+          try {
+            await dbRpc('decrement_stock', {
+              p_variant_id: item.variant_id,
+              p_qty: item.quantity,
+            });
+          } catch (stockErr: any) {
+            console.warn('[verify-payment] Warning during decrement_stock RPC:', stockErr.message);
+          }
+        }
+      }
+
+      return res.status(200).json({
+        success: true,
+        order_ref: existing.order_number,
+        order_id: existing.id,
+      });
+    }
+
+    // Case 3 (Fallback): Order record was not pre-created — create from verified payment
     let orderNum = 1;
     try {
       const countRes = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=id`, {
@@ -130,7 +210,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const orderRef = `ZPN-${String(orderNum).padStart(3, '0')}`;
 
-    // Insert orders row (tracking_id is left NULL until courier AWB is updated in Admin)
     const orderPayload: any = {
       user_id,
       status: 'processing',
@@ -153,7 +232,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } catch (insertErr: any) {
       const errStr = String(insertErr?.message || insertErr);
       if (errStr.includes('order_number') || errStr.includes('schema cache')) {
-        console.warn('[verify-payment] order_number column not found in schema cache, inserting without it:', errStr);
         delete orderPayload.order_number;
         orderRows = await dbPost('orders', orderPayload);
       } else {
@@ -164,34 +242,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const order = orderRows[0];
     if (!order) throw new Error('Order insert returned no data.');
 
-    // ── STEP 3: Insert order_items with price snapshot ──────
-    // price_at_purchase is locked at time of purchase — never changes
-    // even if product prices change later.
-    await dbPost(
-      'order_items',
-      cart_items.map((item) => ({
-        order_id: order.id,
-        variant_id: item.variant_id,
-        quantity: item.quantity,
-        price_at_purchase: item.price,
-      })),
-    );
+    // Insert order_items
+    if (cart_items && cart_items.length > 0) {
+      await dbPost(
+        'order_items',
+        cart_items.map((item) => ({
+          order_id: order.id,
+          variant_id: item.variant_id,
+          quantity: item.quantity,
+          price_at_purchase: item.price,
+        })),
+      );
 
-    // ── STEP 4: Atomic stock decrement via DB function ──────
-    // Uses the decrement_stock() function created in stock_fix_migration.sql
-    // If decrement_stock RPC is not yet created in Supabase, catch warning without aborting verified order
-    try {
+      // Decrement stock
       for (const item of cart_items) {
-        await dbRpc('decrement_stock', {
-          p_variant_id: item.variant_id,
-          p_qty: item.quantity,
-        });
+        try {
+          await dbRpc('decrement_stock', {
+            p_variant_id: item.variant_id,
+            p_qty: item.quantity,
+          });
+        } catch (stockErr: any) {
+          console.warn('[verify-payment] Warning during decrement_stock RPC:', stockErr.message);
+        }
       }
-    } catch (stockErr: any) {
-      console.warn('[verify-payment] Warning during decrement_stock RPC:', stockErr.message);
     }
 
-    // ── STEP 5: Return success ────────────────────────────
     return res.status(200).json({
       success: true,
       order_ref: orderRef,
@@ -200,8 +275,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   } catch (err: any) {
     console.error('[verify-payment] DB write error after verified payment:', err);
-    // IMPORTANT: Payment IS real (signature verified) but DB write failed.
-    // Return the payment ID and exact error message so it can be fixed or reported.
     return res.status(500).json({
       success: false,
       error: `Payment received (ID: ${razorpay_payment_id}) but order could not be saved: ${err.message || 'Database error'}. Please contact support with this payment ID.`,

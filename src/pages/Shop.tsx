@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useSearchParams, Link } from "react-router-dom";
 import {
   SlidersHorizontal, X, ChevronDown, Heart, ShoppingBag,
-  ArrowRight, ChevronLeft, ChevronRight, WifiOff,
+  ArrowRight, ChevronLeft, ChevronRight, WifiOff, Columns2, Columns3,
 } from "lucide-react";
 import { useWishlistStore } from "../store/useWishlistStore";
 import { getCategories, supabase } from "../lib/supabase";
@@ -18,17 +18,22 @@ import { motion, AnimatePresence } from "framer-motion";
 import { DUR, EASE, EASE_ENTER } from "../lib/motion";
 import { usePageSEO } from "../hooks/usePageSEO";
 
+// Standard order for sorting size labels
+const SIZE_ORDER = ["XS", "S", "M", "L", "XL", "XXL", "XXXL", "28", "30", "32", "34", "36", "38", "40", "42"];
+
 // --- Image card with proper loading / error states ---------------------------
 
 type ImgState = "loading" | "loaded" | "error";
 
 function ProductImage({
   src,
+  hoverSrc,
   alt,
   lazy,
   priority,
 }: {
   src: string | null;
+  hoverSrc?: string | null;
   alt: string;
   lazy: boolean;
   priority?: boolean;
@@ -45,7 +50,7 @@ function ProductImage({
   }, [src]);
 
   return (
-    <div className="relative aspect-[3/4] w-full overflow-hidden bg-bg-subtle border border-border">
+    <div className="relative aspect-[3/4] w-full overflow-hidden bg-[#FAFAFA] border border-black/[0.04] rounded-[2px]">
       {/* Skeleton shown until image loads */}
       {imgState === "loading" && (
         <div
@@ -54,13 +59,13 @@ function ProductImage({
         />
       )}
 
-      {/* Brand-colored fallback � shown when src is null OR onError fires */}
+      {/* Brand-colored fallback — shown when src is null OR onError fires */}
       {imgState === "error" && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-bg-subtle gap-2">
-          {/* Minimal brand placeholder � geometric diamond motif */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#FAFAFA] gap-2">
+          {/* Minimal brand placeholder — geometric diamond motif */}
           <svg
-            width="40"
-            height="40"
+            width="44"
+            height="44"
             viewBox="0 0 40 40"
             fill="none"
             aria-hidden="true"
@@ -90,13 +95,13 @@ function ProductImage({
               opacity="0.25"
             />
           </svg>
-          <span className="text-[9px] uppercase tracking-widest text-text-secondary/40 font-bold">
+          <span className="text-[10px] uppercase tracking-widest text-text-secondary/50 font-bold">
             Zenphire
           </span>
         </div>
       )}
 
-      {/* The real image � only rendered when we have a src */}
+      {/* Primary Image */}
       {src && (
         <img
           ref={imgRef}
@@ -107,8 +112,20 @@ function ProductImage({
           {...(priority ? { fetchPriority: "high" as any } : {})}
           onLoad={() => setImgState("loaded")}
           onError={() => setImgState("error")}
-          className={`card-img absolute inset-0 w-full h-full object-cover object-top transition-opacity duration-500 ease-in-out ${imgState === "loaded" ? "opacity-100" : "opacity-0"
-            }`}
+          className={`card-img absolute inset-0 w-full h-full object-cover object-top transition-all duration-700 ease-out ${
+            imgState === "loaded" ? "opacity-100" : "opacity-0"
+          } ${hoverSrc ? "group-hover:opacity-0 md:group-hover:scale-105" : "group-hover:scale-105"}`}
+        />
+      )}
+
+      {/* Secondary Hover Image (Fashion Lookbook Angle) */}
+      {hoverSrc && (
+        <img
+          src={hoverSrc}
+          alt={`${alt} alternate angle`}
+          loading="lazy"
+          decoding="async"
+          className="absolute inset-0 w-full h-full object-cover object-top opacity-0 transition-all duration-700 ease-out md:group-hover:opacity-100 md:group-hover:scale-105 pointer-events-none"
         />
       )}
     </div>
@@ -117,9 +134,9 @@ function ProductImage({
 
 // --- Skeleton grid ------------------------------------------------------------
 
-function SkeletonGrid({ count }: { count: number }) {
+function SkeletonGrid({ count, gridClass }: { count: number; gridClass?: string }) {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-2.5 sm:gap-4 md:gap-5 lg:gap-6">
+    <div className={gridClass || "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2 gap-6 sm:gap-8"}>
       <ProductCardSkeleton count={count} />
     </div>
   );
@@ -361,12 +378,42 @@ export default function Shop() {
       });
   }, [activeOccasion]);
 
-  // -- Client-side filter state ----------------------------------------------
+  // -- Client-side filter & layout state -------------------------------------
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
   const [maxPrice, setMaxPrice] = useState<number>(15000);
   const [sortBy, setSortBy] = useState<string>("newest");
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
+  const [showDesktopFilters, setShowDesktopFilters] = useState(true);
+  const [viewMode, setViewMode] = useState<"large" | "compact">(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("zenphire_shop_view_mode");
+      if (saved === "large" || saved === "compact") return saved as "large" | "compact";
+    }
+    return "large"; // Default to prominent fashion showcase!
+  });
   const [page, setPage] = useState(0);
+
+  const handleViewModeChange = (mode: "large" | "compact") => {
+    setViewMode(mode);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("zenphire_shop_view_mode", mode);
+    }
+  };
+
+  // Dynamic grid column classes matching high-end fashion standards
+  const gridColsClass = useMemo(() => {
+    if (viewMode === "large") {
+      // High-fashion showcase: 2 large columns on desktop, 1 on mobile
+      return showDesktopFilters
+        ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 gap-6 sm:gap-7 md:gap-8 lg:gap-10 anim-stagger"
+        : "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-6 sm:gap-8 md:gap-10 lg:gap-12 anim-stagger";
+    } else {
+      // Compact view: 3 columns on desktop, 2 on mobile
+      return showDesktopFilters
+        ? "grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-3.5 sm:gap-4 md:gap-5 lg:gap-6 anim-stagger"
+        : "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5 gap-3.5 sm:gap-5 md:gap-6 lg:gap-8 anim-stagger";
+    }
+  }, [viewMode, showDesktopFilters]);
 
   // -- Dynamic Product Filters (configured in Admin) -------------------------
   const [allProductFilters, setAllProductFilters] = useState<any[]>([]);
@@ -669,9 +716,6 @@ export default function Shop() {
     setTimeout(() => setHeartId(null), 400);
   };
 
-  // Standard order for sorting size labels
-  const SIZE_ORDER = ["XS", "S", "M", "L", "XL", "XXL", "XXXL",
-    "28", "30", "32", "34", "36", "38", "40", "42"];
 
   // Dynamically derived from loaded products — only sizes that actually exist and have stock
   const sizesList = useMemo(() => {
@@ -715,7 +759,7 @@ export default function Shop() {
 
   // -- Render ----------------------------------------------------------------
   return (
-    <div className="w-full max-w-7xl mx-auto px-2.5 sm:px-5 lg:px-8 py-5 sm:py-8 md:py-10 flex-1 flex flex-col anim-fade-up">
+    <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 md:px-8 lg:px-12 py-5 sm:py-8 md:py-10 flex-1 flex flex-col anim-fade-up">
 
       {/* Page Header */}
       <div className="border-b border-border pb-4 mb-5 sm:pb-5 sm:mb-6 flex flex-col md:flex-row md:items-end md:justify-between gap-2 sm:gap-3">
@@ -728,57 +772,105 @@ export default function Shop() {
           </h1>
         </div>
         {resultCount !== null && (
-          <p className="font-sans text-xs text-text-secondary">{resultCount} results</p>
+          <p className="font-sans text-xs text-text-secondary">{resultCount} {resultCount === 1 ? "piece" : "pieces"}</p>
         )}
       </div>
 
       {/* Control Bar (Sticky & always accessible) */}
-      <div className="sticky top-16 z-30 mb-6 border border-border/80 px-2.5 py-2 sm:px-3 sm:py-2.5 bg-white/95 backdrop-blur-sm shadow-xs rounded-xs">
-        <div className="flex items-center gap-2.5 w-full">
-          {/* Mobile filter button - equal width half row */}
-          <button
-            onClick={() => setIsMobileFilterOpen(true)}
-            title="Filter"
-            className="flex-1 md:hidden flex items-center justify-center gap-2 h-10 px-3 border border-border/80 text-xs font-medium hover:border-text-primary text-text-primary bg-white transition-colors rounded-xs shadow-2xs"
-          >
-            <SlidersHorizontal size={13} />
-            <span>Filter</span>
-            {activeFilterCount > 0 && (
-              <span className="bg-text-primary text-white text-[9px] font-medium px-1.5 py-0.5 rounded-full leading-none">
-                {activeFilterCount}
-              </span>
-            )}
-          </button>
+      <div className="sticky top-16 z-30 mb-8 border border-border/80 px-3 py-2 sm:px-4 sm:py-2.5 bg-white/95 backdrop-blur-md shadow-xs rounded-[2px]">
+        <div className="flex items-center justify-between gap-3 w-full">
+          {/* Left: Mobile Filter & Desktop Filter Toggle */}
+          <div className="flex items-center gap-2 flex-1 md:flex-initial">
+            {/* Mobile filter button */}
+            <button
+              onClick={() => setIsMobileFilterOpen(true)}
+              title="Filter"
+              className="flex-1 md:hidden flex items-center justify-center gap-2 h-10 px-3 border border-border/80 text-xs font-medium hover:border-text-primary text-text-primary bg-white transition-colors rounded-[2px] shadow-2xs"
+            >
+              <SlidersHorizontal size={13} />
+              <span>Filter</span>
+              {activeFilterCount > 0 && (
+                <span className="bg-text-primary text-white text-[9px] font-medium px-1.5 py-0.5 rounded-full leading-none">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
 
-          {/* Desktop: filter reset */}
-          <div className="hidden md:flex items-center gap-2">
-            {activeFilterCount > 0 ? (
+            {/* Desktop: Toggle Sidebar */}
+            <button
+              onClick={() => setShowDesktopFilters((prev) => !prev)}
+              title={showDesktopFilters ? "Hide Filter Sidebar" : "Show Filter Sidebar"}
+              className="hidden md:inline-flex items-center gap-2 h-10 px-3.5 border border-border/80 text-xs font-medium hover:border-text-primary text-text-primary bg-white transition-colors rounded-[2px] shadow-2xs"
+            >
+              <SlidersHorizontal size={13} />
+              <span>{showDesktopFilters ? "Hide Filters" : "Show Filters"}</span>
+              {activeFilterCount > 0 && (
+                <span className="bg-text-primary text-white text-[9px] font-medium px-1.5 py-0.5 rounded-full leading-none">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+
+            {/* Reset filters */}
+            {activeFilterCount > 0 && (
               <button
                 onClick={resetFilters}
                 title="Reset all filters"
-                className="flex items-center gap-1.5 text-xs font-medium text-sale hover:underline uppercase tracking-wider py-1 px-2 border border-sale/30 rounded-xs"
+                className="flex items-center gap-1.5 text-xs font-medium text-sale hover:underline uppercase tracking-wider py-1 px-2.5 border border-sale/30 rounded-[2px] bg-sale/5 transition-colors"
               >
-                <SlidersHorizontal size={12} />
-                <span>Reset Filters</span>
                 <X size={11} strokeWidth={2.5} />
+                <span className="hidden sm:inline">Reset</span>
               </button>
-            ) : (
-              <div title="No filters active" className="flex items-center gap-1.5 text-xs text-text-secondary/60 tracking-wider py-1 px-2">
-                <SlidersHorizontal size={12} />
-                <span>Filters</span>
-              </div>
             )}
           </div>
 
-          {/* Sort dropdown - equal width half row on mobile */}
-          <div className="flex-1 md:flex-initial md:ml-auto">
-            <div className="relative w-full md:w-auto">
+          {/* Center: Result count indicator */}
+          {resultCount !== null && (
+            <p className="font-sans text-xs text-text-secondary hidden lg:block tracking-wide">
+              Showing <span className="font-medium text-text-primary">{resultCount}</span> {resultCount === 1 ? "piece" : "pieces"}
+            </p>
+          )}
+
+          {/* Right: Grid Switcher + Sort */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* View switcher (Large vs Standard) */}
+            <div className="flex items-center gap-1 border border-border/80 p-0.5 rounded-[2px] bg-bg-subtle shadow-2xs">
+              <button
+                onClick={() => handleViewModeChange("large")}
+                title="Large editorial view (High Fashion)"
+                aria-label="Large view"
+                className={`p-1.5 sm:px-2.5 h-8.5 rounded-[2px] transition-colors flex items-center gap-1.5 ${
+                  viewMode === "large"
+                    ? "bg-text-primary text-white shadow-2xs"
+                    : "text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                <Columns2 size={15} />
+                <span className="text-[10px] hidden sm:inline uppercase tracking-widest font-semibold">Large</span>
+              </button>
+              <button
+                onClick={() => handleViewModeChange("compact")}
+                title="Standard grid view"
+                aria-label="Standard view"
+                className={`p-1.5 sm:px-2.5 h-8.5 rounded-[2px] transition-colors flex items-center gap-1.5 ${
+                  viewMode === "compact"
+                    ? "bg-text-primary text-white shadow-2xs"
+                    : "text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                <Columns3 size={15} />
+                <span className="text-[10px] hidden sm:inline uppercase tracking-widest font-semibold">Grid</span>
+              </button>
+            </div>
+
+            {/* Sort dropdown */}
+            <div className="relative">
               <select
                 id="sortBy"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
                 title="Sort"
-                className="w-full md:w-auto appearance-none bg-white border border-border/80 rounded-xs text-xs font-normal h-10 py-2 pl-3 pr-8 focus:outline-none focus:border-text-primary cursor-pointer text-text-primary hover:border-text-primary transition-colors shadow-2xs"
+                className="w-full md:w-auto appearance-none bg-white border border-border/80 rounded-[2px] text-xs font-normal h-10 py-2 pl-3 pr-8 focus:outline-none focus:border-text-primary cursor-pointer text-text-primary hover:border-text-primary transition-colors shadow-2xs"
               >
                 <option value="newest">New Arrivals</option>
                 <option value="price-asc">Price: Low to High</option>
@@ -791,10 +883,11 @@ export default function Shop() {
       </div>
 
       {/* Layout: sidebar + grid */}
-      <div className="w-full md:flex md:gap-8 lg:gap-10">
+      <div className="w-full md:flex md:gap-8 lg:gap-12 items-start">
 
         {/* DESKTOP SIDEBAR */}
-        <aside className="w-56 flex-shrink-0 hidden md:block space-y-8">
+        {showDesktopFilters && (
+          <aside className="w-60 flex-shrink-0 hidden md:block space-y-8 sticky top-36">
           {/* Gender Filter */}
           <div>
             <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-primary mb-3 pb-2 border-b border-border">
@@ -945,6 +1038,7 @@ export default function Shop() {
             />
           </div>
         </aside>
+      )}
 
         {/* PRODUCT GRID */}
         <main className="flex-1 min-w-0 flex flex-col">
@@ -953,7 +1047,7 @@ export default function Shop() {
 
           {/* Loading ─ genuine first fetch */}
           {queryState.status === "loading" && (
-            <SkeletonGrid count={PAGE_SIZE} />
+            <SkeletonGrid count={PAGE_SIZE} gridClass={gridColsClass} />
           )}
 
           {/* Slow network ─ skeleton + banner */}
@@ -963,7 +1057,7 @@ export default function Shop() {
                 <WifiOff size={13} className="shrink-0 text-text-secondary/60" />
                 <span>Still loading ─ your connection seems slow. Hang tight…</span>
               </div>
-              <SkeletonGrid count={PAGE_SIZE} />
+              <SkeletonGrid count={PAGE_SIZE} gridClass={gridColsClass} />
             </>
           )}
 
@@ -1003,34 +1097,35 @@ export default function Shop() {
 
           {queryState.status === "success" && filteredProducts.length > 0 && (
             <>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-2.5 sm:gap-4 md:gap-5 lg:gap-6 anim-stagger">
+              <div className={gridColsClass}>
                 {filteredProducts.map((product, idx) => (
                   <Link
                     key={product.id}
                     to={`/product/${product.slug}`}
-                    className="group product-card flex flex-col h-full"
+                    className="group product-card flex flex-col h-full cursor-pointer"
                   >
-                    <div className="relative mb-2.5 sm:mb-3">
+                    <div className="relative mb-3 sm:mb-3.5">
                       <ProductImage
                         src={imgCard(product.coverImageUrl)}
+                        hoverSrc={product.hoverImageUrl ? imgCard(product.hoverImageUrl) : null}
                         alt={product.name}
-                        lazy={idx >= 8}
+                        lazy={idx >= 6}
                         priority={idx < 4}
                       />
                       {/* Hover accent line */}
                       <div className="gold-accent-line z-10" />
                       {/* Sold-out badge */}
                       {!product.inStock && (
-                        <div className="absolute top-2 left-2 bg-sale text-white text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 z-10">
+                        <div className="absolute top-2.5 left-2.5 sm:top-3 sm:left-3 bg-black/90 text-white text-[9px] uppercase font-bold tracking-[0.2em] px-2.5 py-1 z-10 shadow-xs">
                           Sold Out
                         </div>
                       )}
                       {/* Quick view overlay — desktop only */}
-                      <div className="card-overlay absolute bottom-0 left-0 right-0 bg-white/90 py-2.5 px-4 hidden md:flex items-center justify-between z-10">
-                        <span className="text-[9px] uppercase font-bold tracking-widest text-text-primary flex items-center gap-1">
-                          <ShoppingBag size={10} /> Quick View
+                      <div className="card-overlay absolute bottom-3 left-3 right-3 bg-white/95 backdrop-blur-sm py-2 px-3.5 hidden md:flex items-center justify-between z-10 border border-border/80 shadow-xs rounded-[2px] transition-all">
+                        <span className="text-[10px] uppercase font-bold tracking-[0.18em] text-text-primary flex items-center gap-1.5">
+                          <ShoppingBag size={11} className="text-accent-gold" /> Quick View
                         </span>
-                        <ArrowRight size={11} className="text-text-secondary" />
+                        <ArrowRight size={12} className="text-text-secondary group-hover:translate-x-0.5 transition-transform" />
                       </div>
                       {/* Wishlist button */}
                       <button
@@ -1040,31 +1135,40 @@ export default function Shop() {
                           handleWishlist(product.id);
                         }}
                         aria-label="Toggle Wishlist"
-                        className={`wishlist-btn absolute top-2 right-2 w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-white/80 backdrop-blur-xs border border-border/60 rounded-full z-10 shadow-2xs hover:bg-white active:scale-90 transition-all ${heartId === product.id ? "anim-heart-pop" : ""
+                        className={`wishlist-btn absolute top-2.5 right-2.5 sm:top-3 sm:right-3 w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center bg-white/90 backdrop-blur-sm border border-border/60 rounded-full z-10 shadow-2xs hover:bg-white active:scale-90 transition-all ${heartId === product.id ? "anim-heart-pop" : ""
                           }`}
                       >
                         <Heart
-                          size={13}
+                          size={14}
                           className={
                             isWishlisted(product.id)
                               ? "fill-sale stroke-sale"
-                              : "stroke-text-primary/75"
+                              : "stroke-text-primary/70 hover:stroke-text-primary"
                           }
                         />
                       </button>
                     </div>
-                    <div className="flex flex-col flex-1 justify-between space-y-1 pt-1">
+                    <div className="flex flex-col flex-1 justify-between space-y-1.5 pt-1">
                       <div>
-                        <p className="font-sans text-[10px] uppercase tracking-[0.2em] text-accent-gold font-medium leading-none mb-1">
-                          Zenphire
-                        </p>
-                        <h3 className="font-sans text-xs sm:text-sm font-medium text-text-primary [@media(hover:hover)]:hover:text-accent-gold transition-colors duration-150 line-clamp-1 sm:line-clamp-2 leading-snug">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <p className="font-sans text-[10px] sm:text-[11px] uppercase tracking-[0.24em] text-accent-gold font-medium leading-none">
+                            Zenphire
+                          </p>
+                          {product.availableSizes && product.availableSizes.length > 0 && (
+                            <span className="text-[10px] text-text-secondary/60 font-sans tracking-wide">
+                              {product.availableSizes.slice(0, 4).join(" · ")}{product.availableSizes.length > 4 ? " +" : ""}
+                            </span>
+                          )}
+                        </div>
+                        <h3 className="font-sans text-sm sm:text-base font-medium text-text-primary [@media(hover:hover)]:hover:text-accent-gold transition-colors duration-150 line-clamp-1 sm:line-clamp-2 leading-snug">
                           {product.name}
                         </h3>
                       </div>
-                      <p className="font-sans text-xs sm:text-sm font-semibold text-text-primary pt-0.5">
-                        ₹{Number(product.base_price || 0).toFixed(2)}
-                      </p>
+                      <div className="flex items-baseline justify-between pt-0.5 border-t border-border/40 mt-1">
+                        <p className="font-sans text-sm sm:text-base font-semibold text-text-primary">
+                          ₹{Number(product.base_price || 0).toFixed(2)}
+                        </p>
+                      </div>
                     </div>
                   </Link>
                 ))}

@@ -13,9 +13,9 @@ export default function Cart() {
   const totalItems = items.reduce((acc, item) => acc + item.quantity, 0);
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 min-h-[70vh]">
+    <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-12 min-h-[70vh] overflow-x-hidden">
       {/* Sleek Minimal Header */}
-      <div className="flex items-baseline justify-between pb-5 mb-8 border-b border-border/60">
+      <div className="flex items-baseline justify-between pb-4 sm:pb-5 mb-6 sm:mb-8 border-b border-border/60">
         <h1 className="text-2xl sm:text-3xl font-heading font-medium tracking-tight text-text-primary">
           Shopping Bag
         </h1>
@@ -27,7 +27,7 @@ export default function Cart() {
       </div>
 
       {items.length === 0 ? (
-        <div className="text-center py-24 bg-[#FAFAFA] border border-border/60 rounded-md">
+        <div className="text-center py-16 sm:py-24 bg-[#FAFAFA] border border-border/60 rounded-md px-4">
           <ShoppingBag size={40} className="mx-auto text-text-secondary/40 stroke-[1.2] mb-4" />
           <h2 className="text-base font-heading font-medium uppercase tracking-wider mb-2">Your bag is empty</h2>
           <p className="text-text-secondary text-xs sm:text-sm mb-6 max-w-xs mx-auto">
@@ -44,7 +44,7 @@ export default function Cart() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
           {/* Main items listing */}
-          <div className="lg:col-span-7 xl:col-span-8 divide-y divide-border/60">
+          <div className="lg:col-span-7 xl:col-span-8 divide-y divide-border/60 w-full min-w-0">
             <AnimatePresence initial={false}>
               {items.map((item) => (
                 <motion.div
@@ -54,7 +54,7 @@ export default function Cart() {
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0, overflow: 'hidden' }}
                   transition={{ duration: 0.22, ease: EASE }}
-                  className="py-6 first:pt-0 last:pb-0 flex gap-4 sm:gap-6 items-start"
+                  className="py-5 sm:py-6 first:pt-0 last:pb-0 flex gap-3.5 sm:gap-6 items-start w-full min-w-0"
                 >
                   {/* Thumbnail */}
                   <Link to={`/product/${item.productId}`} className="flex-shrink-0 group">
@@ -67,20 +67,20 @@ export default function Cart() {
 
                   {/* Details & Controls */}
                   <div className="flex-1 min-w-0 flex flex-col justify-between self-stretch py-0.5">
-                    <div className="space-y-1">
-                      <div className="flex justify-between items-start gap-3">
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex justify-between items-start gap-2 sm:gap-3 min-w-0">
                         <Link
                           to={`/product/${item.productId}`}
-                          className="text-sm font-medium text-text-primary hover:text-text-secondary transition-colors truncate"
+                          className="text-xs sm:text-sm font-medium text-text-primary hover:text-text-secondary transition-colors truncate min-w-0 flex-1"
                         >
                           {item.name}
                         </Link>
-                        <span className="text-sm font-semibold text-text-primary flex-shrink-0">
+                        <span className="text-xs sm:text-sm font-semibold text-text-primary flex-shrink-0">
                           ₹{(item.price * item.quantity).toFixed(2)}
                         </span>
                       </div>
 
-                      <p className="text-xs text-text-secondary">
+                      <p className="text-xs text-text-secondary truncate">
                         Size: {item.size} {item.color && <>• Color: {item.color}</>}
                       </p>
                       <p className="text-[11px] text-text-secondary/70">
@@ -89,23 +89,23 @@ export default function Cart() {
                     </div>
 
                     {/* Quantity and Remove */}
-                    <div className="flex items-center justify-between pt-4">
+                    <div className="flex items-center justify-between pt-3 sm:pt-4 gap-2">
                       {/* Minimal Quantity Stepper */}
-                      <div className="flex items-center border border-border/80 rounded-sm bg-white">
+                      <div className="flex items-center border border-border/80 rounded-sm bg-white flex-shrink-0">
                         <button
                           onClick={() => updateQuantity(item.id, item.quantity - 1)}
                           aria-label="Decrease quantity"
-                          className="w-8 h-8 flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-subtle transition-colors"
+                          className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-subtle transition-colors"
                         >
                           <Minus size={12} />
                         </button>
-                        <span className="w-8 text-center text-xs font-medium select-none">
+                        <span className="w-7 sm:w-8 text-center text-xs font-medium select-none">
                           {item.quantity}
                         </span>
                         <button
                           onClick={() => updateQuantity(item.id, item.quantity + 1)}
                           aria-label="Increase quantity"
-                          className="w-8 h-8 flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-subtle transition-colors"
+                          className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-subtle transition-colors"
                         >
                           <Plus size={12} />
                         </button>
@@ -114,7 +114,7 @@ export default function Cart() {
                       {/* Discreet Remove */}
                       <button
                         onClick={() => removeItem(item.id)}
-                        className="text-xs text-text-secondary/70 hover:text-sale transition-colors font-normal py-1"
+                        className="text-xs text-text-secondary/70 hover:text-sale transition-colors font-normal py-1 flex-shrink-0"
                       >
                         Remove
                       </button>
@@ -126,8 +126,8 @@ export default function Cart() {
           </div>
 
           {/* Minimalist Summary Sidebar */}
-          <div className="lg:col-span-5 xl:col-span-4 sticky top-24">
-            <div className="bg-[#FAFAFA] border border-border/70 rounded-md p-6 space-y-5">
+          <div className="lg:col-span-5 xl:col-span-4 sticky top-24 w-full min-w-0">
+            <div className="bg-[#FAFAFA] border border-border/70 rounded-md p-4 sm:p-6 space-y-4 sm:space-y-5">
               <h2 className="text-xs font-semibold uppercase tracking-wider text-text-primary pb-3 border-b border-border/60">
                 Summary
               </h2>
