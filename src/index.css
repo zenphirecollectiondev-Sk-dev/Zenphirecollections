@@ -74,6 +74,7 @@
   html {
     overflow-x: hidden;
     width: 100%;
+    max-width: 100%;
     position: relative;
     background-color: #ffffff;
   }
@@ -82,6 +83,7 @@
     @apply bg-bg text-text-primary font-sans antialiased;
     overflow-x: hidden;
     width: 100%;
+    max-width: 100%;
     position: relative;
     background-color: #ffffff;
   }
@@ -492,19 +494,26 @@
   will-change: transform;
 }
 
-.product-card:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--shadow-card-hover);
+@media (hover: hover) {
+  .product-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-card-hover);
+  }
+
+  .product-card:hover .card-img {
+    transform: scale(1.05);
+  }
+
+  .product-card:hover .card-overlay {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Image zoom — uses base duration, system easing */
 .product-card .card-img {
   transition: transform var(--dur-base) var(--ease);
   will-change: transform;
-}
-
-.product-card:hover .card-img {
-  transform: scale(1.05);
 }
 
 /* Hover overlay — fade + 4px rise */
@@ -514,11 +523,6 @@
   transition:
     opacity var(--dur-base) var(--ease),
     transform var(--dur-base) var(--ease);
-}
-
-.product-card:hover .card-overlay {
-  opacity: 1;
-  transform: translateY(0);
 }
 
 /* =========================================
@@ -564,9 +568,11 @@
   pointer-events: none;
 }
 
-.group:hover .gold-accent-line,
-:hover > .gold-accent-line {
-  transform: scaleX(1);
+@media (hover: hover) {
+  .group:hover .gold-accent-line,
+  :hover > .gold-accent-line {
+    transform: scaleX(1);
+  }
 }
 
 /* =========================================

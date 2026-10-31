@@ -107,7 +107,7 @@ function ProductImage({
           {...(priority ? { fetchPriority: "high" as any } : {})}
           onLoad={() => setImgState("loaded")}
           onError={() => setImgState("error")}
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ease-in-out ${imgState === "loaded" ? "opacity-100" : "opacity-0"
+          className={`card-img absolute inset-0 w-full h-full object-cover object-top transition-opacity duration-500 ease-in-out ${imgState === "loaded" ? "opacity-100" : "opacity-0"
             }`}
         />
       )}
@@ -119,7 +119,7 @@ function ProductImage({
 
 function SkeletonGrid({ count }: { count: number }) {
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-3 gap-y-8 gap-x-4 md:gap-x-6">
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-2.5 sm:gap-4 md:gap-5 lg:gap-6">
       <ProductCardSkeleton count={count} />
     </div>
   );
@@ -206,7 +206,7 @@ export default function Shop() {
     return categories.filter((c: any) =>
       !c.parent_category_id ||
       (!['male', 'female', 'unisex'].includes(c.name?.toLowerCase() || '') &&
-       !['male', 'female', 'unisex'].includes(c.slug?.split('-').pop()?.toLowerCase() || ''))
+        !['male', 'female', 'unisex'].includes(c.slug?.split('-').pop()?.toLowerCase() || ''))
     );
   }, [categories]);
 
@@ -266,8 +266,8 @@ export default function Shop() {
         ? activeGender === 'male'
           ? "Men's"
           : activeGender === 'female'
-          ? "Women's"
-          : "Unisex"
+            ? "Women's"
+            : "Unisex"
         : null;
 
     let catLabel: string | null = null;
@@ -715,12 +715,12 @@ export default function Shop() {
 
   // -- Render ----------------------------------------------------------------
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 min-h-screen overflow-x-hidden anim-fade-up">
+    <div className="w-full max-w-7xl mx-auto px-2.5 sm:px-5 lg:px-8 py-5 sm:py-8 md:py-10 flex-1 flex flex-col anim-fade-up">
 
       {/* Page Header */}
-      <div className="border-b border-border pb-5 mb-7 flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+      <div className="border-b border-border pb-4 mb-5 sm:pb-5 sm:mb-6 flex flex-col md:flex-row md:items-end md:justify-between gap-2 sm:gap-3">
         <div>
-          <p className="text-[10px] uppercase tracking-[0.25em] text-accent-gold font-medium">
+          <p className="font-sans text-[10px] uppercase tracking-[0.25em] text-accent-gold font-medium">
             Zenphire
           </p>
           <h1 className="text-xl sm:text-2xl font-mending font-medium tracking-wide text-text-primary mt-1">
@@ -728,71 +728,70 @@ export default function Shop() {
           </h1>
         </div>
         {resultCount !== null && (
-          <p className="text-xs text-text-secondary">{resultCount} results</p>
+          <p className="font-sans text-xs text-text-secondary">{resultCount} results</p>
         )}
       </div>
 
       {/* Control Bar (Sticky & always accessible) */}
-      <div className="sticky top-16 z-30 flex justify-between items-center mb-8 border border-border/70 px-3 py-2 bg-white/95 backdrop-blur-sm shadow-xs gap-3">
-        {/* Mobile filter button */}
-        <button
-          onClick={() => setIsMobileFilterOpen(true)}
-          title="Filter"
-          className="flex items-center gap-1.5 px-3 py-1.5 border border-border/80 text-xs font-normal md:hidden hover:border-text-primary text-text-primary bg-white transition-colors rounded-xs"
-        >
-          <SlidersHorizontal size={13} />
-          <span>Filter</span>
-          {activeFilterCount > 0 && (
-            <span className="bg-text-primary text-white text-[9px] font-medium px-1.5 py-0.5 rounded-full leading-none">
-              {activeFilterCount}
-            </span>
-          )}
-        </button>
+      <div className="sticky top-16 z-30 mb-6 border border-border/80 px-2.5 py-2 sm:px-3 sm:py-2.5 bg-white/95 backdrop-blur-sm shadow-xs rounded-xs">
+        <div className="flex items-center gap-2.5 w-full">
+          {/* Mobile filter button - equal width half row */}
+          <button
+            onClick={() => setIsMobileFilterOpen(true)}
+            title="Filter"
+            className="flex-1 md:hidden flex items-center justify-center gap-2 h-10 px-3 border border-border/80 text-xs font-medium hover:border-text-primary text-text-primary bg-white transition-colors rounded-xs shadow-2xs"
+          >
+            <SlidersHorizontal size={13} />
+            <span>Filter</span>
+            {activeFilterCount > 0 && (
+              <span className="bg-text-primary text-white text-[9px] font-medium px-1.5 py-0.5 rounded-full leading-none">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
 
-        {/* Desktop: filter reset */}
-        <div className="hidden md:flex items-center gap-2">
-          {activeFilterCount > 0 ? (
-            <button
-              onClick={resetFilters}
-              title="Reset all filters"
-              className="flex items-center gap-1.5 text-xs font-medium text-sale hover:underline uppercase tracking-wider py-1 px-2 border border-sale/30 rounded-xs"
-            >
-              <SlidersHorizontal size={12} />
-              <span>Reset Filters</span>
-              <X size={11} strokeWidth={2.5} />
-            </button>
-          ) : (
-            <div title="No filters active" className="flex items-center gap-1.5 text-xs text-text-secondary/60 tracking-wider py-1 px-2">
-              <SlidersHorizontal size={12} />
-              <span>Filters</span>
+          {/* Desktop: filter reset */}
+          <div className="hidden md:flex items-center gap-2">
+            {activeFilterCount > 0 ? (
+              <button
+                onClick={resetFilters}
+                title="Reset all filters"
+                className="flex items-center gap-1.5 text-xs font-medium text-sale hover:underline uppercase tracking-wider py-1 px-2 border border-sale/30 rounded-xs"
+              >
+                <SlidersHorizontal size={12} />
+                <span>Reset Filters</span>
+                <X size={11} strokeWidth={2.5} />
+              </button>
+            ) : (
+              <div title="No filters active" className="flex items-center gap-1.5 text-xs text-text-secondary/60 tracking-wider py-1 px-2">
+                <SlidersHorizontal size={12} />
+                <span>Filters</span>
+              </div>
+            )}
+          </div>
+
+          {/* Sort dropdown - equal width half row on mobile */}
+          <div className="flex-1 md:flex-initial md:ml-auto">
+            <div className="relative w-full md:w-auto">
+              <select
+                id="sortBy"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                title="Sort"
+                className="w-full md:w-auto appearance-none bg-white border border-border/80 rounded-xs text-xs font-normal h-10 py-2 pl-3 pr-8 focus:outline-none focus:border-text-primary cursor-pointer text-text-primary hover:border-text-primary transition-colors shadow-2xs"
+              >
+                <option value="newest">New Arrivals</option>
+                <option value="price-asc">Price: Low to High</option>
+                <option value="price-desc">Price: High to Low</option>
+              </select>
+              <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-text-secondary/70" />
             </div>
-          )}
-        </div>
-
-        {/* Sort */}
-        <div className="flex items-center gap-2 ml-auto">
-          <span className="text-xs text-text-secondary font-normal hidden sm:inline-block">
-            Sort:
-          </span>
-          <div className="relative">
-            <select
-              id="sortBy"
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              title="Sort"
-              className="appearance-none bg-white border border-border/80 rounded-xs text-xs font-normal py-1.5 pl-2.5 pr-6 focus:outline-none focus:border-text-primary cursor-pointer text-text-primary hover:border-text-primary transition-colors"
-            >
-              <option value="newest">New Arrivals</option>
-              <option value="price-asc">Price: Low to High</option>
-              <option value="price-desc">Price: High to Low</option>
-            </select>
-            <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-text-secondary/70" />
           </div>
         </div>
       </div>
 
       {/* Layout: sidebar + grid */}
-      <div className="flex gap-10">
+      <div className="w-full md:flex md:gap-8 lg:gap-10">
 
         {/* DESKTOP SIDEBAR */}
         <aside className="w-56 flex-shrink-0 hidden md:block space-y-8">
@@ -808,11 +807,10 @@ export default function Shop() {
                   <button
                     key={g.id}
                     onClick={() => handleGenderChange(g.id)}
-                    className={`px-3 py-1.5 text-xs font-semibold rounded-xs border transition-all duration-150 ${
-                      isActive
-                        ? "bg-text-primary text-white border-text-primary shadow-xs"
-                        : "border-border text-text-secondary hover:text-text-primary hover:border-accent bg-white"
-                    }`}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-xs border transition-all duration-150 ${isActive
+                      ? "bg-text-primary text-white border-text-primary shadow-xs"
+                      : "border-border text-text-secondary hover:text-text-primary hover:border-accent bg-white"
+                      }`}
                   >
                     {g.label}
                   </button>
@@ -879,11 +877,10 @@ export default function Shop() {
                       <button
                         key={opt.id}
                         onClick={() => handleDynamicFilterToggle(filter.id, opt.id)}
-                        className={`px-3 py-1.5 text-xs font-semibold rounded-xs border transition-all duration-150 ${
-                          isSel
-                            ? "bg-text-primary text-white border-text-primary shadow-xs"
-                            : "border-border text-text-secondary hover:text-text-primary hover:border-accent bg-white"
-                        }`}
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-xs border transition-all duration-150 ${isSel
+                          ? "bg-text-primary text-white border-text-primary shadow-xs"
+                          : "border-border text-text-secondary hover:text-text-primary hover:border-accent bg-white"
+                          }`}
                       >
                         {opt.value}
                       </button>
@@ -908,7 +905,7 @@ export default function Shop() {
             </h3>
             {queryState.status === 'loading' || queryState.status === 'slow' ? (
               <div className="flex flex-wrap gap-2">
-                {[1,2,3,4].map(i => (
+                {[1, 2, 3, 4].map(i => (
                   <div key={i} className="w-10 h-10 bg-border/40 animate-pulse" />
                 ))}
               </div>
@@ -923,8 +920,8 @@ export default function Shop() {
                       key={size}
                       onClick={() => handleSizeToggle(size)}
                       className={`size-btn w-10 h-10 border text-xs font-semibold flex items-center justify-center ${isSel
-                          ? "ambient-green-gradient text-white border-transparent selected"
-                          : "border-border text-text-primary bg-white hover:border-accent"
+                        ? "ambient-green-gradient text-white border-transparent selected"
+                        : "border-border text-text-primary bg-white hover:border-accent"
                         }`}
                     >
                       {size}
@@ -950,7 +947,7 @@ export default function Shop() {
         </aside>
 
         {/* PRODUCT GRID */}
-        <main className="flex-1 min-w-0">
+        <main className="flex-1 min-w-0 flex flex-col">
 
           {/* -- State machine rendering ----------------------------------- */}
 
@@ -1006,14 +1003,14 @@ export default function Shop() {
 
           {queryState.status === "success" && filteredProducts.length > 0 && (
             <>
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-y-8 gap-x-3.5 sm:gap-x-4 md:gap-x-6 anim-stagger">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-2.5 sm:gap-4 md:gap-5 lg:gap-6 anim-stagger">
                 {filteredProducts.map((product, idx) => (
                   <Link
                     key={product.id}
                     to={`/product/${product.slug}`}
-                    className="group product-card block"
+                    className="group product-card flex flex-col h-full"
                   >
-                    <div className="relative mb-3">
+                    <div className="relative mb-2.5 sm:mb-3">
                       <ProductImage
                         src={imgCard(product.coverImageUrl)}
                         alt={product.name}
@@ -1028,8 +1025,8 @@ export default function Shop() {
                           Sold Out
                         </div>
                       )}
-                      {/* Quick view overlay */}
-                      <div className="card-overlay absolute bottom-0 left-0 right-0 bg-white/90 py-2.5 px-4 flex items-center justify-between z-10">
+                      {/* Quick view overlay — desktop only */}
+                      <div className="card-overlay absolute bottom-0 left-0 right-0 bg-white/90 py-2.5 px-4 hidden md:flex items-center justify-between z-10">
                         <span className="text-[9px] uppercase font-bold tracking-widest text-text-primary flex items-center gap-1">
                           <ShoppingBag size={10} /> Quick View
                         </span>
@@ -1043,27 +1040,29 @@ export default function Shop() {
                           handleWishlist(product.id);
                         }}
                         aria-label="Toggle Wishlist"
-                        className={`wishlist-btn absolute top-2.5 right-2.5 min-w-[36px] min-h-[36px] flex items-center justify-center p-2 bg-white/90 border border-border/60 rounded-full z-10 shadow-xs ${heartId === product.id ? "anim-heart-pop" : ""
+                        className={`wishlist-btn absolute top-2 right-2 w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-white/80 backdrop-blur-xs border border-border/60 rounded-full z-10 shadow-2xs hover:bg-white active:scale-90 transition-all ${heartId === product.id ? "anim-heart-pop" : ""
                           }`}
                       >
                         <Heart
-                          size={14}
+                          size={13}
                           className={
                             isWishlisted(product.id)
                               ? "fill-sale stroke-sale"
-                              : "stroke-text-primary"
+                              : "stroke-text-primary/75"
                           }
                         />
                       </button>
                     </div>
-                    <div className="space-y-0.5">
-                      <p className="text-[9px] uppercase tracking-widest text-text-secondary font-bold">
-                        Zenphire
-                      </p>
-                      <h3 className="text-xs font-medium text-text-primary group-hover:text-accent-gold transition-colors duration-150 truncate">
-                        {product.name}
-                      </h3>
-                      <p className="text-xs font-semibold text-text-primary">
+                    <div className="flex flex-col flex-1 justify-between space-y-1 pt-1">
+                      <div>
+                        <p className="font-sans text-[10px] uppercase tracking-[0.2em] text-accent-gold font-medium leading-none mb-1">
+                          Zenphire
+                        </p>
+                        <h3 className="font-sans text-xs sm:text-sm font-medium text-text-primary [@media(hover:hover)]:hover:text-accent-gold transition-colors duration-150 line-clamp-1 sm:line-clamp-2 leading-snug">
+                          {product.name}
+                        </h3>
+                      </div>
+                      <p className="font-sans text-xs sm:text-sm font-semibold text-text-primary pt-0.5">
                         ₹{Number(product.base_price || 0).toFixed(2)}
                       </p>
                     </div>
@@ -1136,11 +1135,10 @@ export default function Shop() {
                         <button
                           key={g.id}
                           onClick={() => handleGenderChange(g.id)}
-                          className={`px-3 py-1.5 border text-xs font-normal rounded-xs transition-all ${
-                            isActive
-                              ? "filter-chip-active bg-white"
-                              : "border-border/80 bg-white text-text-primary hover:border-text-primary"
-                          }`}
+                          className={`px-3 py-1.5 border text-xs font-normal rounded-xs transition-all ${isActive
+                            ? "filter-chip-active bg-white"
+                            : "border-border/80 bg-white text-text-primary hover:border-text-primary"
+                            }`}
                         >
                           {g.label}
                         </button>
@@ -1165,11 +1163,10 @@ export default function Shop() {
                             <button
                               key={slug}
                               onClick={() => handleCategoryChange(slug)}
-                              className={`px-3 py-1.5 border text-xs font-normal rounded-xs capitalize ${
-                                isActive
-                                  ? "filter-chip-active bg-white"
-                                  : "border-border/80 bg-white text-text-primary hover:border-text-primary"
-                              }`}
+                              className={`px-3 py-1.5 border text-xs font-normal rounded-xs capitalize ${isActive
+                                ? "filter-chip-active bg-white"
+                                : "border-border/80 bg-white text-text-primary hover:border-text-primary"
+                                }`}
                             >
                               {label}
                             </button>
@@ -1211,11 +1208,10 @@ export default function Shop() {
                             <button
                               key={opt.id}
                               onClick={() => handleDynamicFilterToggle(filter.id, opt.id)}
-                              className={`px-3 py-1.5 border text-xs font-normal rounded-xs capitalize ${
-                                isSel
-                                  ? "filter-chip-active bg-white"
-                                  : "border-border/80 bg-white text-text-primary hover:border-text-primary"
-                              }`}
+                              className={`px-3 py-1.5 border text-xs font-normal rounded-xs capitalize ${isSel
+                                ? "filter-chip-active bg-white"
+                                : "border-border/80 bg-white text-text-primary hover:border-text-primary"
+                                }`}
                             >
                               {opt.value}
                             </button>
@@ -1241,7 +1237,7 @@ export default function Shop() {
                   </h3>
                   {queryState.status === 'loading' || queryState.status === 'slow' ? (
                     <div className="flex flex-wrap gap-2">
-                      {[1,2,3,4].map(i => (
+                      {[1, 2, 3, 4].map(i => (
                         <div key={i} className="w-9 h-9 bg-border/40 animate-pulse" />
                       ))}
                     </div>
@@ -1256,8 +1252,8 @@ export default function Shop() {
                             key={size}
                             onClick={() => handleSizeToggle(size)}
                             className={`size-btn w-9 h-9 border text-xs font-normal flex items-center justify-center rounded-xs ${isSel
-                                ? "ambient-green-gradient text-white border-transparent selected"
-                                : "border-border/80 text-text-primary bg-white hover:border-text-primary"
+                              ? "ambient-green-gradient text-white border-transparent selected"
+                              : "border-border/80 text-text-primary bg-white hover:border-text-primary"
                               }`}
                           >
                             {size}
