@@ -53,6 +53,14 @@ function localApiPlugin(env: Record<string, string>) {
             const mod = await server.ssrLoadModule('/api/verify-razorpay-payment.ts')
             return await mod.default(req, res)
           }
+          if (url === '/api/delete-test-orders') {
+            const mod = await server.ssrLoadModule('/api/delete-test-orders.ts')
+            return await mod.default(req, res)
+          }
+          if (url === '/api/cancel-razorpay-order') {
+            const mod = await server.ssrLoadModule('/api/cancel-razorpay-order.ts')
+            return await mod.default(req, res)
+          }
           next()
         } catch (err: any) {
           console.error(`[Local API Error] ${url}:`, err)

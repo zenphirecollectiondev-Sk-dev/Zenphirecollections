@@ -3,6 +3,7 @@ import { ShoppingBag, Plus, Minus, ArrowRight } from 'lucide-react';
 import { useCartStore } from '../store/useCartStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { EASE } from '../lib/motion';
+import CouponRecommendation from '../components/CouponRecommendation';
 
 export default function Cart() {
   const { items, removeItem, updateQuantity } = useCartStore();
@@ -152,6 +153,9 @@ export default function Cart() {
                     Add ₹{(1000 - subtotal).toFixed(2)} more to qualify for complimentary shipping.
                   </p>
                 )}
+
+                {/* Smart Coupon Nudge */}
+                <CouponRecommendation subtotal={subtotal} compact className="pt-1" />
 
                 <div className="flex justify-between items-baseline pt-4 border-t border-border/60">
                   <span className="font-semibold uppercase text-xs tracking-wider text-text-primary">Estimated Total</span>

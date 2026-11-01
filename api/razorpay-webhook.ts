@@ -51,7 +51,7 @@ async function dbFetch(endpoint: string, options?: RequestInit) {
     const errText = await res.text();
     throw new Error(`DB error (${endpoint}): ${errText}`);
   }
-  return res.json();
+  return res.json() as Promise<any>;
 }
 
 async function dbRpc(fn: string, args: object) {
@@ -68,7 +68,7 @@ async function dbRpc(fn: string, args: object) {
     const errText = await res.text();
     throw new Error(`RPC error (${fn}): ${errText}`);
   }
-  return res.json();
+  return res.json() as Promise<any>;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {

@@ -363,7 +363,7 @@ function AppContent() {
                 <ul className="space-y-4 text-sm text-white/70 font-medium">
                   <li><Link to="/contact" className="inline-block hover:text-white transition-colors duration-200">Contact Us</Link></li>
                   <li><Link to="/faq" className="inline-block hover:text-white transition-colors duration-200">Help & FAQ</Link></li>
-                  <li><Link to="/shipping" className="inline-block hover:text-white transition-colors duration-200">Shipping & Returns</Link></li>
+                  <li><Link to="/shipping" className="inline-block hover:text-white transition-colors duration-200">Shipping & Payment Policy</Link></li>
                 </ul>
               </div>
               

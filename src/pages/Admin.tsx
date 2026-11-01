@@ -50,6 +50,30 @@ interface ProductVariant {
   sku: string;
 }
 
+const SIZE_ORDER = ['XS', 'S', 'M', 'L', 'XL', '2XL', 'XXL', '3XL', 'XXXL', 'FREE SIZE', 'FS', '28', '30', '32', '34', '36', '38', '40', '42'];
+
+const sortVariants = (variants: ProductVariant[]): ProductVariant[] => {
+  return [...variants].sort((a, b) => {
+    const sizeA = (a.size || '').toUpperCase().trim();
+    const sizeB = (b.size || '').toUpperCase().trim();
+    const idxA = SIZE_ORDER.indexOf(sizeA);
+    const idxB = SIZE_ORDER.indexOf(sizeB);
+
+    if (idxA !== -1 && idxB !== -1) {
+      if (idxA !== idxB) return idxA - idxB;
+    } else if (idxA !== -1) {
+      return -1;
+    } else if (idxB !== -1) {
+      return 1;
+    } else {
+      const cmp = sizeA.localeCompare(sizeB, undefined, { numeric: true });
+      if (cmp !== 0) return cmp;
+    }
+
+    return (a.color || '').localeCompare(b.color || '');
+  });
+};
+
 interface Product {
   id: string;
   name: string;
@@ -230,6 +254,12 @@ export default function Admin() {
   const [orderUpdateTracking, setOrderUpdateTracking] = useState('');
   const [loadingOrderItems, setLoadingOrderItems] = useState(false);
   const [orderSearchQuery, setOrderSearchQuery] = useState('');
+
+  // Order Deletion states
+  const [isDeleteAllOrdersModalOpen, setIsDeleteAllOrdersModalOpen] = useState(false);
+  const [orderToDelete, setOrderToDelete] = useState<any | null>(null);
+  const [isDeletingOrders, setIsDeletingOrders] = useState(false);
+  const [deleteConfirmInput, setDeleteConfirmInput] = useState('');
 
   // Toast notification queue
   const [toasts, setToasts] = useState<{ id: number; msg: string; isError: boolean }[]>([]);
@@ -916,6 +946,110 @@ export default function Admin() {
     }
   };
 
+  // Delete a single order and its items
+  const handleDeleteOrder = async (orderId: string) => {
+    if (!orderId) return;
+    setIsDeletingOrders(true);
+    try {
+      // 1. Try serverless backend endpoint first (uses SUPABASE_SERVICE_ROLE_KEY)
+      let apiSuccess = false;
+      try {
+        const res = await fetch('/api/delete-test-orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ order_id: orderId }),
+        });
+        if (res.ok) {
+          apiSuccess = true;
+        }
+      } catch (apiErr) {
+        console.warn('API deletion fallback to client:', apiErr);
+      }
+
+      // 2. If API was unavailable, execute direct Supabase client delete
+      if (!apiSuccess) {
+        // Delete order items first to satisfy foreign key constraints
+        const { error: itemsErr } = await supabase
+          .from('order_items')
+          .delete()
+          .eq('order_id', orderId);
+        if (itemsErr) throw itemsErr;
+
+        const { error: orderErr } = await supabase
+          .from('orders')
+          .delete()
+          .eq('id', orderId);
+        if (orderErr) throw orderErr;
+      }
+
+      triggerNotification('Order and associated transaction records deleted.');
+      setOrderToDelete(null);
+      if (selectedOrder?.id === orderId) {
+        setIsOrderModalOpen(false);
+        setSelectedOrder(null);
+      }
+      fetchData();
+    } catch (err: any) {
+      console.error('Error deleting order:', err);
+      triggerNotification(err.message || 'Failed to delete order.', true);
+    } finally {
+      setIsDeletingOrders(false);
+    }
+  };
+
+  // Delete ALL test orders and transaction records
+  const handleDeleteAllOrders = async () => {
+    setIsDeletingOrders(true);
+    try {
+      // 1. Try serverless backend endpoint first (uses SUPABASE_SERVICE_ROLE_KEY)
+      let apiSuccess = false;
+      try {
+        const res = await fetch('/api/delete-test-orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ all: true }),
+        });
+        if (res.ok) {
+          apiSuccess = true;
+        }
+      } catch (apiErr) {
+        console.warn('API bulk delete fallback to client:', apiErr);
+      }
+
+      // 2. If API was unavailable, execute direct Supabase client delete
+      if (!apiSuccess) {
+        // Delete all order_items first
+        const { error: itemsErr } = await supabase
+          .from('order_items')
+          .delete()
+          .neq('id', '00000000-0000-0000-0000-000000000000');
+        if (itemsErr) throw itemsErr;
+
+        // Delete all orders
+        const { error: ordersErr } = await supabase
+          .from('orders')
+          .delete()
+          .neq('id', '00000000-0000-0000-0000-000000000000');
+        if (ordersErr) throw ordersErr;
+      }
+
+      triggerNotification('✅ All test orders and transaction records deleted successfully.');
+      setIsDeleteAllOrdersModalOpen(false);
+      setDeleteConfirmInput('');
+      setSelectedOrder(null);
+      setIsOrderModalOpen(false);
+      setRecentOrders([]);
+      setOrdersCount(0);
+      setRevenue(0);
+      fetchData();
+    } catch (err: any) {
+      console.error('Error deleting all orders:', err);
+      triggerNotification(err.message || 'Failed to delete all orders.', true);
+    } finally {
+      setIsDeletingOrders(false);
+    }
+  };
+
   // Handle Coupon Submit
   const handleCouponSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1482,11 +1616,11 @@ export default function Admin() {
   // Adjust default variant size when category switches between pants and other clothing
   useEffect(() => {
     if (isPantsProduct) {
-      if (!['28', '30', '32', '34', '36', '38'].includes(varSize)) {
+      if (!['28', '30', '32', '34', '36', '38', '40', '42', 'Free Size', 'FREE SIZE', 'FS'].includes(varSize)) {
         setVarSize('30');
       }
     } else {
-      if (!['S', 'M', 'L', 'XL'].includes(varSize)) {
+      if (!['XS', 'S', 'M', 'L', 'XL', '2XL', 'XXL', '3XL', 'Free Size', 'FREE SIZE', 'FS'].includes(varSize)) {
         setVarSize('M');
       }
     }
@@ -1808,7 +1942,7 @@ export default function Admin() {
     setProdSizeGuideType(prod.size_guide_type || 'category');
     setProdCustomSizeGuide(prod.custom_size_guide_html || '');
     setProdImages(prod.product_images || []);
-    setProdVariants(prod.product_variants || []);
+    setProdVariants(sortVariants(prod.product_variants || []));
 
     const existingOcc = occasionProducts.find(op => op.product_id === prod.id);
     setProdOccasion(existingOcc ? existingOcc.occasion : '');
@@ -1920,7 +2054,7 @@ export default function Admin() {
       stock_qty: isNaN(qty) ? 0 : qty,
       sku: targetSku
     };
-    setProdVariants([...prodVariants, newVar]);
+    setProdVariants(sortVariants([...prodVariants, newVar]));
   };
 
   // Delete variant from list inside modal
@@ -2639,6 +2773,18 @@ export default function Admin() {
                   <p className="text-2xl font-black text-text-primary mt-2">
                     {ordersCount} Orders
                   </p>
+                  {ordersCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDeleteConfirmInput('');
+                        setIsDeleteAllOrdersModalOpen(true);
+                      }}
+                      className="text-[10px] text-rose-600 hover:text-rose-700 font-bold uppercase tracking-wider mt-2 flex items-center gap-1 transition-colors"
+                    >
+                      <Trash2 size={11} /> Clear Test Orders
+                    </button>
+                  )}
                 </div>
                 <div className="w-12 h-12 bg-bg-subtle flex items-center justify-center border border-border">
                   <Activity size={20} className="text-text-secondary stroke-[1.5]" />
@@ -3197,7 +3343,7 @@ export default function Admin() {
             animate={{ opacity: 1, y: 0 }}
             className="space-y-6"
           >
-            {/* Search controls */}
+            {/* Search & Action controls */}
             <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4">
               <div className="relative flex-grow max-w-md">
                 <Search size={14} className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-text-secondary" />
@@ -3209,6 +3355,20 @@ export default function Admin() {
                   className="w-full pl-10 pr-4 py-2.5 border border-border/80 bg-white text-xs focus:outline-none focus:border-accent shadow-xs"
                 />
               </div>
+
+              {recentOrders.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDeleteConfirmInput('');
+                    setIsDeleteAllOrdersModalOpen(true);
+                  }}
+                  className="flex items-center justify-center gap-2 px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold uppercase tracking-wider transition-colors shadow-xs"
+                >
+                  <Trash2 size={13} className="stroke-[2.2]" />
+                  <span>Delete Test Orders & Transactions ({recentOrders.length})</span>
+                </button>
+              )}
             </div>
 
             {/* Orders Table */}
@@ -3277,24 +3437,37 @@ export default function Admin() {
                                 <span className={`inline-block text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
                                   (o as any).payment_status === 'paid'
                                     ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                                    : 'bg-amber-50 text-amber-800 border-amber-200'
+                                    : (o as any).payment_status === 'failed'
+                                      ? 'bg-rose-50 text-rose-800 border-rose-200'
+                                      : 'bg-amber-50 text-amber-800 border-amber-200'
                                 }`}>
-                                  {(o as any).payment_status === 'paid' ? 'Paid' : 'Not Paid'}
+                                  {(o as any).payment_status === 'paid'
+                                    ? 'Paid'
+                                    : (o as any).payment_status === 'failed'
+                                      ? 'Failed'
+                                      : 'Unpaid'}
                                 </span>
                               </div>
                             </td>
                             <td className="py-4 pl-8">
-                              <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 border ${o.status === 'delivered'
-                                ? 'bg-green-50 text-green-700 border-green-200'
-                                : o.status === 'cancelled'
-                                  ? 'bg-red-50 text-sale border-red-200'
-                                  : o.status === 'shipped'
-                                    ? 'bg-blue-50 text-blue-700 border-blue-200'
-                                    : o.status === 'processing'
-                                      ? 'bg-purple-50 text-purple-700 border-purple-200'
-                                      : 'bg-yellow-50 text-yellow-700 border-yellow-200'
-                                }`}>
-                                {o.status}
+                              <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 border ${
+                                o.status === 'delivered'
+                                  ? 'bg-green-50 text-green-700 border-green-200'
+                                  : o.status === 'cancelled' || (o as any).payment_status === 'failed'
+                                    ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                    : o.status === 'shipped'
+                                      ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                      : (o as any).payment_status === 'unpaid'
+                                        ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                        : o.status === 'processing'
+                                          ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                          : 'bg-yellow-50 text-yellow-700 border-yellow-200'
+                              }`}>
+                                {(o as any).payment_status === 'failed' || o.status === 'cancelled'
+                                  ? 'Cancelled'
+                                  : (o as any).payment_status === 'unpaid'
+                                    ? 'Awaiting Payment'
+                                    : o.status}
                               </span>
                             </td>
                             <td className="py-4 text-[11px]">
@@ -3314,12 +3487,22 @@ export default function Admin() {
                               )}
                             </td>
                             <td className="py-4 pr-6 text-right">
-                              <button
-                                onClick={() => fetchOrderDetails(o)}
-                                className="border border-border bg-white text-text-primary px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider hover:bg-bg-subtle transition-all shadow-xs"
-                              >
-                                View Details
-                              </button>
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  onClick={() => fetchOrderDetails(o)}
+                                  className="border border-border bg-white text-text-primary px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider hover:bg-bg-subtle transition-all shadow-xs"
+                                >
+                                  View Details
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setOrderToDelete(o)}
+                                  title="Delete this order & transaction"
+                                  className="p-1.5 border border-border bg-white text-text-secondary hover:text-rose-600 hover:border-rose-300 hover:bg-rose-50 transition-colors shadow-xs"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         );
@@ -5971,13 +6154,19 @@ export default function Admin() {
                                 <option value="34">34</option>
                                 <option value="36">36</option>
                                 <option value="38">38</option>
+                                <option value="40">40</option>
+                                <option value="42">42</option>
+                                <option value="Free Size">Free Size</option>
                               </>
                             ) : (
                               <>
+                                <option value="XS">XS</option>
                                 <option value="S">S</option>
                                 <option value="M">M</option>
                                 <option value="L">L</option>
                                 <option value="XL">XL</option>
+                                <option value="2XL">2XL</option>
+                                <option value="Free Size">Free Size</option>
                               </>
                             )}
                           </select>
@@ -6517,21 +6706,31 @@ export default function Admin() {
                     </div>
                   </div>
 
-                  <div className="pt-8 border-t border-border flex gap-3">
+                  <div className="pt-8 border-t border-border flex flex-col sm:flex-row gap-3">
                     <button
                       type="button"
-                      onClick={() => setIsOrderModalOpen(false)}
-                      className="flex-1 py-2.5 border border-border bg-white text-text-primary text-xs font-bold uppercase tracking-widest hover:bg-bg-subtle transition-colors shadow-xs"
+                      onClick={() => setOrderToDelete(selectedOrder)}
+                      className="py-2.5 px-4 border border-rose-200 bg-rose-50 text-rose-700 text-xs font-bold uppercase tracking-widest hover:bg-rose-100 transition-colors shadow-xs flex items-center justify-center gap-1.5"
                     >
-                      Cancel
+                      <Trash2 size={13} />
+                      Delete Order
                     </button>
-                    <button
-                      type="button"
-                      onClick={handleUpdateOrder}
-                      className="flex-1 py-2.5 bg-accent text-white text-xs font-bold uppercase tracking-widest hover:bg-accent-hover transition-colors shadow-sm"
-                    >
-                      Save Changes
-                    </button>
+                    <div className="flex-1 flex gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setIsOrderModalOpen(false)}
+                        className="flex-1 py-2.5 border border-border bg-white text-text-primary text-xs font-bold uppercase tracking-widest hover:bg-bg-subtle transition-colors shadow-xs"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleUpdateOrder}
+                        className="flex-1 py-2.5 bg-accent text-white text-xs font-bold uppercase tracking-widest hover:bg-accent-hover transition-colors shadow-sm"
+                      >
+                        Save Changes
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -6892,6 +7091,234 @@ export default function Admin() {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ==========================================
+          DELETE ALL TEST ORDERS & TRANSACTIONS MODAL
+          ========================================== */}
+      <AnimatePresence>
+        {isDeleteAllOrdersModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                if (!isDeletingOrders) setIsDeleteAllOrdersModalOpen(false);
+              }}
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="relative w-full max-w-lg bg-white border border-border p-6 md:p-8 shadow-2xl z-10 flex flex-col"
+            >
+              <div className="flex justify-between items-start border-b border-border pb-4 mb-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600 shrink-0">
+                    <Trash2 size={20} className="stroke-[2.2]" />
+                  </div>
+                  <div>
+                    <span className="text-[9px] uppercase tracking-widest text-rose-600 font-black bg-rose-50 px-2 py-0.5 border border-rose-200">
+                      Danger Zone
+                    </span>
+                    <h3 className="text-base font-heading font-black uppercase mt-1 text-text-primary">
+                      Delete Test Orders & Transactions
+                    </h3>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={isDeletingOrders}
+                  onClick={() => setIsDeleteAllOrdersModalOpen(false)}
+                  className="p-1.5 text-text-secondary hover:text-text-primary hover:bg-bg-subtle transition-colors rounded-full"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="space-y-4 text-xs">
+                <div className="p-3.5 bg-rose-50/70 border border-rose-200 text-rose-900 rounded-sm space-y-1">
+                  <div className="font-bold flex items-center gap-1.5">
+                    <AlertTriangle size={14} className="text-rose-600 shrink-0" />
+                    <span>Permanent Deletion Warning</span>
+                  </div>
+                  <p className="text-[11px] leading-relaxed text-rose-800">
+                    This will permanently delete all <strong>{recentOrders.length}</strong> orders, customer line items, and transaction logs recorded during testing.
+                  </p>
+                </div>
+
+                <div className="p-3.5 bg-emerald-50/60 border border-emerald-200 text-emerald-900 rounded-sm">
+                  <div className="font-bold text-emerald-800 flex items-center gap-1.5 mb-1">
+                    <Check size={14} className="text-emerald-600 shrink-0" />
+                    <span>Store Catalog Is 100% Protected</span>
+                  </div>
+                  <p className="text-[11px] text-emerald-800/90 leading-relaxed">
+                    Your final products, product variants, categories, images, coupons, and size guides will <strong>remain completely untouched</strong>.
+                  </p>
+                </div>
+
+                <div className="pt-2">
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-text-secondary mb-1.5">
+                    Type <span className="text-rose-600 font-mono font-black">DELETE</span> to confirm:
+                  </label>
+                  <input
+                    type="text"
+                    value={deleteConfirmInput}
+                    onChange={(e) => setDeleteConfirmInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && deleteConfirmInput.trim().toUpperCase() === 'DELETE' && !isDeletingOrders) {
+                        e.preventDefault();
+                        handleDeleteAllOrders();
+                      }
+                    }}
+                    placeholder="Type DELETE"
+                    className="w-full px-3 py-2 border border-border bg-white text-text-primary text-xs font-mono uppercase focus:outline-none focus:border-rose-500"
+                    disabled={isDeletingOrders}
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-6 mt-6 border-t border-border">
+                <button
+                  type="button"
+                  disabled={isDeletingOrders}
+                  onClick={() => {
+                    setIsDeleteAllOrdersModalOpen(false);
+                    setDeleteConfirmInput('');
+                  }}
+                  className="px-4 py-2.5 border border-border bg-white text-text-primary text-xs font-bold uppercase tracking-widest hover:bg-bg-subtle transition-colors shadow-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={deleteConfirmInput.trim().toUpperCase() !== 'DELETE' || isDeletingOrders}
+                  onClick={handleDeleteAllOrders}
+                  className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold uppercase tracking-widest transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {isDeletingOrders ? (
+                    <>
+                      <Loader2 size={13} className="animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 size={13} />
+                      Confirm Delete All ({recentOrders.length})
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ==========================================
+          DELETE SINGLE ORDER CONFIRMATION MODAL
+          ========================================== */}
+      <AnimatePresence>
+        {orderToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                if (!isDeletingOrders) setOrderToDelete(null);
+              }}
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="relative w-full max-w-md bg-white border border-border p-6 shadow-2xl z-10 flex flex-col"
+            >
+              <div className="flex justify-between items-start border-b border-border pb-3 mb-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-full bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600 shrink-0">
+                    <Trash2 size={16} />
+                  </div>
+                  <div>
+                    <span className="text-[9px] uppercase tracking-widest text-rose-600 font-bold bg-rose-50 px-2 py-0.5 border border-rose-200">
+                      Delete Order
+                    </span>
+                    <h3 className="text-sm font-heading font-black uppercase mt-1 text-text-primary">
+                      Confirm Deletion
+                    </h3>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={isDeletingOrders}
+                  onClick={() => setOrderToDelete(null)}
+                  className="p-1.5 text-text-secondary hover:text-text-primary hover:bg-bg-subtle transition-colors rounded-full"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="space-y-3 text-xs">
+                <p className="text-text-secondary">
+                  Are you sure you want to permanently delete this order and its transaction record?
+                </p>
+                <div className="p-3 bg-bg-subtle border border-border space-y-1 font-mono text-[11px]">
+                  <div>
+                    <span className="text-text-secondary">Ref:</span>{' '}
+                    <span className="font-bold text-text-primary">
+                      #{orderToDelete.order_number || orderToDelete.id.slice(0, 8)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-text-secondary">Customer:</span>{' '}
+                    <span className="font-semibold text-text-primary">
+                      {orderToDelete.profiles?.name || 'Guest'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-text-secondary">Total:</span>{' '}
+                    <span className="font-bold text-text-primary">
+                      ₹{Number(orderToDelete.total || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4 mt-4 border-t border-border">
+                <button
+                  type="button"
+                  disabled={isDeletingOrders}
+                  onClick={() => setOrderToDelete(null)}
+                  className="px-3.5 py-2 border border-border bg-white text-text-primary text-[11px] font-bold uppercase tracking-wider hover:bg-bg-subtle transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isDeletingOrders}
+                  onClick={() => handleDeleteOrder(orderToDelete.id)}
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold uppercase tracking-wider transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {isDeletingOrders ? (
+                    <>
+                      <Loader2 size={12} className="animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 size={12} />
+                      Delete Order
+                    </>
+                  )}
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

@@ -33,7 +33,7 @@ async function dbPost(table: string, body: object) {
     const err = await res.text();
     throw new Error(`DB insert error on ${table}: ${err}`);
   }
-  return res.json();
+  return res.json() as Promise<any>;
 }
 
 async function dbRpc(fn: string, args: object) {
@@ -50,7 +50,7 @@ async function dbRpc(fn: string, args: object) {
     const err = await res.text();
     throw new Error(`RPC error (${fn}): ${err}`);
   }
-  return res.json();
+  return res.json() as Promise<any>;
 }
 
 async function dbPatch(path: string, body: object) {
@@ -68,7 +68,7 @@ async function dbPatch(path: string, body: object) {
     const err = await res.text();
     throw new Error(`DB patch error on ${path}: ${err}`);
   }
-  return res.json();
+  return res.json() as Promise<any>;
 }
 
 async function dbGet(path: string) {
@@ -84,7 +84,7 @@ async function dbGet(path: string) {
     const err = await res.text();
     throw new Error(`DB get error on ${path}: ${err}`);
   }
-  return res.json();
+  return res.json() as Promise<any>;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {

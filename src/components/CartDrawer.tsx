@@ -4,6 +4,7 @@ import { X, Plus, Minus, Trash2, ShoppingBag } from 'lucide-react';
 import { useCartStore } from '../store/useCartStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DUR, EASE, EASE_ENTER } from '../lib/motion';
+import CouponRecommendation from './CouponRecommendation';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -171,6 +172,9 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                   <span className="text-xs font-medium uppercase tracking-wider text-text-secondary">Subtotal</span>
                   <span className="text-base sm:text-lg font-medium text-text-primary">₹{subtotal.toFixed(2)}</span>
                 </div>
+
+                {/* Compact Coupon Recommendation / Upsell */}
+                <CouponRecommendation subtotal={subtotal} compact className="pt-0.5" />
 
                 <p className="text-[11px] text-text-secondary/70 text-center leading-relaxed font-light">
                   Shipping &amp; taxes are calculated at checkout.

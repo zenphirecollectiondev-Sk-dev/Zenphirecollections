@@ -5,6 +5,36 @@
 - At the END of every session (before committing): add a new entry below, newest on top.
 - Never delete old entries — this is the permanent build history.
 
+## [2026-11-01] — Session: Coupon Recommendations & Payment Dispatch Policy Notice
+**What was done:**
+- Added `"Free Size"` option to the SKU variant size selector and sorted variant list in `src/pages/Admin.tsx`.
+- Implemented smart live **Coupon Recommendations** at checkout (`src/components/CouponRecommendation.tsx`):
+  - Eligible coupon recommendations: finds qualified coupons based on subtotal, highlights the highest saving as "Best offer" with exact monetary savings, and provides a 1-click "Apply" button reusing the existing apply logic.
+  - "Almost there" upsell nudge: finds the nearest unlockable coupon threshold (`min_order_value > subtotal`), presents concise copy ("Add ₹X more to unlock [CODE] and save ₹Y"), and displays an accessible Framer Motion progress bar (`role="progressbar"`).
+  - Better-coupon suggestion after coupon application: detects when a higher-tier coupon is close to unlocking and nudges customer ("Add ₹X more to switch to [CODE] and save ₹Y more").
+  - Added live cart recomputation via Zustand and compact variants for the Cart Drawer (`src/components/CartDrawer.tsx`) and Cart page (`src/pages/Cart.tsx`).
+  - Handled loading, empty, and error states silently without breaking checkout flow or altering backend/DB schemas.
+- Implemented **Payment Settlement & Dispatch Policy Notice** (`src/components/PaymentDispatchNotice.tsx`):
+  - Policy: "Payments take up to 2 business days to reflect in our account. Your order will be dispatched once the payment is received. We'll notify you as soon as it ships."
+  - Deployed in multiple customer touchpoints: Checkout page above mobile and desktop "Pay Now" actions, Order Success confirmation receipt, User Account order details drawer, Shipping & Payment Policy page (`src/pages/ShippingReturns.tsx`), and updated footer policy link in `src/App.tsx`.
+  - Built with variants (`compact`, `detailed`, `account`) styled in luxury deep forest green (`#00221A`) and brass gold (`#B8975A`).
+- Clean production build verified via `npm run build` (code 0).
+
+**Files touched:**
+- `src/components/CouponRecommendation.tsx` (new)
+- `src/components/PaymentDispatchNotice.tsx` (new)
+- `src/pages/Checkout.tsx`
+- `src/pages/Account.tsx`
+- `src/pages/ShippingReturns.tsx`
+- `src/pages/Cart.tsx`
+- `src/components/CartDrawer.tsx`
+- `src/App.tsx`
+- `PROGRESS_LOG.md`
+
+**Status:** ✅ Complete — Both features fully implemented, tested, and passing production build cleanly.
+
+---
+
 ## [2026-07-12] — Session: Typography Shift to Avenir Next
 **What was done:**
 - Added `"Avenir Next"` and `"Avenir"` as the primary fonts in the Tailwind CSS configuration's sans-serif font stack.

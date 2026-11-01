@@ -10,6 +10,8 @@ import { DUR, EASE, EASE_ENTER } from '../lib/motion';
 import { useCartStore } from '../store/useCartStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { supabase } from '../lib/supabase';
+import CouponRecommendation from '../components/CouponRecommendation';
+import PaymentDispatchNotice from '../components/PaymentDispatchNotice';
 
 type CheckoutStep = 'SHIPPING' | 'REVIEW' | 'SUCCESS';
 
@@ -244,17 +246,16 @@ export default function Checkout() {
   };
 
   // Handle Coupon Apply — validates against DB (checks is_active + expiry + min_order)
-  const handleApplyCoupon = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const applyCouponByCode = async (codeToApply: string) => {
     setCouponError(null);
     setCouponSuccess(null);
 
-    if (!couponCode.trim()) {
+    if (!codeToApply.trim()) {
       setCouponError('Please enter a coupon code.');
       return;
     }
 
-    const normalizedCode = couponCode.trim().toUpperCase();
+    const normalizedCode = codeToApply.trim().toUpperCase();
 
     try {
       const { data: dbCoupon, error: couponErr } = await supabase
@@ -270,12 +271,13 @@ export default function Checkout() {
         setCouponError('Invalid coupon code or coupon has been deactivated.');
         return;
       }
-      if (new Date() > new Date((dbCoupon as any).expiry)) {
+      if ((dbCoupon as any).expiry && new Date() > new Date((dbCoupon as any).expiry)) {
         setCouponError('This coupon code has expired.');
         return;
       }
-      if (subtotal < ((dbCoupon as any).min_order_value || 0)) {
-        setCouponError(`Minimum order value of ₹${Number((dbCoupon as any).min_order_value).toFixed(2)} is required.`);
+      const minVal = Number((dbCoupon as any).min_order_value) || 0;
+      if (subtotal < minVal) {
+        setCouponError(`Minimum order value of ₹${minVal.toFixed(2)} is required.`);
         return;
       }
 
@@ -284,8 +286,14 @@ export default function Checkout() {
         : (dbCoupon as any).value;
       discountAmount = Math.min(discountAmount, subtotal);
 
-      setAppliedCoupon({ code: normalizedCode, discountType: (dbCoupon as any).discount_type, value: (dbCoupon as any).value });
+      setAppliedCoupon({
+        code: normalizedCode,
+        discountType: (dbCoupon as any).discount_type,
+        value: (dbCoupon as any).value,
+        minOrderValue: minVal,
+      });
       setCouponDiscount(discountAmount);
+      setCouponCode(normalizedCode);
       setCouponSuccess(`Coupon "${normalizedCode}" applied! You save ₹${discountAmount.toFixed(2)}.`);
     } catch (_) {
       setCouponError('Unable to validate coupon. Please check your connection and try again.');
@@ -293,6 +301,29 @@ export default function Checkout() {
       setCouponDiscount(0);
     }
   };
+
+  const handleApplyCoupon = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await applyCouponByCode(couponCode);
+  };
+
+  // Re-verify applied coupon live whenever subtotal changes
+  useEffect(() => {
+    if (!appliedCoupon) return;
+    const minVal = appliedCoupon.minOrderValue || 0;
+    if (subtotal < minVal) {
+      setAppliedCoupon(null);
+      setCouponDiscount(0);
+      setCouponError(`Cart total fell below the ₹${minVal.toFixed(2)} minimum requirement for "${appliedCoupon.code}".`);
+      setCouponSuccess(null);
+    } else {
+      let discountAmount = appliedCoupon.discountType === 'percentage'
+        ? (subtotal * appliedCoupon.value) / 100
+        : appliedCoupon.value;
+      discountAmount = Math.min(discountAmount, subtotal);
+      setCouponDiscount(discountAmount);
+    }
+  }, [subtotal, appliedCoupon]);
 
   // Remove applied coupon
   const handleRemoveCoupon = () => {
@@ -449,6 +480,17 @@ export default function Checkout() {
             setLoading(false);
             setPaymentLoading(false);
             setError('Payment was dismissed. Your cart is preserved — you can resume anytime.');
+            try {
+              fetch('/api/cancel-razorpay-order', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  razorpay_order_id,
+                  reason: 'user_dismissed',
+                }),
+                keepalive: true,
+              }).catch(() => {});
+            } catch {}
           },
         },
         handler: async (response: any) => {
@@ -479,6 +521,17 @@ export default function Checkout() {
         setPaymentLoading(false);
         const reason = response.error?.description || response.error?.reason || 'Payment could not be processed.';
         setError(`Payment failed: ${reason}. Your cart is preserved — please try again with another payment method.`);
+        try {
+          fetch('/api/cancel-razorpay-order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              razorpay_order_id,
+              reason: `payment_failed: ${reason}`,
+            }),
+            keepalive: true,
+          }).catch(() => {});
+        } catch {}
       });
 
       rzp.open();
@@ -1106,6 +1159,15 @@ export default function Checkout() {
                     </p>
                   )}
 
+                  {/* Smart Coupon Recommendations & Upsell Nudge */}
+                  <CouponRecommendation
+                    subtotal={subtotal}
+                    availableCoupons={availableCoupons}
+                    appliedCoupon={appliedCoupon}
+                    currentDiscount={discount}
+                    onApplyCoupon={applyCouponByCode}
+                  />
+
                   {/* Available coupons configured in Admin Console (Dynamic Only) */}
                   {!appliedCoupon && availableCoupons.length > 0 && (
                     <div className="flex items-center gap-1.5 flex-wrap pt-0.5 text-[11px] text-text-secondary">
@@ -1149,7 +1211,8 @@ export default function Checkout() {
                 </div>
 
                 {/* Mobile Direct Pay Action */}
-                <div className="lg:hidden pt-2">
+                <div className="lg:hidden pt-2 space-y-2.5">
+                  <PaymentDispatchNotice variant="compact" />
                   <button
                     type="button"
                     onClick={initializePayment}
@@ -1239,18 +1302,21 @@ export default function Checkout() {
 
               {/* Primary action in sidebar if on review step */}
               {step === 'REVIEW' && (
-                <button
-                  type="button"
-                  onClick={initializePayment}
-                  disabled={loading || paymentLoading}
-                  className="btn w-full h-12 rounded-sm bg-[#00221A] hover:bg-[#063A2C] text-white font-semibold text-xs uppercase tracking-widest transition-all shadow-xs flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading || paymentLoading ? (
-                    <><RefreshCw size={14} className="animate-spin" /> Preparing Payment...</>
-                  ) : (
-                    'Proceed to Payment'
-                  )}
-                </button>
+                <div className="space-y-3">
+                  <PaymentDispatchNotice variant="compact" />
+                  <button
+                    type="button"
+                    onClick={initializePayment}
+                    disabled={loading || paymentLoading}
+                    className="btn w-full h-12 rounded-sm bg-[#00221A] hover:bg-[#063A2C] text-white font-semibold text-xs uppercase tracking-widest transition-all shadow-xs flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loading || paymentLoading ? (
+                      <><RefreshCw size={14} className="animate-spin" /> Preparing Payment...</>
+                    ) : (
+                      'Proceed to Payment'
+                    )}
+                  </button>
+                </div>
               )}
 
               {/* Trust micro-text */}
@@ -1374,6 +1440,9 @@ export default function Checkout() {
                 </p>
               </div>
             </div>
+
+            {/* Payment Settlement & Dispatch Policy Notice */}
+            <PaymentDispatchNotice variant="detailed" />
 
             {/* CTA Buttons */}
             <div className="pt-2 flex flex-col sm:flex-row gap-2.5 sm:gap-3 justify-center items-stretch sm:items-center">

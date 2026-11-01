@@ -33,7 +33,7 @@ async function dbQuery(path: string, options?: RequestInit) {
     const err = await res.text();
     throw new Error(`DB error: ${err}`);
   }
-  return res.json();
+  return res.json() as Promise<any>;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -168,7 +168,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       throw new Error(`Razorpay order creation failed: ${rzpErr}`);
     }
 
-    const rzpOrder = await rzpRes.json();
+    const rzpOrder = (await rzpRes.json()) as any;
 
     // ── Step 7: Pre-create pending order in Supabase as a safety net ──
     let createdOrderId: string | null = null;

@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { ChevronRight, Truck, RefreshCw, Shield, Clock } from "lucide-react";
+import PaymentDispatchNotice from "../components/PaymentDispatchNotice";
 
 export default function ShippingReturns() {
   return (
@@ -7,12 +8,17 @@ export default function ShippingReturns() {
       <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-text-secondary mb-8">
         <Link to="/" className="hover:text-text-primary transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)]">Home</Link>
         <ChevronRight size={10} />
-        <span className="text-text-primary font-bold">Shipping & Returns</span>
+        <span className="text-text-primary font-bold">Shipping, Payment &amp; Returns</span>
       </div>
       <div className="border-b border-border pb-8 mb-10">
         <span className="text-[10px] uppercase tracking-[0.2em] text-text-secondary font-bold">Policies</span>
-        <h1 className="text-3xl font-heading font-black uppercase mt-1 mb-3">Shipping & Returns</h1>
-        <p className="text-sm text-text-secondary">Transparent policies, no surprises.</p>
+        <h1 className="text-3xl font-heading font-black uppercase mt-1 mb-3">Shipping &amp; Payment Policy</h1>
+        <p className="text-sm text-text-secondary">Transparent policies, clear fulfillment timelines, no surprises.</p>
+      </div>
+
+      {/* Prominent Payment Settlement & Dispatch Policy Banner */}
+      <div className="mb-10">
+        <PaymentDispatchNotice variant="detailed" />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
@@ -34,9 +40,17 @@ export default function ShippingReturns() {
 
       <div className="space-y-8">
         <section>
+          <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary mb-4 pb-2 border-b border-border">Payment Settlement &amp; Dispatch Policy</h2>
+          <div className="space-y-3 text-sm text-text-secondary leading-relaxed">
+            <p><strong>Settlement Timeline:</strong> When you complete payment via Razorpay, funds take up to <strong>2 business days</strong> to reflect in our bank account.</p>
+            <p><strong>Dispatch Protocol:</strong> To ensure high fulfillment integrity, your order is prepared, carefully inspected, and dispatched immediately upon receipt of payment in our account.</p>
+            <p><strong>Real-time Tracking:</strong> Once your package is handed over to our courier partner, you will receive an automated tracking notification with your Air Waybill (AWB) number and direct carrier tracking link.</p>
+          </div>
+        </section>
+        <section>
           <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary mb-4 pb-2 border-b border-border">Shipping Policy</h2>
           <div className="space-y-3 text-sm text-text-secondary leading-relaxed">
-            <p>Orders are processed within 1–2 business days of payment confirmation. You will receive an email with your tracking number once your order is dispatched.</p>
+            <p>Orders are dispatched within 1–2 business days of payment confirmation. You will receive an email and SMS with your tracking number once your order is dispatched.</p>
             <p>We ship pan-India via trusted courier partners. Delivery timelines may vary during sale periods or public holidays.</p>
             <p>COD (Cash on Delivery) is currently not available. We accept all digital payment methods.</p>
           </div>
@@ -45,7 +59,7 @@ export default function ShippingReturns() {
           <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary mb-4 pb-2 border-b border-border">Return Policy</h2>
           <div className="space-y-3 text-sm text-text-secondary leading-relaxed">
             <p>Items must be returned within 7 days of the delivery date. All items must be unworn, unwashed, and returned in their original packaging with tags attached.</p>
-            <p>To initiate a return, go to your Account page, select the order, and click "Request Return". Our team will schedule a free pickup within 2 business days.</p>
+            <p>To initiate a return, go to your Account page, select the order, and click &quot;Request Return&quot;. Our team will schedule a free pickup within 2 business days.</p>
             <p>Sale items and customised orders are final sale and not eligible for return or exchange.</p>
           </div>
         </section>

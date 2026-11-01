@@ -7,20 +7,47 @@
 
 interface Props {
   count?: number;
+  viewMode?: "grid" | "list";
 }
 
-export function ProductCardSkeleton({ count = 1 }: Props) {
+export function ProductCardSkeleton({ count = 1, viewMode = "grid" }: Props) {
+  if (viewMode === "list") {
+    return (
+      <>
+        {Array.from({ length: count }).map((_, i) => (
+          <div
+            key={i}
+            className="animate-pulse flex flex-col rounded-xl overflow-hidden border border-border/60 bg-white w-full min-w-0"
+            aria-hidden="true"
+          >
+            {/* Tall image placeholder */}
+            <div className="relative aspect-[3/4] sm:aspect-[4/5] w-full bg-neutral-100" />
+            {/* Content placeholders below image */}
+            <div className="px-4 pt-3.5 pb-4 space-y-2">
+              <div className="h-4 w-3/4 bg-neutral-200 rounded" />
+              <div className="h-4 w-1/3 bg-neutral-200 rounded" />
+              <div className="flex gap-1 mt-1">
+                {[1, 2, 3].map(j => (
+                  <div key={j} className="h-5 w-7 bg-neutral-100 rounded" />
+                ))}
+              </div>
+            </div>
+          </div>
+        ))}
+      </>
+    );
+  }
+
   return (
     <>
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="animate-pulse" aria-hidden="true">
+        <div key={i} className="animate-pulse flex flex-col w-full min-w-0" aria-hidden="true">
           {/* Image placeholder — matches aspect-[3/4] of real card */}
-          <div className="aspect-[3/4] w-full bg-zinc-100 border border-black/[0.04] mb-3 sm:mb-3.5 rounded-[2px]" />
-          {/* Text placeholders */}
-          <div className="space-y-2">
-            <div className="h-2.5 w-16 bg-zinc-100 rounded" />
-            <div className="h-4 w-3/4 bg-zinc-200 rounded" />
-            <div className="h-4 w-1/4 bg-zinc-200 rounded" />
+          <div className="relative aspect-[3/4] w-full overflow-hidden rounded-lg bg-neutral-100" />
+          {/* Text placeholders matching card pt-3.5 text block */}
+          <div className="pt-3.5 space-y-2 w-full min-w-0">
+            <div className="h-4 w-3/4 bg-neutral-200 rounded" />
+            <div className="h-4 w-1/4 bg-neutral-200 rounded" />
           </div>
         </div>
       ))}
