@@ -1,6 +1,8 @@
 import { useEffect, useState, useMemo } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation, NavLink } from 'react-router-dom';
-import { ShoppingBag, Heart, User, Search, Shield, LogOut, Menu, X, ChevronDown, ArrowRight } from 'lucide-react';
+import { ShoppingBag, Heart, User, Search, Shield, LogOut, Menu, X, ChevronDown, ArrowRight, MapPin } from 'lucide-react';
+import { SUPPORT_EMAIL, SUPPORT_PHONE, INSTAGRAM_URL, INSTAGRAM_HANDLE, ADDRESS_LINES } from './config/siteInfo';
+import InstagramIcon from './components/ui/InstagramIcon';
 import { useAuthStore } from './store/useAuthStore';
 import { useCartStore } from './store/useCartStore';
 import { useWishlistStore } from './store/useWishlistStore';
@@ -337,47 +339,86 @@ function AppContent() {
         <footer className="relative ambient-green-gradient border-t border-white/10 mt-auto text-white shadow-[0_-8px_30px_rgba(0,0,0,0.15)] overflow-hidden">
           {/* Subtle gold line on top */}
           <div className="absolute top-0 left-0 right-0 h-[1px] gold-accent-line opacity-70" />
-          
+
           <div className="max-w-7xl mx-auto px-6 lg:px-8 py-16">
             <div className="grid grid-cols-1 md:grid-cols-12 gap-12 md:gap-8">
-              
+
               {/* Brand Section */}
-              <div className="md:col-span-6 lg:col-span-5 space-y-6">
+              <div className="md:col-span-6 lg:col-span-4 space-y-5">
                 <h3 className="font-heading text-2xl md:text-3xl tracking-[0.15em] text-accent-gold uppercase zenphire-title-animated" style={{ animationDuration: '8s' }}>
                   Zenphire
                 </h3>
                 <p className="text-white/70 text-sm max-w-sm leading-relaxed font-sans">
                   Premium modern apparel. Redefining minimal fashion for the everyday wardrobe with precision cuts and artisan craftsmanship.
                 </p>
-                <div className="pt-2">
+                {/* Instagram Link */}
+                <div className="pt-1">
+                  <a
+                    href={INSTAGRAM_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Zenphire on Instagram"
+                    className="inline-flex items-center gap-2 text-xs font-semibold text-accent-gold hover:text-white transition-colors"
+                  >
+                    <InstagramIcon size={16} className="text-accent-gold" />
+                    <span>{INSTAGRAM_HANDLE}</span>
+                  </a>
+                </div>
+                <div className="pt-1">
                   <p className="text-[10px] md:text-xs uppercase tracking-widest text-white/40 font-semibold">Elevate your essentials.</p>
                 </div>
               </div>
-              
-              {/* Spacer for large screens */}
-              <div className="hidden lg:block lg:col-span-1"></div>
+
+              {/* Address Section */}
+              <div className="md:col-span-6 lg:col-span-3 space-y-3">
+                <h4 className="font-heading text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] mb-4 text-accent-gold flex items-center gap-1.5">
+                  <MapPin size={13} className="text-accent-gold" />
+                  <span>Store</span>
+                </h4>
+                <address className="not-italic text-xs text-white/70 space-y-1 leading-relaxed">
+                  {ADDRESS_LINES.map((line, idx) => (
+                    <div key={idx}>{line}</div>
+                  ))}
+                </address>
+                <div className="pt-2 text-[11px] text-white/60 space-y-1">
+                  <span className="text-white/40 block text-[10px] uppercase tracking-wider mb-0.5">Customer Support:</span>
+                  <div>
+                    <a href={`mailto:${SUPPORT_EMAIL}`} className="text-accent-gold hover:underline">
+                      {SUPPORT_EMAIL}
+                    </a>
+                  </div>
+                  <div>
+                    <a href={`tel:+91${SUPPORT_PHONE}`} className="text-white/70 hover:text-accent-gold transition-colors">
+                      +91 {SUPPORT_PHONE}
+                    </a>
+                  </div>
+                </div>
+              </div>
 
               {/* Links Sections */}
-              <div className="md:col-span-3">
-                <h4 className="font-heading text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] mb-6 text-accent-gold">Customer Care</h4>
-                <ul className="space-y-4 text-sm text-white/70 font-medium">
+              <div className="md:col-span-3 lg:col-span-2">
+                <h4 className="font-heading text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] mb-4 text-accent-gold">Customer Care</h4>
+                <ul className="space-y-3 text-sm text-white/70 font-medium">
                   <li><Link to="/contact" className="inline-block hover:text-white transition-colors duration-200">Contact Us</Link></li>
-                  <li><Link to="/faq" className="inline-block hover:text-white transition-colors duration-200">Help & FAQ</Link></li>
-                  <li><Link to="/shipping" className="inline-block hover:text-white transition-colors duration-200">Shipping & Payment Policy</Link></li>
+                  <li><Link to="/faq" className="inline-block hover:text-white transition-colors duration-200">Help &amp; FAQ</Link></li>
+                  <li><Link to="/shipping" className="inline-block hover:text-white transition-colors duration-200">Shipping &amp; Policy</Link></li>
                 </ul>
               </div>
-              
-              <div className="md:col-span-3">
-                <h4 className="font-heading text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] mb-6 text-accent-gold">Legal</h4>
-                <ul className="space-y-4 text-sm text-white/70 font-medium">
+
+              <div className="md:col-span-3 lg:col-span-3">
+                <h4 className="font-heading text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] mb-4 text-accent-gold">Legal &amp; Policy</h4>
+                <ul className="space-y-3 text-sm text-white/70 font-medium">
                   <li><Link to="/privacy" className="inline-block hover:text-white transition-colors duration-200">Privacy Policy</Link></li>
                   <li><Link to="/terms" className="inline-block hover:text-white transition-colors duration-200">Terms of Service</Link></li>
                 </ul>
+                <div className="mt-4 pt-3 border-t border-white/10 text-[11px] text-white/50 leading-relaxed">
+                  Complimentary Free Shipping • No Returns, No Exchanges. All sales are final.
+                </div>
               </div>
-              
+
             </div>
           </div>
-          
+
           {/* Bottom Bar */}
           <div className="border-t border-white/5 bg-black/20">
             <div className="max-w-7xl mx-auto px-6 lg:px-8 py-6 flex flex-col md:flex-row justify-between items-center gap-4">
@@ -480,15 +521,15 @@ function MobileMenuDrawer({ onClose, openSections, toggleSection, wishlistCount,
 
     const occasionItems = (occasions && occasions.length > 0)
       ? occasions.map(occ => ({
-          name: occ.name,
-          to: `/shop?occasion=${occ.slug}`
-        }))
+        name: occ.name,
+        to: `/shop?occasion=${occ.slug}`
+      }))
       : [
-          { name: 'Casuals', to: '/shop?occasion=casuals' },
-          { name: 'Formal', to: '/shop?occasion=formal' },
-          { name: 'Ethnic', to: '/shop?occasion=ethnic' },
-          { name: 'Party Wear', to: '/shop?occasion=party-wear' },
-        ];
+        { name: 'Casuals', to: '/shop?occasion=casuals' },
+        { name: 'Formal', to: '/shop?occasion=formal' },
+        { name: 'Ethnic', to: '/shop?occasion=ethnic' },
+        { name: 'Party Wear', to: '/shop?occasion=party-wear' },
+      ];
 
     return [
       {

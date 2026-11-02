@@ -677,6 +677,16 @@ export default function ProductDetail() {
               </button>
             </div>
 
+            {/* Policy & Shipping Trust Note */}
+            <div className="pt-3 border-t border-border/60 text-center space-y-1">
+              <p className="text-[11px] font-medium text-text-primary">
+                Complimentary Free Shipping on all orders
+              </p>
+              <p className="text-[10px] text-text-secondary">
+                No Returns, No Exchanges. All sales are final.
+              </p>
+            </div>
+
 
           </div>
         </div>

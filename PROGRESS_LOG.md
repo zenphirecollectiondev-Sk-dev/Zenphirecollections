@@ -5,6 +5,38 @@
 - At the END of every session (before committing): add a new entry below, newest on top.
 - Never delete old entries — this is the permanent build history.
 
+## [2026-11-02] — Session: Central Site Config, Free Shipping & Final Sale Policy Updates
+**What was done:**
+- Created central site configuration in `src/config/siteInfo.ts` exporting `SUPPORT_EMAIL` (`Zenphirecollection@gmail.com`), `SUPPORT_PHONE` (`8643000097`), `INSTAGRAM_URL`, `INSTAGRAM_HANDLE`, and `ADDRESS_LINES`.
+- Created accessible SVG icon component in `src/components/ui/InstagramIcon.tsx`.
+- Updated all storefront locations to enforce "Complimentary Free Shipping on all products" across India:
+  - Set `shippingCost = 0` in `api/create-razorpay-order.ts`.
+  - Set display & cart shipping to 0 in `src/pages/Cart.tsx`, `src/pages/Checkout.tsx`, and `src/components/CartDrawer.tsx`.
+  - Removed threshold requirements from UI text across cart, checkout, FAQs, and policies.
+- Implemented "No Returns, No Exchanges. All sales are final" policy text across `ProductDetail.tsx`, `Cart.tsx`, `CartDrawer.tsx`, `Checkout.tsx`, `FAQ.tsx`, `Terms.tsx`, and `ShippingReturns.tsx`.
+- Updated contact details, Instagram handles/links, address blocks, and highlighted support email placeholders across `App.tsx` footer, `ContactUs.tsx`, `FAQ.tsx`, `Terms.tsx`, and `PrivacyPolicy.tsx`.
+- Verified clean build via `npm run build` (code 0).
+
+**Files touched:**
+- `src/config/siteInfo.ts` (new)
+- `src/components/ui/InstagramIcon.tsx` (new)
+- `api/create-razorpay-order.ts`
+- `src/pages/Cart.tsx`
+- `src/components/CartDrawer.tsx`
+- `src/pages/Checkout.tsx`
+- `src/pages/ContactUs.tsx`
+- `src/pages/ShippingReturns.tsx`
+- `src/pages/FAQ.tsx`
+- `src/pages/Terms.tsx`
+- `src/pages/PrivacyPolicy.tsx`
+- `src/pages/ProductDetail.tsx`
+- `src/App.tsx`
+- `PROGRESS_LOG.md`
+
+**Status:** ✅ Complete — all site-wide content and policy updates verified and passing production build.
+
+---
+
 ## [2026-11-01] — Session: Coupon Recommendations & Payment Dispatch Policy Notice
 **What was done:**
 - Added `"Free Size"` option to the SKU variant size selector and sorted variant list in `src/pages/Admin.tsx`.

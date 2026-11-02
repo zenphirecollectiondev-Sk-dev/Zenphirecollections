@@ -116,7 +116,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // ── Step 4: Compute shipping & final total ──
     const afterDiscount = subtotal - discountAmount;
-    const shippingCost = afterDiscount > 0 && afterDiscount <= 1000 ? 150 : 0;
+    const shippingCost = 0; // Free shipping on all products
     const total = Math.max(0, afterDiscount + shippingCost);
     const totalPaise = Math.round(total * 100); // Razorpay uses paise
 

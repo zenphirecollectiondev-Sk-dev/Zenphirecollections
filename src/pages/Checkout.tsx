@@ -185,10 +185,8 @@ export default function Checkout() {
   }, [appliedCoupon, couponDiscount]);
 
   const shipping = useMemo(() => {
-    const remaining = subtotal - discount;
-    if (remaining <= 0) return 0;
-    return remaining > 1000 ? 0 : 150;
-  }, [subtotal, discount]);
+    return 0; // Complimentary free shipping on all orders
+  }, []);
 
   const total = useMemo(() => {
     const val = subtotal - discount + shipping;
@@ -760,11 +758,7 @@ export default function Checkout() {
                   )}
                   <div className="flex justify-between text-text-secondary">
                     <span>Shipping</span>
-                    {shipping === 0 ? (
-                      <span className="text-emerald-600 font-semibold uppercase text-[11px]">Free</span>
-                    ) : (
-                      <span className="text-text-primary font-medium">₹{shipping.toFixed(2)}</span>
-                    )}
+                    <span className="text-emerald-600 font-semibold uppercase text-[11px]">Free</span>
                   </div>
                 </div>
               </motion.div>
@@ -1225,6 +1219,9 @@ export default function Checkout() {
                       `Pay ₹${total.toFixed(2)} via Razorpay`
                     )}
                   </button>
+                  <p className="text-[10px] text-text-secondary/70 text-center pt-0.5">
+                    Free Shipping • All sales are final (No Returns, No Exchanges)
+                  </p>
                 </div>
               </motion.div>
             )}
@@ -1283,11 +1280,7 @@ export default function Checkout() {
 
                 <div className="flex justify-between text-text-secondary">
                   <span>Shipping</span>
-                  {shipping === 0 ? (
-                    <span className="text-emerald-700 font-semibold uppercase text-[11px]">Free</span>
-                  ) : (
-                    <span className="text-text-primary font-medium">₹{shipping.toFixed(2)}</span>
-                  )}
+                  <span className="text-emerald-700 font-semibold uppercase text-[11px]">Free</span>
                 </div>
 
                 <div className="pt-3 border-t border-border/60 flex justify-between items-baseline">
@@ -1324,6 +1317,9 @@ export default function Checkout() {
                 <ShieldCheck size={12} className="text-emerald-600" />
                 <span>Encrypted 256-Bit SSL Checkout</span>
               </div>
+              <p className="text-[10px] text-text-secondary/70 text-center">
+                Free Shipping • All sales are final (No Returns, No Exchanges)
+              </p>
             </div>
           </aside>
         </div>

@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { ChevronRight, Shield, Lock, Eye, FileText } from "lucide-react";
+import { SUPPORT_EMAIL } from "../config/siteInfo";
 
 export default function PrivacyPolicy() {
   return (
@@ -88,10 +89,16 @@ export default function PrivacyPolicy() {
 
           <section>
             <h2 className="text-lg font-heading text-accent-gold uppercase tracking-wider mb-3 flex items-center gap-2">
-              <FileText size={18} /> 5. Your Rights & Contact
+              <FileText size={18} /> 5. Your Rights &amp; Contact
             </h2>
             <p>
-              You have the right to request access to your personal data, request corrections, or request deletion of your account. For any privacy-related inquiries, please contact our support team at <a href="mailto:privacy@zenphire.com" className="text-accent-gold hover:underline">privacy@zenphire.com</a>.
+              You have the right to request access to your personal data, request corrections, or request deletion of your account. For any privacy-related inquiries, please contact our support team at {SUPPORT_EMAIL ? (
+                <a href={`mailto:${SUPPORT_EMAIL}`} className="text-accent-gold hover:underline">{SUPPORT_EMAIL}</a>
+              ) : (
+                <span className="px-2 py-0.5 rounded bg-accent-gold/20 text-accent-gold font-mono text-xs border border-accent-gold/30">
+                  [Support Email]
+                </span>
+              )}.
             </p>
           </section>
         </div>

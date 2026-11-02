@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
-import { ChevronRight, Scale, CheckCircle2, AlertCircle } from "lucide-react";
+import { ChevronRight, Scale, CheckCircle2, AlertCircle, MapPin, Truck } from "lucide-react";
+import { SUPPORT_EMAIL, ADDRESS_LINES } from "../config/siteInfo";
 
 export default function Terms() {
   return (
@@ -35,20 +36,32 @@ export default function Terms() {
 
           <section>
             <h2 className="text-lg font-heading text-accent-gold uppercase tracking-wider mb-3 flex items-center gap-2">
-              <CheckCircle2 size={18} /> 2. Product Availability & Pricing
+              <CheckCircle2 size={18} /> 2. Product Availability &amp; Pricing
             </h2>
             <p className="mb-2">
               All product prices are listed in INR (₹) and include applicable taxes. We reserve the right to alter pricing, modify product descriptions, or discontinue items at any time without notice.
             </p>
             <ul className="list-disc list-inside space-y-1 text-white/70 pl-2">
-              <li>In the rare event of a pricing error or inventory discrepancy, we reserve the right to cancel affected orders with a full refund.</li>
+              <li>In the rare event of a pricing error or inventory discrepancy, we reserve the right to cancel affected orders.</li>
               <li>Product colors shown online may vary slightly depending on display monitor settings.</li>
             </ul>
           </section>
 
           <section>
             <h2 className="text-lg font-heading text-accent-gold uppercase tracking-wider mb-3 flex items-center gap-2">
-              <CheckCircle2 size={18} /> 3. Orders & Payment
+              <Truck size={18} /> 3. Shipping &amp; Final Sale Policy
+            </h2>
+            <p className="mb-2">
+              We provide complimentary free standard shipping on all products across India with no minimum purchase requirement.
+            </p>
+            <p className="text-white/90 font-medium">
+              <strong>No Returns, No Exchanges. All sales are final.</strong> Zenphire operates under a strict final sale policy. We do not accept returns, offer size exchanges, or issue refunds for any purchased items. Please inspect sizing details and garment descriptions prior to placing an order.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-lg font-heading text-accent-gold uppercase tracking-wider mb-3 flex items-center gap-2">
+              <CheckCircle2 size={18} /> 4. Orders &amp; Payment
             </h2>
             <p>
               When placing an order, you warrant that all information provided is true and accurate. Orders are subject to acceptance and stock availability. We accept major Credit/Debit Cards, UPI, Net Banking, and Wallets. Order confirmation does not guarantee immediate stock allocation until payment validation is complete.
@@ -57,7 +70,7 @@ export default function Terms() {
 
           <section>
             <h2 className="text-lg font-heading text-accent-gold uppercase tracking-wider mb-3 flex items-center gap-2">
-              <CheckCircle2 size={18} /> 4. Intellectual Property
+              <CheckCircle2 size={18} /> 5. Intellectual Property
             </h2>
             <p>
               All content on this site—including logos, product designs, imagery, text, code, and graphical layouts—is the exclusive intellectual property of Zenphire Collections. Unauthorized reproduction or commercial use without written permission is strictly prohibited.
@@ -66,7 +79,7 @@ export default function Terms() {
 
           <section>
             <h2 className="text-lg font-heading text-accent-gold uppercase tracking-wider mb-3 flex items-center gap-2">
-              <AlertCircle size={18} /> 5. Limitation of Liability
+              <AlertCircle size={18} /> 6. Limitation of Liability
             </h2>
             <p>
               Zenphire Collections shall not be liable for indirect, incidental, or consequential damages resulting from the use of our services or delay in shipment caused by unforeseen third-party logistics events (force majeure).
@@ -75,11 +88,25 @@ export default function Terms() {
 
           <section>
             <h2 className="text-lg font-heading text-accent-gold uppercase tracking-wider mb-3 flex items-center gap-2">
-              <Scale size={18} /> 6. Governing Law & Contact
+              <Scale size={18} /> 7. Governing Law &amp; Operational Address
             </h2>
-            <p>
-              These Terms shall be governed and construed in accordance with the laws of India. For any disputes or questions regarding these Terms, please reach out to <a href="mailto:legal@zenphire.com" className="text-accent-gold hover:underline">legal@zenphire.com</a>.
+            <p className="mb-3">
+              These Terms shall be governed and construed in accordance with the laws of India. For any disputes or questions regarding these Terms, please reach out to {SUPPORT_EMAIL ? (
+                <a href={`mailto:${SUPPORT_EMAIL}`} className="text-accent-gold hover:underline">{SUPPORT_EMAIL}</a>
+              ) : (
+                <span className="px-2 py-0.5 rounded bg-accent-gold/20 text-accent-gold font-mono text-xs border border-accent-gold/30">
+                  [Support Email]
+                </span>
+              )}.
             </p>
+            <div className="pt-2 border-t border-accent-gold/15 flex items-start gap-3 text-xs text-white/70">
+              <MapPin size={16} className="text-accent-gold flex-shrink-0 mt-0.5" />
+              <address className="not-italic space-y-0.5">
+                {ADDRESS_LINES.map((line, idx) => (
+                  <div key={idx}>{line}</div>
+                ))}
+              </address>
+            </div>
           </section>
         </div>
       </div>

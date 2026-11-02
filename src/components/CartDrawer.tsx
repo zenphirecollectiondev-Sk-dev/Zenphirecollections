@@ -177,7 +177,7 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                 <CouponRecommendation subtotal={subtotal} compact className="pt-0.5" />
 
                 <p className="text-[11px] text-text-secondary/70 text-center leading-relaxed font-light">
-                  Shipping &amp; taxes are calculated at checkout.
+                  Free shipping on all orders • No Returns, No Exchanges. All sales are final.
                 </p>
 
                 <div>

@@ -9,8 +9,7 @@ export default function Cart() {
   const { items, removeItem, updateQuantity } = useCartStore();
 
   const subtotal = items.reduce((acc, item) => acc + item.price * item.quantity, 0);
-  const shipping = subtotal > 1000 ? 0 : 150;
-  const total = subtotal + shipping;
+  const total = subtotal;
   const totalItems = items.reduce((acc, item) => acc + item.quantity, 0);
 
   return (
@@ -141,18 +140,8 @@ export default function Cart() {
 
                 <div className="flex justify-between text-text-secondary">
                   <span>Shipping</span>
-                  {shipping === 0 ? (
-                    <span className="font-semibold text-emerald-700 uppercase text-[11px]">Free</span>
-                  ) : (
-                    <span className="font-medium text-text-primary">₹{shipping.toFixed(2)}</span>
-                  )}
+                  <span className="font-semibold text-emerald-700 uppercase text-[11px]">Free</span>
                 </div>
-
-                {shipping > 0 && (
-                  <p className="text-[11px] text-text-secondary/80 leading-relaxed pt-1 border-t border-border/40">
-                    Add ₹{(1000 - subtotal).toFixed(2)} more to qualify for complimentary shipping.
-                  </p>
-                )}
 
                 {/* Smart Coupon Nudge */}
                 <CouponRecommendation subtotal={subtotal} compact className="pt-1" />
@@ -161,6 +150,10 @@ export default function Cart() {
                   <span className="font-semibold uppercase text-xs tracking-wider text-text-primary">Estimated Total</span>
                   <span className="text-xl font-medium text-text-primary">₹{total.toFixed(2)}</span>
                 </div>
+
+                <p className="text-[10px] text-text-secondary/80 text-center pt-1">
+                  Complimentary Free Shipping • No Returns, No Exchanges. All sales are final.
+                </p>
               </div>
 
               <div className="pt-2 space-y-3">
